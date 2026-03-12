@@ -1580,7 +1580,16 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                         userMessage,
                         assistantMessage,
                         clientRequestId: generationId,
-                        provider: resolvedProvider,
+                        provider: {
+                            ...resolvedProvider,
+                            ...(resolvedProvider.type === 'google'
+                                ? {
+                                    streamOptions: {
+                                        streamGeminiThoughts: DBState.db.streamGeminiThoughts,
+                                    },
+                                }
+                                : {}),
+                        },
                         outputMutators: {
                             presetEditOutputRegex: serverSafePresetEditOutputRegex,
                         },

@@ -19,6 +19,9 @@ export type ResolvedServerProvider = {
         body: Record<string, any>
         stream: boolean
     }
+    streamOptions?: {
+        streamGeminiThoughts?: boolean
+    }
 }
 
 type PolicyState = {

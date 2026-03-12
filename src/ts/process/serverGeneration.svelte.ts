@@ -873,6 +873,9 @@ export async function submitServerGenerationJob(payload: {
             body: Record<string, any>
             stream: boolean
         }
+        streamOptions?: {
+            streamGeminiThoughts?: boolean
+        }
     }
     outputMutators?: {
         presetEditOutputRegex?: ServerSafePresetEditOutputRegex[]

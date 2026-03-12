@@ -55,11 +55,20 @@ function validateProviderRequest(provider) {
 async function runProviderRequest(provider, handlers) {
     switch (provider.type) {
         case 'openai-compatible':
-            return runOpenAiCompatibleRequest(provider.request ?? {}, handlers);
+            return runOpenAiCompatibleRequest({
+                ...(provider.request ?? {}),
+                ...(provider.streamOptions ? { streamOptions: provider.streamOptions } : {}),
+            }, handlers);
         case 'anthropic':
-            return runAnthropicRequest(provider.request ?? {}, handlers);
+            return runAnthropicRequest({
+                ...(provider.request ?? {}),
+                ...(provider.streamOptions ? { streamOptions: provider.streamOptions } : {}),
+            }, handlers);
         case 'google':
-            return runGoogleRequest(provider.request ?? {}, handlers);
+            return runGoogleRequest({
+                ...(provider.request ?? {}),
+                ...(provider.streamOptions ? { streamOptions: provider.streamOptions } : {}),
+            }, handlers);
         default:
             throw new Error(`Unsupported provider type: ${provider.type}`);
     }

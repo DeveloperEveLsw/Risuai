@@ -50,32 +50,101 @@ async function* iterateGoogleSse(body, abortSignal) {
     }
 }
 
-function serializeGoogleText(state) {
-    if (!state.thoughts) {
-        return state.content;
-    }
-    return `<Thoughts>\n\n${state.thoughts}\n\n</Thoughts>\n\n${state.content}`;
+function initGoogleStreamState(state = {}) {
+    return {
+        thoughts: state.thoughts || '',
+        lastThought: state.lastThought || '',
+        content: state.content || '',
+        toolCalls: Array.isArray(state.toolCalls) ? state.toolCalls : [],
+        signText: state.signText || '',
+        signFunction: state.signFunction || '',
+        usageMetadata: state.usageMetadata || null,
+        modelStatus: state.modelStatus || null,
+    };
 }
 
-function applyGoogleParts(state, parts) {
-    for (const part of parts) {
-        if (typeof part?.text !== 'string' || part.text.length === 0) {
-            continue;
+function appendGoogleParts(state, parts) {
+    for (const part of parts ?? []) {
+        if (typeof part?.text === 'string' && part.text.length > 0) {
+            state.thoughts += state.lastThought;
+            state.lastThought = '';
+
+            if (part.thought) {
+                state.lastThought = part.text;
+            }
+            else {
+                state.content += part.text;
+            }
+
+            if (part.thoughtSignature) {
+                state.signText = part.thoughtSignature;
+            }
         }
 
-        if (part?.thought) {
-            state.thoughts += part.text;
-            continue;
+        if (part?.functionCall) {
+            state.toolCalls.push(part.functionCall);
+            if (part?.thoughtSignature) {
+                state.signFunction = part.thoughtSignature;
+            }
         }
-
-        state.content += part.text;
     }
 
     return state;
 }
 
-function extractGoogleParts(payload) {
-    return payload?.candidates?.[0]?.content?.parts ?? [];
+function applyGoogleChunk(state, payload) {
+    const parts = payload?.candidates?.[0]?.content?.parts ?? [];
+    appendGoogleParts(state, parts);
+
+    if (payload?.usageMetadata) {
+        state.usageMetadata = payload.usageMetadata;
+    }
+    if (payload?.modelStatus) {
+        state.modelStatus = payload.modelStatus;
+    }
+
+    return state;
+}
+
+function serializeGoogleStreamState(state, options = {}) {
+    const prefix = options.prefix ? `${options.prefix}\n\n` : '';
+    const thoughts = state.thoughts || '';
+    const lastThought = state.lastThought || '';
+    const content = state.content || '';
+
+    if (options.streamGeminiThoughts) {
+        return prefix
+            + (thoughts ? `<Thoughts>\n\n${thoughts}\n\n</Thoughts>\n\n` : '')
+            + (lastThought ? `${lastThought}\n\n` : '')
+            + content;
+    }
+
+    return prefix
+        + (thoughts + lastThought ? `<Thoughts>\n\n${thoughts + lastThought}\n\n</Thoughts>\n\n` : '')
+        + content;
+}
+
+function processGoogleTextResponse(items) {
+    const thoughts = items.filter((item) => item?.thought).map((item) => item.text).join('\n\n');
+    const content = items.filter((item) => !item?.thought).map((item) => item.text).join('\n\n');
+    return (thoughts ? `<Thoughts>\n\n${thoughts}\n\n</Thoughts>\n\n` : '') + content;
+}
+
+function collectGoogleTextItems(payload, items) {
+    const parts = payload?.candidates?.[0]?.content?.parts ?? [];
+    for (const part of parts) {
+        if (typeof part?.text === 'string' && part.text.length > 0) {
+            items.push({
+                text: part.text,
+                thought: !!part.thought,
+            });
+        }
+    }
+    return items;
+}
+
+function extractGoogleModel(payload, request) {
+    return payload?.modelVersion ?? payload?.model ?? request?.body?.model ?? null;
 }
 
 function isGoogleStreamingRequest(request) {
@@ -102,13 +171,15 @@ async function runGoogleRequest(request, handlers) {
 
     if (!isGoogleStreamingRequest(request)) {
         const payload = await response.json();
-        const state = applyGoogleParts({ thoughts: '', content: '' }, extractGoogleParts(payload));
-        const text = serializeGoogleText(state);
+        const payloads = Array.isArray(payload) ? payload : [payload];
+        const items = payloads.flatMap((entry) => collectGoogleTextItems(entry, []));
+        const text = processGoogleTextResponse(items);
         if (text) {
             await handlers.onText(text);
         }
+        const lastPayload = payloads[payloads.length - 1] ?? payload;
         return {
-            model: payload?.modelVersion ?? null,
+            model: extractGoogleModel(lastPayload, request),
             raw: payload,
             finalText: text,
         };
@@ -118,20 +189,18 @@ async function runGoogleRequest(request, handlers) {
         throw new Error('Upstream stream body missing');
     }
 
-    const state = {
-        thoughts: '',
-        content: '',
-    };
+    const state = initGoogleStreamState();
+    const streamOptions = request?.streamOptions ?? {};
 
     for await (const chunk of iterateGoogleSse(response.body, handlers.abortSignal)) {
-        applyGoogleParts(state, extractGoogleParts(chunk));
-        await handlers.onText(serializeGoogleText(state), chunk);
+        applyGoogleChunk(state, chunk);
+        await handlers.onText(serializeGoogleStreamState(state, streamOptions), chunk);
     }
 
     return {
         model: null,
         raw: null,
-        finalText: serializeGoogleText(state),
+        finalText: serializeGoogleStreamState(state, streamOptions),
     };
 }
 
