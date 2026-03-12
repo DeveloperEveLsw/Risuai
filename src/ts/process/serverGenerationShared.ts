@@ -62,13 +62,34 @@ function normalizeHeaders(headers: Record<string, string> = {}) {
     return normalized
 }
 
+export function inferPreparedRequestStream(request: PreparedServerProviderRequest | null | undefined) {
+    if (!request) {
+        return false
+    }
+
+    if (request.stream === true) {
+        return true
+    }
+
+    const url = request.url?.toLowerCase() ?? ''
+    if (url.includes('alt=sse') || url.includes(':streamgeneratecontent')) {
+        return true
+    }
+
+    if (request.body?.stream === true) {
+        return true
+    }
+
+    return false
+}
+
 function normalizeRequest(request: PreparedServerProviderRequest): ResolvedServerProvider['request'] {
     return {
         url: request.url,
         method: request.method ?? 'POST',
         headers: cloneValue(request.headers ?? {}),
         body: cloneValue(request.body ?? {}),
-        stream: request.stream !== false,
+        stream: inferPreparedRequestStream(request),
     }
 }
 

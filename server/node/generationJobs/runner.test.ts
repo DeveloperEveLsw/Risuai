@@ -340,4 +340,104 @@ describe('GenerationRunner', () => {
         }))
         expect(chatService.patchChatDocument).toHaveBeenCalled()
     })
+
+    test('run treats Gemini SSE urls as streaming even when the request stream flag is false', async () => {
+        const encoder = new TextEncoder()
+        global.fetch = vi.fn(async () => {
+            return new Response(new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode('data: {"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}\n\n'))
+                    controller.enqueue(encoder.encode('data: {"candidates":[{"content":{"parts":[{"text":" world"}]}}]}\n\n'))
+                    controller.close()
+                },
+            }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                },
+            })
+        }) as typeof fetch
+
+        let sequence = 0
+        const patches: string[] = []
+        const job = {
+            job_id: 'job-1',
+            status: 'queued',
+            session_key: 'session-1',
+            request_payload: {
+                provider: {
+                    type: 'google',
+                    request: {
+                        url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0:streamGenerateContent?alt=sse',
+                        method: 'POST',
+                        headers: {},
+                        body: {
+                            contents: [],
+                        },
+                        stream: false,
+                    },
+                },
+                target: {
+                    characterId: 'character-1',
+                    chatId: 'chat-1',
+                    assistantMessageChatId: 'assistant-1',
+                },
+            },
+        }
+
+        const jobRepository = {
+            getJob: vi.fn(async () => ({ ...job, cancel_requested_at: null })),
+            updateJobStatus: vi.fn(async (_jobId, status, patch) => ({
+                ...job,
+                status,
+                ...patch,
+            })),
+            appendEvent: vi.fn(async () => ({
+                sequence_no: ++sequence,
+            })),
+        }
+
+        const chatService = {
+            patchChatDocument: vi.fn(async ({ mutate }) => {
+                const chatPayload = {
+                    message: [
+                        { role: 'char', data: '', chatId: 'assistant-1' },
+                    ],
+                    isStreaming: false,
+                }
+                mutate(chatPayload)
+                patches.push(chatPayload.message[0].data)
+                return {
+                    document: {
+                        revision: sequence + 1,
+                    },
+                }
+            }),
+            constructor: {
+                ensureMessageArray(chatPayload) {
+                    chatPayload.message ??= []
+                    return chatPayload.message
+                },
+            },
+        }
+
+        const runner = new GenerationRunner({
+            jobRepository,
+            chatService,
+            eventHub: {
+                publish: vi.fn(),
+            },
+        })
+
+        await runner.run(job.job_id)
+
+        expect(patches).toContain('hello')
+        expect(patches).toContain('hello world')
+        expect(jobRepository.updateJobStatus).toHaveBeenCalledWith(job.job_id, 'completed', expect.objectContaining({
+            resultPayload: {
+                text: 'hello world',
+                model: null,
+            },
+        }))
+    })
 })

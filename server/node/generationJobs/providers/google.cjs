@@ -78,6 +78,15 @@ function extractGoogleParts(payload) {
     return payload?.candidates?.[0]?.content?.parts ?? [];
 }
 
+function isGoogleStreamingRequest(request) {
+    if (request?.stream === true) {
+        return true;
+    }
+
+    const url = (request?.url ?? '').toLowerCase();
+    return url.includes('alt=sse') || url.includes(':streamgeneratecontent');
+}
+
 async function runGoogleRequest(request, handlers) {
     const response = await fetch(request.url, {
         method: request.method ?? 'POST',
@@ -91,7 +100,7 @@ async function runGoogleRequest(request, handlers) {
         throw new Error(errorText || `Upstream error ${response.status}`);
     }
 
-    if (!request.stream) {
+    if (!isGoogleStreamingRequest(request)) {
         const payload = await response.json();
         const state = applyGoogleParts({ thoughts: '', content: '' }, extractGoogleParts(payload));
         const text = serializeGoogleText(state);

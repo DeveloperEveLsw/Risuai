@@ -34,7 +34,7 @@ import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
 import { getLiveChatRevision, isServerGenerationSupported, submitServerGenerationJob } from "./serverGeneration.svelte";
 import { pluginV2 } from "../plugins/plugins.svelte";
-import { extractServerSafePresetEditOutputRegex, getServerGenerationPolicyError, inferServerGenerationProvider } from "./serverGenerationShared";
+import { extractServerSafePresetEditOutputRegex, getServerGenerationPolicyError, inferPreparedRequestStream, inferServerGenerationProvider } from "./serverGenerationShared";
 
 export interface OpenAIChat{
     role: 'system'|'user'|'assistant'|'function'
@@ -1497,6 +1497,13 @@ export async function sendChat(chatProcessIndex = -1,arg:{
             if(previewReq.type === 'success'){
                 const prepared = JSON.parse(previewReq.result)
                 if(prepared?.url && prepared?.body && prepared?.headers){
+                    const preparedRequestStream = inferPreparedRequestStream({
+                        url: prepared.url,
+                        method: 'POST',
+                        headers: prepared.headers,
+                        body: prepared.body,
+                        stream: prepared.stream ?? prepared.body?.stream,
+                    })
                     const activeModelInfo = getModelInfo(DBState.db.aiModel)
                     const policyError = getServerGenerationPolicyError({
                         currentChar,
@@ -1511,7 +1518,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                             method: 'POST',
                             headers: prepared.headers,
                             body: prepared.body,
-                            stream: !!prepared.body?.stream,
+                            stream: preparedRequestStream,
                         },
                     })
                     if(policyError){
@@ -1525,7 +1532,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                         method: 'POST',
                         headers: prepared.headers,
                         body: prepared.body,
-                        stream: !!prepared.body?.stream,
+                        stream: preparedRequestStream,
                     })
                     if(!resolvedProvider){
                         throwError('Current provider path is not yet supported for server-owned generation.')

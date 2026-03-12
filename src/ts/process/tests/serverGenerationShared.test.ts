@@ -5,6 +5,7 @@ import {
     extractServerSafePresetEditOutputRegex,
     getServerGenerationCompatibilityReport,
     getServerGenerationPolicyError,
+    inferPreparedRequestStream,
     inferServerGenerationProvider,
     isServerSafePresetEditOutputRegex,
     mergeChatsForLivePatch,
@@ -131,7 +132,12 @@ describe('serverGenerationShared', () => {
             body: {
                 contents: [],
             },
-        })?.type).toBe('google')
+        })).toMatchObject({
+            type: 'google',
+            request: {
+                stream: true,
+            },
+        })
 
         expect(inferServerGenerationProvider({
             url: 'https://api.openai.com/v1/chat/completions',
@@ -142,6 +148,25 @@ describe('serverGenerationShared', () => {
                 messages: [],
             },
         })?.type).toBe('openai-compatible')
+    })
+
+    test('inferPreparedRequestStream detects SSE urls even without body.stream', () => {
+        expect(inferPreparedRequestStream({
+            url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0:streamGenerateContent?alt=sse',
+            headers: {},
+            body: {
+                contents: [],
+            },
+            stream: false,
+        })).toBe(true)
+
+        expect(inferPreparedRequestStream({
+            url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0:generateContent',
+            headers: {},
+            body: {
+                contents: [],
+            },
+        })).toBe(false)
     })
 
     test('getServerGenerationPolicyError rejects output hooks and tool calling payloads', () => {
