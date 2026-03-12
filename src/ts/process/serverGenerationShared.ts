@@ -1,0 +1,350 @@
+import type { Chat, Message, character } from "../storage/database.svelte";
+
+export type ServerProviderType = 'openai-compatible' | 'anthropic' | 'google';
+
+export type PreparedServerProviderRequest = {
+    url: string
+    method?: string
+    headers?: Record<string, string>
+    body?: Record<string, any>
+    stream?: boolean
+}
+
+export type ResolvedServerProvider = {
+    type: ServerProviderType
+    request: {
+        url: string
+        method: string
+        headers: Record<string, string>
+        body: Record<string, any>
+        stream: boolean
+    }
+}
+
+type PolicyState = {
+    currentChar: Pick<character, 'customscript' | 'triggerscript'>
+    pluginState: {
+        hasProviderPlugin: boolean
+        hasEditOutputPlugin: boolean
+        hasAfterRequestPlugin: boolean
+    }
+    preparedRequest?: PreparedServerProviderRequest | null
+}
+
+function cloneValue<T>(value: T): T {
+    if (value == null) {
+        return value
+    }
+    if (typeof structuredClone === 'function') {
+        return structuredClone(value)
+    }
+    return JSON.parse(JSON.stringify(value))
+}
+
+function normalizeHeaders(headers: Record<string, string> = {}) {
+    const normalized: Record<string, string> = {}
+    for (const [key, value] of Object.entries(headers)) {
+        normalized[key.toLowerCase()] = value
+    }
+    return normalized
+}
+
+function normalizeRequest(request: PreparedServerProviderRequest): ResolvedServerProvider['request'] {
+    return {
+        url: request.url,
+        method: request.method ?? 'POST',
+        headers: cloneValue(request.headers ?? {}),
+        body: cloneValue(request.body ?? {}),
+        stream: request.stream !== false,
+    }
+}
+
+function valuesEqual(left: unknown, right: unknown) {
+    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null)
+}
+
+function pickMergedValue<T>(serverValue: T, localValue: T, baseValue?: T) {
+    if (baseValue === undefined) {
+        return cloneValue(localValue ?? serverValue)
+    }
+
+    const serverChanged = !valuesEqual(serverValue, baseValue)
+    const localChanged = !valuesEqual(localValue, baseValue)
+
+    if (!serverChanged) {
+        return cloneValue(localValue)
+    }
+
+    if (!localChanged) {
+        return cloneValue(serverValue)
+    }
+
+    return cloneValue(localValue)
+}
+
+function mergeUniqueArray<T>(serverValue: T[] = [], localValue: T[] = [], baseValue?: T[]) {
+    if (baseValue === undefined) {
+        return cloneValue(localValue.length > 0 ? localValue : serverValue)
+    }
+
+    const serverChanged = !valuesEqual(serverValue, baseValue)
+    const localChanged = !valuesEqual(localValue, baseValue)
+
+    if (!serverChanged) {
+        return cloneValue(localValue)
+    }
+
+    if (!localChanged) {
+        return cloneValue(serverValue)
+    }
+
+    const merged: T[] = []
+    const seen = new Set<string>()
+    for (const value of [...serverValue, ...localValue]) {
+        const key = JSON.stringify(value ?? null)
+        if (seen.has(key)) {
+            continue
+        }
+        seen.add(key)
+        merged.push(cloneValue(value))
+    }
+    return merged
+}
+
+function mergeNamedMap(
+    serverValue: Record<string, string> = {},
+    localValue: Record<string, string> = {},
+    baseValue?: Record<string, string>
+) {
+    if (baseValue === undefined) {
+        return {
+            ...cloneValue(serverValue),
+            ...cloneValue(localValue),
+        }
+    }
+
+    const next: Record<string, string> = {}
+    const keys = new Set([
+        ...Object.keys(serverValue ?? {}),
+        ...Object.keys(localValue ?? {}),
+        ...Object.keys(baseValue ?? {}),
+    ])
+
+    for (const key of keys) {
+        const mergedValue = pickMergedValue(serverValue?.[key], localValue?.[key], baseValue?.[key])
+        if (mergedValue != null) {
+            next[key] = mergedValue
+        }
+    }
+
+    return next
+}
+
+function messageIdentity(message: Message, index: number) {
+    if (message?.chatId) {
+        return `chat:${message.chatId}`
+    }
+    return `fallback:${message?.role ?? 'unknown'}:${message?.time ?? 'none'}:${message?.saying ?? 'none'}:${message?.data ?? ''}:${index}`
+}
+
+function chooseMessageData(existing: Message, incoming: Message) {
+    const existingData = existing?.data ?? ''
+    const incomingData = incoming?.data ?? ''
+    if (incomingData === '' && existingData !== '') {
+        return existingData
+    }
+    return incomingData || existingData || ''
+}
+
+function mergeMessage(existing: Message, incoming: Message) {
+    const merged = {
+        ...cloneValue((existing ?? {}) as Message),
+        ...cloneValue((incoming ?? {}) as Message),
+    } as Message
+
+    merged.data = chooseMessageData(existing, incoming)
+
+    if (existing?.generationInfo || incoming?.generationInfo) {
+        merged.generationInfo = {
+            ...(existing?.generationInfo ?? {}),
+            ...(incoming?.generationInfo ?? {}),
+        }
+    }
+
+    if (existing?.promptInfo || incoming?.promptInfo) {
+        merged.promptInfo = {
+            ...(existing?.promptInfo ?? {}),
+            ...(incoming?.promptInfo ?? {}),
+        }
+    }
+
+    return merged
+}
+
+function mergeMessageArrays(baseMessages: Message[] = [], incomingMessages: Message[] = []) {
+    const merged = cloneValue(baseMessages)
+    const keyToIndex = new Map<string, number>()
+
+    for (let index = 0; index < merged.length; index++) {
+        keyToIndex.set(messageIdentity(merged[index], index), index)
+    }
+
+    for (let index = 0; index < incomingMessages.length; index++) {
+        const incoming = cloneValue(incomingMessages[index])
+        const key = messageIdentity(incoming, index)
+        const existingIndex = keyToIndex.get(key)
+        if (existingIndex == null) {
+            keyToIndex.set(key, merged.length)
+            merged.push(incoming)
+            continue
+        }
+
+        merged[existingIndex] = mergeMessage(merged[existingIndex], incoming)
+    }
+
+    return merged
+}
+
+function emptyChat(): Chat {
+    return {
+        message: [],
+        note: '',
+        name: '',
+        localLore: [],
+    }
+}
+
+export function mergeChatsForLivePatch(serverChat: Chat | null | undefined, localChat: Chat, baseChat?: Chat | null) {
+    const currentServerChat = cloneValue(serverChat ?? emptyChat())
+    const nextChat = {
+        ...currentServerChat,
+        ...cloneValue(localChat),
+    } as Chat
+    const originalBaseChat = cloneValue(baseChat ?? emptyChat())
+
+    nextChat.message = mergeMessageArrays(currentServerChat.message, localChat.message ?? [])
+    nextChat.note = pickMergedValue(currentServerChat.note ?? '', localChat.note ?? '', originalBaseChat.note ?? '')
+    nextChat.name = pickMergedValue(currentServerChat.name ?? '', localChat.name ?? '', originalBaseChat.name ?? '')
+    nextChat.localLore = mergeUniqueArray(currentServerChat.localLore ?? [], localChat.localLore ?? [], originalBaseChat.localLore ?? [])
+    nextChat.bookmarks = mergeUniqueArray(currentServerChat.bookmarks ?? [], localChat.bookmarks ?? [], originalBaseChat.bookmarks ?? [])
+    nextChat.bookmarkNames = mergeNamedMap(
+        currentServerChat.bookmarkNames ?? {},
+        localChat.bookmarkNames ?? {},
+        originalBaseChat.bookmarkNames ?? {}
+    )
+
+    if ((currentServerChat.isStreaming || localChat.isStreaming) && nextChat.isStreaming !== false) {
+        nextChat.isStreaming = true
+    }
+
+    return nextChat
+}
+
+export function buildGenerationSubmitChat(serverChat: Chat | null | undefined, localChat: Chat, userMessage: Message | null, assistantMessage: Message) {
+    const mergedChat = mergeChatsForLivePatch(serverChat, localChat)
+
+    if (userMessage) {
+        mergedChat.message = mergeMessageArrays(mergedChat.message, [userMessage])
+    }
+
+    mergedChat.message = mergeMessageArrays(mergedChat.message, [assistantMessage])
+    mergedChat.isStreaming = true
+
+    return mergedChat
+}
+
+export function inferServerGenerationProvider(request: PreparedServerProviderRequest | null | undefined): ResolvedServerProvider | null {
+    if (!request?.url) {
+        return null
+    }
+
+    const normalizedHeaders = normalizeHeaders(request.headers ?? {})
+    const normalizedRequest = normalizeRequest(request)
+    const url = normalizedRequest.url.toLowerCase()
+    const body = normalizedRequest.body ?? {}
+
+    if (normalizedHeaders['anthropic-version'] || body.anthropic_version) {
+        return {
+            type: 'anthropic',
+            request: normalizedRequest,
+        }
+    }
+
+    if (
+        url.includes('generativelanguage.googleapis.com') ||
+        url.includes('aiplatform.googleapis.com') ||
+        Array.isArray(body.contents)
+    ) {
+        return {
+            type: 'google',
+            request: normalizedRequest,
+        }
+    }
+
+    if (
+        url.includes('/chat/completions') ||
+        url.includes('/responses') ||
+        url.endsWith('/completions') ||
+        Array.isArray(body.messages) ||
+        Array.isArray(body.input)
+    ) {
+        return {
+            type: 'openai-compatible',
+            request: normalizedRequest,
+        }
+    }
+
+    return null
+}
+
+function hasPreparedToolUse(preparedRequest?: PreparedServerProviderRequest | null) {
+    const body = preparedRequest?.body ?? {}
+    if (Array.isArray(body.tools) && body.tools.length > 0) {
+        return true
+    }
+    if (Array.isArray(body.messages) && body.messages.some((message) => message?.role === 'tool' || Array.isArray(message?.tool_calls) && message.tool_calls.length > 0)) {
+        return true
+    }
+    if (Array.isArray(body.input) && body.input.some((item) => item?.type === 'function_call_output')) {
+        return true
+    }
+    if (Array.isArray(body.contents) && body.contents.some((item) => Array.isArray(item?.parts) && item.parts.some((part: any) => part?.functionCall || part?.functionResponse))) {
+        return true
+    }
+    if (Array.isArray(body.tools?.functionDeclarations) && body.tools.functionDeclarations.length > 0) {
+        return true
+    }
+    return false
+}
+
+export function getServerGenerationPolicyError(state: PolicyState) {
+    if (state.pluginState.hasProviderPlugin) {
+        return 'Server-owned generation does not support plugin providers yet.'
+    }
+
+    if (state.pluginState.hasEditOutputPlugin) {
+        return 'Server-owned generation is not compatible with output-editing plugins.'
+    }
+
+    if (state.pluginState.hasAfterRequestPlugin) {
+        return 'Server-owned generation is not compatible with response-rewriting plugins.'
+    }
+
+    if (state.currentChar.customscript?.some((script) => script?.type === 'editoutput')) {
+        return 'Server-owned generation is not compatible with editoutput scripts.'
+    }
+
+    if (state.currentChar.triggerscript?.some((trigger) => trigger?.type === 'output')) {
+        return 'Server-owned generation is not compatible with output triggers.'
+    }
+
+    if (hasPreparedToolUse(state.preparedRequest)) {
+        return 'Server-owned generation does not support tool-calling requests yet.'
+    }
+
+    if (!inferServerGenerationProvider(state.preparedRequest ?? null)) {
+        return 'Current provider path is not yet supported for server-owned generation.'
+    }
+
+    return null
+}

@@ -6,6 +6,13 @@ const { existsSync, mkdirSync, readFileSync, writeFileSync } = require('fs');
 const fs = require('fs/promises')
 const nodeCrypto = require('crypto')
 const { createStorageBackend } = require('./storage/index.cjs');
+const { DocumentRepository } = require('./live/documentRepository.cjs');
+const { LiveChatService } = require('./live/chatService.cjs');
+const { LiveEventHub, writeSseEvent } = require('./live/eventHub.cjs');
+const { GenerationJobRepository } = require('./generationJobs/jobRepository.cjs');
+const { GenerationRunner } = require('./generationJobs/runner.cjs');
+const { validateProviderRequest } = require('./generationJobs/providers/index.cjs');
+const { toChatDocumentKey } = require('./live/documentKeys.cjs');
 app.use(express.static(path.join(process.cwd(), 'dist'), {index: false}));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
@@ -28,6 +35,11 @@ if(!existsSync(savePath)){
 const storageBackend = createStorageBackend({
     savePath
 });
+const liveEventHub = new LiveEventHub();
+let documentRepository = null;
+let liveChatService = null;
+let generationJobRepository = null;
+let generationRunner = null;
 
 const passwordPath = path.join(process.cwd(), 'save', '__password')
 if(existsSync(passwordPath)){
@@ -52,6 +64,34 @@ async function hashJSON(json){
     const hash = nodeCrypto.createHash('sha256');
     hash.update(JSON.stringify(json));
     return hash.digest('hex');
+}
+
+function getLiveSessionKey(req) {
+    return (
+        req.headers['x-risu-session-key'] ||
+        req.query.session_key ||
+        req.body?.sessionKey ||
+        'database/database.bin'
+    ).toString();
+}
+
+function getLiveAccountId(req) {
+    return (
+        req.headers['x-risu-account-id'] ||
+        req.body?.accountId ||
+        null
+    );
+}
+
+function requireLiveBackend(res) {
+    if (storageBackend.type !== 'postgres' || !storageBackend.pool) {
+        res.status(501).send({
+            error: 'Live server-owned state requires RISU_STORAGE_DRIVER=postgres',
+        });
+        return false;
+    }
+
+    return true;
 }
 
 app.get('/', async (req, res, next) => {
@@ -663,6 +703,619 @@ app.post('/api/write', async (req, res, next) => {
     }
 });
 
+app.get('/api/live/events', async (req, res) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    const sessionKey = getLiveSessionKey(req);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    writeSseEvent(res, 'ready', {
+        sessionKey,
+        ts: Date.now(),
+    });
+
+    const unsubscribe = liveEventHub.subscribe(sessionKey, (event) => {
+        writeSseEvent(res, event.type || 'message', event);
+    });
+
+    const heartbeat = setInterval(() => {
+        writeSseEvent(res, 'heartbeat', { ts: Date.now() });
+    }, 15000);
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        unsubscribe();
+    });
+});
+
+app.get('/api/live/chats/:chatKey', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const document = await documentRepository.getDocument('chat', req.params.chatKey);
+        if (!document) {
+            res.status(404).send({ error: 'Chat document not found' });
+            return;
+        }
+
+        res.send({
+            document,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/live/chats', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const documents = await documentRepository.listDocuments('chat');
+        const sessionKey = getLiveSessionKey(req);
+        res.send({
+            documents: documents.filter((document) => (document.metadata?.sessionKey ?? sessionKey) === sessionKey),
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.patch('/api/live/chats/:chatKey', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    const sessionKey = getLiveSessionKey(req);
+    const body = req.body ?? {};
+    const expectedRevision = body.expectedRevision;
+
+    try {
+        const current = await documentRepository.getDocument('chat', req.params.chatKey);
+        const bodyPayload = body.payload ?? null;
+        if (!current && !bodyPayload) {
+            res.status(404).send({ error: 'Chat document not found' });
+            return;
+        }
+
+        if (!current) {
+            const created = await documentRepository.upsertDocument(
+                'chat',
+                req.params.chatKey,
+                bodyPayload,
+                {
+                    ...(body.metadata ?? {}),
+                    sessionKey,
+                }
+            );
+            liveChatService.publishChatUpdated(sessionKey, created);
+            res.send({
+                document: created,
+                created: true,
+            });
+            return;
+        }
+
+        const updated = await documentRepository.compareAndSwapDocument(
+            'chat',
+            req.params.chatKey,
+            expectedRevision,
+            body.payload ?? current.payload,
+            {
+                ...(current.metadata ?? {}),
+                ...(body.metadata ?? {}),
+                sessionKey,
+            }
+        );
+
+        if (updated.conflict) {
+            res.status(409).send(updated);
+            return;
+        }
+
+        liveChatService.publishChatUpdated(sessionKey, updated.document);
+        res.send({
+            document: updated.document,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/live/root', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const document = await documentRepository.getDocument('db_root', getLiveSessionKey(req));
+        if (!document) {
+            res.status(404).send({ error: 'Root document not found' });
+            return;
+        }
+
+        res.send({
+            document,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.patch('/api/live/root', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    const sessionKey = getLiveSessionKey(req);
+    const body = req.body ?? {};
+    const expectedRevision = body.expectedRevision;
+
+    try {
+        const current = await documentRepository.getDocument('db_root', sessionKey);
+        const bodyPayload = body.payload ?? null;
+        if (!current && !bodyPayload) {
+            res.status(404).send({ error: 'Root document not found' });
+            return;
+        }
+
+        if (!current) {
+            const created = await documentRepository.upsertDocument(
+                'db_root',
+                sessionKey,
+                bodyPayload,
+                {
+                    ...(body.metadata ?? {}),
+                    sessionKey,
+                }
+            );
+            res.send({
+                document: created,
+                created: true,
+            });
+            return;
+        }
+
+        const updated = await documentRepository.compareAndSwapDocument(
+            'db_root',
+            sessionKey,
+            expectedRevision,
+            body.payload ?? current.payload,
+            {
+                ...(current.metadata ?? {}),
+                ...(body.metadata ?? {}),
+                sessionKey,
+            }
+        );
+
+        if (updated.conflict) {
+            res.status(409).send(updated);
+            return;
+        }
+
+        res.send({
+            document: updated.document,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/live/characters/:characterKey', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const document = await documentRepository.getDocument('character', req.params.characterKey);
+        if (!document) {
+            res.status(404).send({ error: 'Character document not found' });
+            return;
+        }
+
+        res.send({
+            document,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.patch('/api/live/characters/:characterKey', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    const sessionKey = getLiveSessionKey(req);
+    const body = req.body ?? {};
+    const expectedRevision = body.expectedRevision;
+
+    try {
+        const current = await documentRepository.getDocument('character', req.params.characterKey);
+        const bodyPayload = body.payload ?? null;
+        if (!current && !bodyPayload) {
+            res.status(404).send({ error: 'Character document not found' });
+            return;
+        }
+
+        if (!current) {
+            const created = await documentRepository.upsertDocument(
+                'character',
+                req.params.characterKey,
+                bodyPayload,
+                {
+                    ...(body.metadata ?? {}),
+                    sessionKey,
+                }
+            );
+            res.send({
+                document: created,
+                created: true,
+            });
+            return;
+        }
+
+        const updated = await documentRepository.compareAndSwapDocument(
+            'character',
+            req.params.characterKey,
+            expectedRevision,
+            body.payload ?? current.payload,
+            {
+                ...(current.metadata ?? {}),
+                ...(body.metadata ?? {}),
+                sessionKey,
+            }
+        );
+
+        if (updated.conflict) {
+            res.status(409).send(updated);
+            return;
+        }
+
+        res.send({
+            document: updated.document,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/generation-jobs', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const statuses = typeof req.query.status === 'string'
+            ? req.query.status.split(',').map((status) => status.trim()).filter(Boolean)
+            : ['queued', 'running'];
+
+        const jobs = await generationJobRepository.listJobsByStatus(getLiveSessionKey(req), statuses);
+        res.send({
+            jobs,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/generation-jobs/:jobId', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const job = await generationJobRepository.getJob(req.params.jobId);
+        if (!job) {
+            res.status(404).send({ error: 'Job not found' });
+            return;
+        }
+
+        res.send({
+            job,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/generation-jobs/:jobId/events', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const events = await generationJobRepository.listEvents(
+            req.params.jobId,
+            Number(req.query.after ?? 0)
+        );
+
+        res.send({
+            events,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.post('/api/generation-jobs/:jobId/cancel', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    try {
+        const job = await generationJobRepository.requestCancel(req.params.jobId);
+        if (!job) {
+            res.status(404).send({ error: 'Job not found' });
+            return;
+        }
+
+        await generationRunner.cancel(req.params.jobId);
+        const eventRow = await generationJobRepository.appendEvent(req.params.jobId, 'cancel_requested', {});
+        liveEventHub.publish(job.session_key, {
+            type: 'job_updated',
+            sessionKey: job.session_key,
+            jobId: req.params.jobId,
+            status: job.status,
+            sequenceNo: eventRow.sequence_no,
+            cancelRequested: true,
+            chatKey: job.chat_document_key,
+        });
+
+        res.send({
+            job,
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+
+app.post('/api/generation-jobs', async (req, res, next) => {
+    if (!await checkAuth(req, res)) {
+        return;
+    }
+    if (!requireLiveBackend(res)) {
+        return;
+    }
+
+    const body = req.body ?? {};
+    const sessionKey = getLiveSessionKey(req);
+    const accountId = getLiveAccountId(req);
+    const characterId = body.characterId;
+    const chatId = body.chatId;
+    const assistantMessage = body.assistantMessage ?? {};
+    const userMessage = body.userMessage ?? null;
+    const provider = body.provider ?? {};
+    const chatSnapshot = body.chatSnapshot ?? { id: chatId, message: [] };
+    const clientRequestId = body.clientRequestId ?? assistantMessage.chatId ?? null;
+
+    if (!characterId || !chatId || !assistantMessage?.chatId || !provider?.type || !provider?.request?.url) {
+        res.status(400).send({
+            error: 'characterId, chatId, assistantMessage.chatId, and provider.request.url are required',
+        });
+        return;
+    }
+
+    const providerError = validateProviderRequest(provider);
+    if (providerError) {
+        res.status(400).send({
+            error: providerError,
+        });
+        return;
+    }
+
+    const chatDocumentKey = toChatDocumentKey(characterId, chatId);
+
+    const client = await storageBackend.pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const existingJob = await generationJobRepository.getJobByClientRequest(sessionKey, clientRequestId, client);
+        if (existingJob) {
+            const existingChat = await documentRepository.getDocument('chat', chatDocumentKey, client);
+            await client.query('COMMIT');
+            res.send({
+                job: existingJob,
+                chat: existingChat,
+                duplicated: true,
+            });
+            return;
+        }
+
+        const activeJobs = await generationJobRepository.listJobsByStatus(sessionKey, ['queued', 'running'], client);
+        const activeJobForChat = activeJobs.find((job) => job.chat_document_key === chatDocumentKey);
+        if (activeJobForChat) {
+            await client.query('ROLLBACK');
+            res.status(409).send({
+                error: 'An active generation already exists for this chat',
+                job: activeJobForChat,
+            });
+            return;
+        }
+
+        const ensuredChat = await liveChatService.ensureChatDocument({
+            sessionKey,
+            characterId,
+            chatId,
+            chatSnapshot,
+            metadata: {
+                source: 'generation_submit',
+                activeJobId: null,
+            },
+            client,
+        });
+
+        const patchedChat = await liveChatService.patchChatDocument({
+            sessionKey,
+            characterId,
+            chatId,
+            expectedRevision: body.expectedRevision ?? ensuredChat.revision,
+            client,
+            publish: false,
+            metadata: {
+                source: 'generation_submit',
+                activeJobId: null,
+                lastJobStatus: 'queued',
+                lastJobError: null,
+            },
+            mutate: (chatPayload) => {
+                const messages = LiveChatService.ensureMessageArray(chatPayload);
+                chatPayload.isStreaming = true;
+
+                if (userMessage?.chatId && !messages.some((message) => message?.chatId === userMessage.chatId)) {
+                    messages.push(userMessage);
+                }
+
+                if (!messages.some((message) => message?.chatId === assistantMessage.chatId)) {
+                    messages.push({
+                        ...assistantMessage,
+                        role: assistantMessage.role ?? 'char',
+                        data: assistantMessage.data ?? '',
+                    });
+                }
+            },
+        });
+
+        if (patchedChat.conflict) {
+            await client.query('ROLLBACK');
+            res.status(409).send({
+                error: 'Chat revision conflict',
+                current: patchedChat.current,
+            });
+            return;
+        }
+
+        const job = await generationJobRepository.createJob({
+            sessionKey,
+            accountId,
+            deviceId: body.deviceId ?? null,
+            characterId,
+            chatDocumentKey,
+            assistantMessageChatId: assistantMessage.chatId,
+            clientRequestId,
+            requestPayloadVersion: 1,
+            requestPayload: {
+                provider,
+                target: {
+                    sessionKey,
+                    characterId,
+                    chatId,
+                    assistantMessageChatId: assistantMessage.chatId,
+                },
+            },
+        }, client);
+
+        const createdEvent = await generationJobRepository.appendEvent(job.job_id, 'job_created', {
+            jobId: job.job_id,
+            chatDocumentKey,
+        }, client);
+
+        const metadataUpdated = await documentRepository.getDocument('chat', chatDocumentKey, client);
+        if (metadataUpdated) {
+            const compare = await documentRepository.compareAndSwapDocument(
+                'chat',
+                chatDocumentKey,
+                metadataUpdated.revision,
+                metadataUpdated.payload,
+                {
+                    ...(metadataUpdated.metadata ?? {}),
+                    sessionKey,
+                    activeJobId: job.job_id,
+                    lastJobId: job.job_id,
+                    lastJobStatus: 'queued',
+                    lastJobError: null,
+                },
+                client
+            );
+            if (!compare.conflict) {
+                patchedChat.document = compare.document;
+            }
+        }
+
+        await client.query('COMMIT');
+
+        liveChatService.publishChatUpdated(sessionKey, patchedChat.document);
+        liveEventHub.publish(sessionKey, {
+            type: 'job_updated',
+            sessionKey,
+            jobId: job.job_id,
+            status: job.status,
+            sequenceNo: createdEvent.sequence_no,
+            chatKey: chatDocumentKey,
+        });
+
+        await generationRunner.queue(job);
+
+        res.send({
+            job,
+            chat: patchedChat.document,
+        });
+    }
+    catch (error) {
+        await client.query('ROLLBACK');
+        next(error);
+    }
+    finally {
+        client.release();
+    }
+});
+
 const oauthData = {
     client_id: '',
     client_secret: '',
@@ -799,6 +1452,17 @@ async function startServer() {
         const port = process.env.PORT || 6001;
         await storageBackend.initialize();
         console.log(`[Server] Storage backend: ${storageBackend.type}`);
+        if (storageBackend.type === 'postgres' && storageBackend.pool) {
+            documentRepository = new DocumentRepository(storageBackend.pool);
+            liveChatService = new LiveChatService(documentRepository, liveEventHub);
+            generationJobRepository = new GenerationJobRepository(storageBackend.pool);
+            generationRunner = new GenerationRunner({
+                jobRepository: generationJobRepository,
+                chatService: liveChatService,
+                eventHub: liveEventHub,
+            });
+            console.log('[Server] Live state repositories enabled.');
+        }
         const httpsOptions = await getHttpsOptions();
 
         if (httpsOptions) {

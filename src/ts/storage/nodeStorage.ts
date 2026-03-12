@@ -133,6 +133,11 @@ export class NodeStorage{
         }
     }
 
+    async getAuthHeader() {
+        await this.checkAuth()
+        return await this.createAuth()
+    }
+
     private async checkAuth(){
 
         if(!this.authChecked){

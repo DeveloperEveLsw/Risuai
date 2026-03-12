@@ -28,10 +28,13 @@ import { runImageEmbedding } from "./transformers";
 import { hanuraiMemory } from "./memory/hanuraiMemory";
 import { hypaMemoryV2 } from "./memory/hypav2";
 import { runLuaEditTrigger } from "./scriptings";
-import { getModelInfo, LLMFlags } from "../model/modellist";
+import { getModelInfo, LLMFlags, LLMFormat } from "../model/modellist";
 import { hypaMemoryV3 } from "./memory/hypav3";
 import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
+import { getLiveChatRevision, isServerGenerationSupported, submitServerGenerationJob } from "./serverGeneration.svelte";
+import { pluginV2 } from "../plugins/plugins.svelte";
+import { getServerGenerationPolicyError, inferServerGenerationProvider } from "./serverGenerationShared";
 
 export interface OpenAIChat{
     role: 'system'|'user'|'assistant'|'function'
@@ -1469,7 +1472,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         return true
     }
 
-    const req = await requestChatData({
+    const requestArgs = {
         formated: formated,
         biasString: biases,
         currentChar: currentChar,
@@ -1482,7 +1485,103 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         previewBody: arg.previewPrompt,
         escape: nowChatroom.type === 'character' && nowChatroom.escapeOutput,
         rememberToolUsage: DBState.db.rememberToolUsage,
-    }, 'model', abortSignal)
+    }
+
+    if(!arg.previewPrompt && !arg.continue && await isServerGenerationSupported()){
+        try {
+            const previewReq = await requestChatData({
+                ...requestArgs,
+                previewBody: true,
+            }, 'model', abortSignal)
+
+            if(previewReq.type === 'success'){
+                const prepared = JSON.parse(previewReq.result)
+                if(prepared?.url && prepared?.body && prepared?.headers){
+                    const activeModelInfo = getModelInfo(DBState.db.aiModel)
+                    const policyError = getServerGenerationPolicyError({
+                        currentChar,
+                        pluginState: {
+                            hasProviderPlugin: activeModelInfo.format === LLMFormat.Plugin || !!DBState.db.currentPluginProvider || !!DBState.db.botPresets[DBState.db.botPresetsId]?.currentPluginProvider,
+                            hasEditOutputPlugin: pluginV2.editoutput.size > 0,
+                            hasAfterRequestPlugin: pluginV2.replacerafterRequest.size > 0,
+                        },
+                        preparedRequest: {
+                            url: prepared.url,
+                            method: 'POST',
+                            headers: prepared.headers,
+                            body: prepared.body,
+                            stream: !!prepared.body?.stream,
+                        },
+                    })
+                    if(policyError){
+                        throwError(policyError)
+                        doingChat.set(false)
+                        return false
+                    }
+
+                    const resolvedProvider = inferServerGenerationProvider({
+                        url: prepared.url,
+                        method: 'POST',
+                        headers: prepared.headers,
+                        body: prepared.body,
+                        stream: !!prepared.body?.stream,
+                    })
+                    if(!resolvedProvider){
+                        throwError('Current provider path is not yet supported for server-owned generation.')
+                        doingChat.set(false)
+                        return false
+                    }
+
+                    const currentChatSnapshot = safeStructuredClone(DBState.db.characters[selectedChar].chats[selectedChat])
+                    const lastMessage = currentChatSnapshot.message.at(-1)
+                    if(lastMessage?.role === 'user' && !lastMessage.chatId){
+                        lastMessage.chatId = v4()
+                        lastMessage.time ??= Date.now()
+                        const liveLastMessage = DBState.db.characters[selectedChar].chats[selectedChat].message.at(-1)
+                        if(liveLastMessage?.role === 'user'){
+                            liveLastMessage.chatId = lastMessage.chatId
+                            liveLastMessage.time ??= lastMessage.time
+                        }
+                    }
+                    const userMessage = lastMessage?.role === 'user' ? safeStructuredClone(lastMessage) : null
+                    const assistantMessage:Message = {
+                        role: 'char',
+                        data: '',
+                        saying: currentChar.chaId,
+                        time: Date.now(),
+                        generationInfo,
+                        promptInfo,
+                        chatId: generationId,
+                    }
+
+                    await submitServerGenerationJob({
+                        characterId: currentChar.chaId,
+                        chatId: currentChatSnapshot.id,
+                        expectedRevision: getLiveChatRevision(`chat:${currentChar.chaId}:${currentChatSnapshot.id}`) ?? undefined,
+                        chatSnapshot: currentChatSnapshot,
+                        userMessage,
+                        assistantMessage,
+                        clientRequestId: generationId,
+                        provider: resolvedProvider
+                    })
+
+                    stageTimings.stage3Duration = Date.now() - stageTimings.stage3Start
+                    if(generationInfo.stageTiming) {
+                        generationInfo.stageTiming.stage3 = stageTimings.stage3Duration
+                    }
+                    chatProcessStage.set(4)
+                    return true
+                }
+            }
+        } catch (error) {
+            console.error('Server-owned generation submission failed', error)
+            throwError(`Server-owned generation failed: ${error}`)
+            doingChat.set(false)
+            return false
+        }
+    }
+
+    const req = await requestChatData(requestArgs, 'model', abortSignal)
 
     console.log(req)
     if(req.model){

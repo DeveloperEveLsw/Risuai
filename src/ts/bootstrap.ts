@@ -32,6 +32,7 @@ import { initMobileGesture } from "./hotkey";
 import { moduleUpdate } from "./process/modules";
 import type { AccountStorage } from "./storage/accountStorage";
 import { makeColdData } from "./process/coldstorage.svelte";
+import { ensureLiveServerSubscription, isServerGenerationSupported, recoverLiveServerState, startLiveChatMirror } from "./process/serverGeneration.svelte";
 import {
     forageStorage,
     saveDb,
@@ -243,6 +244,11 @@ export async function loadData() {
             assignIds()
             makeColdData()
             registerModelDynamic()
+            if (await isServerGenerationSupported()) {
+                await recoverLiveServerState()
+                await startLiveChatMirror()
+                void ensureLiveServerSubscription()
+            }
             saveDb()
             moduleUpdate()
             if (import.meta.env.VITE_RISU_TOS === 'TRUE') {

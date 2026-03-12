@@ -28,6 +28,7 @@
     import { getInlayAsset } from 'src/ts/process/files/inlays';
     import { ConnectionOpenStore } from 'src/ts/sync/multiuser';
     import { coldStorageHeader, preLoadChat } from 'src/ts/process/coldstorage.svelte';
+    import { cancelServerGenerationJob, getActiveServerJobForChat, getLiveChatMetadata } from 'src/ts/process/serverGeneration.svelte';
     import Chats from './Chats.svelte';
     import Button from '../UI/GUI/Button.svelte';
     import PluginDefinedIcon from '../Others/PluginDefinedIcon.svelte';
@@ -57,6 +58,34 @@
     let { openModuleList = $bindable(false), openChatList = $bindable(false), customStyle = '' }: Props = $props();
     let currentCharacter = $derived(DBState.db.characters[$selectedCharID])
     let currentChat = $derived(currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [])
+    let currentChatGenerating = $derived(($doingChat || currentCharacter?.chats?.[currentCharacter.chatPage]?.isStreaming) ?? false)
+    let currentChatServerMeta = $derived.by(() => {
+        const character = DBState.db.characters[$selectedCharID]
+        const chat = character?.chats?.[character.chatPage]
+        if(!character?.chaId || !chat?.id){
+            return null
+        }
+        return getLiveChatMetadata(`chat:${character.chaId}:${chat.id}`)
+    })
+    let currentChatServerStatus = $derived.by(() => {
+        const status = currentCharacter?.chats?.[currentCharacter.chatPage]?.isStreaming
+            ? (currentChatServerMeta?.lastJobStatus === 'queued' ? 'queued' : 'running')
+            : currentChatServerMeta?.lastJobStatus
+        switch (status) {
+            case 'queued':
+                return { label: 'QUEUED', className: 'text-sky-400' }
+            case 'running':
+                return { label: 'RUNNING', className: 'text-green-400' }
+            case 'completed':
+                return { label: 'COMPLETED', className: 'text-cyan-400' }
+            case 'failed':
+                return { label: 'FAILED', className: 'text-red-400' }
+            case 'cancelled':
+                return { label: 'CANCELLED', className: 'text-yellow-400' }
+            default:
+                return null
+        }
+    })
 
     function scrollToBottom() {
         chatsInstance?.scrollToLatestMessage();
@@ -142,7 +171,7 @@
 
     async function sendMain(continueResponse:boolean) {
         let selectedChar = $selectedCharID
-        if($doingChat){
+        if(currentChatGenerating){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -174,6 +203,8 @@
                         cha.push({
                             role: 'user',
                             data: '*says nothing*',
+                            chatId: v4(),
+                            time: Date.now(),
                             name: $ConnectionOpenStore ? DBState.db.username : null
                         })
                     }
@@ -191,6 +222,7 @@
                 cha.push({
                     role: 'user',
                     data: await processScript(char,messageInput,'editinput'),
+                    chatId: v4(),
                     time: Date.now(),
                     name: $ConnectionOpenStore ? DBState.db.username : null
                 })
@@ -199,6 +231,7 @@
                 cha.push({
                     role: 'user',
                     data: messageInput,
+                    chatId: v4(),
                     time: Date.now(),
                     name: $ConnectionOpenStore ? DBState.db.username : null
                 })
@@ -215,7 +248,7 @@
     }
 
     async function reroll() {
-        if($doingChat){
+        if(currentChatGenerating){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -270,7 +303,7 @@
     }
 
     async function unReroll() {
-        if($doingChat){
+        if(currentChatGenerating){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -328,6 +361,20 @@
     }
 
     function abortChat(){
+        const currentCharacter = DBState.db.characters[$selectedCharID]
+        const currentChat = currentCharacter?.chats?.[currentCharacter.chatPage]
+        const serverJob = currentCharacter?.chaId && currentChat?.id
+            ? getActiveServerJobForChat(currentCharacter.chaId, currentChat.id)
+            : null
+
+        if(serverJob){
+            cancelServerGenerationJob(serverJob.job_id).catch((error) => {
+                console.error(error)
+                alertError(error)
+            })
+            return
+        }
+
         if(abortController){
             abortController.abort()
         }
@@ -655,7 +702,7 @@
                 ></textarea>
 
 
-                {#if $doingChat || doingChatInputTranslate}
+                {#if currentChatGenerating || doingChatInputTranslate}
                     <button
                             aria-labelledby="cancel"
                             class="peer-focus:border-textcolor  flex justify-center border-y border-darkborderc items-center text-gray-100 p-3 hover:bg-blue-500 transition-colors" onclick={abortChat}
@@ -722,6 +769,15 @@
                               placeholder={language.enterMessageForTranslateToEnglish}
                               style:height={inputTranslateHeight}
                     ></textarea>
+                </div>
+            {/if}
+
+            {#if currentChatServerStatus}
+                <div class="mx-4 mb-2 text-xs text-textcolor2">
+                    Server status: <span class={currentChatServerStatus.className}>{currentChatServerStatus.label}</span>
+                    {#if currentChatServerMeta.lastJobError}
+                        <span class="text-red-400"> ({currentChatServerMeta.lastJobError})</span>
+                    {/if}
                 </div>
             {/if}
 

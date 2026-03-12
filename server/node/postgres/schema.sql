@@ -54,11 +54,18 @@ CREATE TABLE IF NOT EXISTS risu_chat_sessions (
 CREATE TABLE IF NOT EXISTS risu_generation_jobs (
     job_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_key TEXT NOT NULL,
+    account_id TEXT,
     device_id TEXT,
+    character_id TEXT,
+    chat_document_key TEXT,
+    assistant_message_chat_id TEXT,
+    client_request_id TEXT,
     status TEXT NOT NULL DEFAULT 'queued',
+    request_payload_version INTEGER NOT NULL DEFAULT 1,
     request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     result_payload JSONB,
     error_text TEXT,
+    cancel_requested_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     started_at TIMESTAMPTZ,
@@ -67,11 +74,36 @@ CREATE TABLE IF NOT EXISTS risu_generation_jobs (
         CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled'))
 );
 
+ALTER TABLE risu_generation_jobs
+    ADD COLUMN IF NOT EXISTS account_id TEXT,
+    ADD COLUMN IF NOT EXISTS device_id TEXT,
+    ADD COLUMN IF NOT EXISTS character_id TEXT,
+    ADD COLUMN IF NOT EXISTS chat_document_key TEXT,
+    ADD COLUMN IF NOT EXISTS assistant_message_chat_id TEXT,
+    ADD COLUMN IF NOT EXISTS client_request_id TEXT,
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'queued',
+    ADD COLUMN IF NOT EXISTS request_payload_version INTEGER NOT NULL DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS result_payload JSONB,
+    ADD COLUMN IF NOT EXISTS error_text TEXT,
+    ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_risu_generation_jobs_status
     ON risu_generation_jobs (status, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_risu_generation_jobs_session_key
     ON risu_generation_jobs (session_key, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_risu_generation_jobs_account_id
+    ON risu_generation_jobs (account_id, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_risu_generation_jobs_client_request
+    ON risu_generation_jobs (session_key, client_request_id)
+    WHERE client_request_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS risu_generation_job_events (
     id BIGSERIAL PRIMARY KEY,

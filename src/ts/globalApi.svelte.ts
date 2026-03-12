@@ -40,6 +40,7 @@ import { fetch as TauriHTTPFetch } from '@tauri-apps/plugin-http';
 import { moduleUpdate } from "./process/modules";
 import type { AccountStorage } from "./storage/accountStorage";
 import { makeColdData } from "./process/coldstorage.svelte";
+import { flushLiveStateToServer, isServerGenerationSupported, syncLiveChatDocumentsFromServer } from "./process/serverGeneration.svelte";
 import { isTauri, isNodeServer } from "./platform";
 
 export const forageStorage = new AutoStorage()
@@ -417,6 +418,12 @@ export async function saveDb() {
             if (!db.characters) {
                 await sleep(1000)
                 continue
+            }
+
+            if (await isServerGenerationSupported()) {
+                await flushLiveStateToServer()
+                await syncLiveChatDocumentsFromServer()
+                db = getDatabase()
             }
 
             await encoder.set(db, toSave)

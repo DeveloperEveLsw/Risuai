@@ -54,12 +54,41 @@ vi.mock('uuid', () => ({
     v4: vi.fn(() => 'test-uuid-1234'),
 }))
 
-vi.mock(import('src/ts/storage/database.svelte'), () => ({
-    getDatabase: vi.fn(),
+vi.mock('src/ts/storage/database.svelte', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('src/ts/storage/database.svelte')>()
+    return {
+        ...actual,
+        getDatabase: vi.fn(() => ({
+            aiModel: 'gpt-4o-mini',
+        })),
+        getCurrentChat: vi.fn(() => ({
+            message: [],
+        })),
+        getCurrentCharacter: vi.fn(() => null),
+    }
+})
+
+vi.mock('src/ts/stores.svelte', () => ({
+    DBState: {
+        db: {
+            characters: [],
+            modules: [],
+            enabledModules: [],
+        },
+    },
+    selIdState: {
+        selId: -1,
+    },
+    selectedCharID: {
+        subscribe: vi.fn(() => () => {}),
+    },
+    ReloadGUIPointer: {
+        subscribe: vi.fn(() => () => {}),
+    },
 }))
 
 vi.mock(
-    import('src/ts/util'),
+    'src/ts/util',
     () =>
         ({
             asBuffer: (arr: Uint8Array) => arr,

@@ -20,6 +20,7 @@
     import { language } from "src/lang";
     import Toggles from "./Toggles.svelte";
     import { changeChatTo, createChatCopyName } from "src/ts/globalApi.svelte";
+    import { getLiveChatMetadata } from "src/ts/process/serverGeneration.svelte";
 
     interface Props {
         chara: character|groupChat;
@@ -35,6 +36,32 @@
     let listEle: HTMLDivElement = $state()
     let sorted = $state(0)
     let opened = 0
+
+    const getChatServerMeta = (chat: Chat) => {
+        if(!chara?.chaId || !chat?.id){
+            return null
+        }
+        return getLiveChatMetadata(`chat:${chara.chaId}:${chat.id}`)
+    }
+
+    const getChatServerStatus = (chat: Chat) => {
+        const meta = getChatServerMeta(chat)
+        const status = chat.isStreaming ? (meta?.lastJobStatus === 'queued' ? 'queued' : 'running') : meta?.lastJobStatus
+        switch (status) {
+            case 'queued':
+                return { label: 'QUEUED', className: 'text-sky-400' }
+            case 'running':
+                return { label: 'RUNNING', className: 'text-green-400' }
+            case 'completed':
+                return { label: 'COMPLETED', className: 'text-cyan-400' }
+            case 'failed':
+                return { label: 'FAILED', className: 'text-red-400' }
+            case 'cancelled':
+                return { label: 'CANCELLED', className: 'text-yellow-400' }
+            default:
+                return null
+        }
+    }
 
     const createStb = () => {
         for (let chat of listEle.querySelectorAll('.risu-chat')) {
@@ -254,6 +281,10 @@
                             <TextInput bind:value={chat.name} className="grow min-w-0" padding={false}/>
                         {:else}
                             <span>{chat.name}</span>
+                            {@const serverStatus = getChatServerStatus(chat)}
+                            {#if serverStatus}
+                                <span class={`ml-2 text-xs ${serverStatus.className}`}>{serverStatus.label}</span>
+                            {/if}
                         {/if}
                         <div class="grow flex justify-end">
                             <div role="button" tabindex="0" onkeydown={(e) => {
@@ -365,6 +396,10 @@
                     <TextInput bind:value={chara.chats[i].name} className="grow min-w-0" padding={false}/>
                 {:else}
                     <span>{chat.name}</span>
+                    {@const serverStatus = getChatServerStatus(chat)}
+                    {#if serverStatus}
+                        <span class={`ml-2 text-xs ${serverStatus.className}`}>{serverStatus.label}</span>
+                    {/if}
                 {/if}
                 <div class="grow flex justify-end">
                     <div role="button" tabindex="0" onkeydown={(e) => {
