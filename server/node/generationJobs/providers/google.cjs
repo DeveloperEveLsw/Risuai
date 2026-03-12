@@ -17,36 +17,47 @@ async function* iterateGoogleSse(body, abortSignal) {
         }
 
         buffer += decodeUint8Array(value);
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop() ?? '';
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
 
-        for (const part of parts) {
-            const lines = part
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean);
-
-            for (const line of lines) {
-                if (!line.startsWith('data:')) {
-                    continue;
-                }
-
-                const payloadText = line.slice(5).trim();
-                if (!payloadText || payloadText === '[DONE]') {
-                    continue;
-                }
-
-                let parsed;
-                try {
-                    parsed = JSON.parse(payloadText);
-                }
-                catch (_error) {
-                    continue;
-                }
-
-                yield parsed;
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line.startsWith('data:')) {
+                continue;
             }
+
+            const payloadText = line.slice(5).trim();
+            if (!payloadText || payloadText === '[DONE]') {
+                continue;
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(payloadText);
+            }
+            catch (_error) {
+                continue;
+            }
+
+            yield parsed;
         }
+    }
+
+    const tail = buffer.trim();
+    if (!tail.startsWith('data:')) {
+        return;
+    }
+
+    const payloadText = tail.slice(5).trim();
+    if (!payloadText || payloadText === '[DONE]') {
+        return;
+    }
+
+    try {
+        yield JSON.parse(payloadText);
+    }
+    catch (_error) {
+        return;
     }
 }
 
