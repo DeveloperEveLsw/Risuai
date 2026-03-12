@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
     buildGenerationSubmitChat,
+    getServerGenerationCompatibilityReport,
     getServerGenerationPolicyError,
     inferServerGenerationProvider,
     mergeChatsForLivePatch,
@@ -152,6 +153,7 @@ describe('serverGenerationShared', () => {
                 hasEditOutputPlugin: false,
                 hasAfterRequestPlugin: false,
             },
+            presetRegex: [],
             preparedRequest: {
                 url: 'https://api.openai.com/v1/chat/completions',
                 headers: {},
@@ -171,6 +173,7 @@ describe('serverGenerationShared', () => {
                 hasEditOutputPlugin: false,
                 hasAfterRequestPlugin: false,
             },
+            presetRegex: [],
             preparedRequest: {
                 url: 'https://api.openai.com/v1/chat/completions',
                 headers: {},
@@ -180,5 +183,105 @@ describe('serverGenerationShared', () => {
                 },
             },
         })).toBe('Server-owned generation does not support tool-calling requests yet.')
+    })
+
+    test('getServerGenerationPolicyError allows built-in requests even when plugin metadata is stale elsewhere', () => {
+        expect(getServerGenerationPolicyError({
+            currentChar: {
+                customscript: [],
+                triggerscript: [],
+            },
+            pluginState: {
+                hasProviderPlugin: false,
+                hasEditOutputPlugin: false,
+                hasAfterRequestPlugin: false,
+            },
+            presetRegex: [
+                { type: 'editprocess' } as any,
+                { type: 'editdisplay' } as any,
+            ],
+            preparedRequest: {
+                url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0:streamGenerateContent?alt=sse',
+                headers: {},
+                body: {
+                    contents: [],
+                },
+            },
+        })).toBe(null)
+    })
+
+    test('getServerGenerationPolicyError rejects preset editoutput regex', () => {
+        expect(getServerGenerationPolicyError({
+            currentChar: {
+                customscript: [],
+                triggerscript: [],
+            },
+            pluginState: {
+                hasProviderPlugin: false,
+                hasEditOutputPlugin: false,
+                hasAfterRequestPlugin: false,
+            },
+            presetRegex: [
+                { type: 'editoutput' } as any,
+            ],
+            preparedRequest: {
+                url: 'https://api.openai.com/v1/chat/completions',
+                headers: {},
+                body: {
+                    messages: [],
+                },
+            },
+        })).toBe('Server-owned generation is not compatible with preset editoutput regex.')
+    })
+
+    test('getServerGenerationCompatibilityReport distinguishes request transforms from plugin executors', () => {
+        expect(getServerGenerationCompatibilityReport({
+            currentChar: {
+                customscript: [],
+                triggerscript: [],
+            },
+            pluginState: {
+                hasProviderPlugin: false,
+                hasEditOutputPlugin: false,
+                hasAfterRequestPlugin: false,
+            },
+            presetRegex: [
+                { type: 'editprocess' } as any,
+                { type: 'editdisplay' } as any,
+            ],
+            preparedRequest: {
+                url: 'https://api.openai.com/v1/chat/completions',
+                headers: {},
+                body: {
+                    messages: [],
+                },
+            },
+        })).toMatchObject({
+            executionOwner: 'builtin-http',
+            hasRequestMutators: true,
+            hasDisplayMutators: true,
+            hasResponseMutators: false,
+            blockers: [],
+        })
+
+        expect(getServerGenerationCompatibilityReport({
+            currentChar: {
+                customscript: [],
+                triggerscript: [],
+            },
+            pluginState: {
+                hasProviderPlugin: true,
+                hasEditOutputPlugin: false,
+                hasAfterRequestPlugin: false,
+            },
+            presetRegex: [],
+            preparedRequest: {
+                url: 'https://api.openai.com/v1/chat/completions',
+                headers: {},
+                body: {
+                    messages: [],
+                },
+            },
+        }).executionOwner).toBe('plugin-executor')
     })
 })

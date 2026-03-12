@@ -1500,8 +1500,9 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                     const activeModelInfo = getModelInfo(DBState.db.aiModel)
                     const policyError = getServerGenerationPolicyError({
                         currentChar,
+                        presetRegex: DBState.db.presetRegex,
                         pluginState: {
-                            hasProviderPlugin: activeModelInfo.format === LLMFormat.Plugin || !!DBState.db.currentPluginProvider || !!DBState.db.botPresets[DBState.db.botPresetsId]?.currentPluginProvider,
+                            hasProviderPlugin: activeModelInfo.format === LLMFormat.Plugin,
                             hasEditOutputPlugin: pluginV2.editoutput.size > 0,
                             hasAfterRequestPlugin: pluginV2.replacerafterRequest.size > 0,
                         },

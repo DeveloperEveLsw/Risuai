@@ -23,12 +23,21 @@ export type ResolvedServerProvider = {
 
 type PolicyState = {
     currentChar: Pick<character, 'customscript' | 'triggerscript'>
+    presetRegex?: Array<{ type?: string | null } | null>
     pluginState: {
         hasProviderPlugin: boolean
         hasEditOutputPlugin: boolean
         hasAfterRequestPlugin: boolean
     }
     preparedRequest?: PreparedServerProviderRequest | null
+}
+
+export type ServerGenerationCompatibilityReport = {
+    executionOwner: 'builtin-http' | 'plugin-executor' | 'unknown'
+    hasRequestMutators: boolean
+    hasDisplayMutators: boolean
+    hasResponseMutators: boolean
+    blockers: string[]
 }
 
 function cloneValue<T>(value: T): T {
@@ -317,34 +326,73 @@ function hasPreparedToolUse(preparedRequest?: PreparedServerProviderRequest | nu
     return false
 }
 
-export function getServerGenerationPolicyError(state: PolicyState) {
-    if (state.pluginState.hasProviderPlugin) {
-        return 'Server-owned generation does not support plugin providers yet.'
+function hasScriptType(scripts: Array<{ type?: string | null } | null | undefined>, type: string) {
+    return scripts.some((script) => script?.type === type)
+}
+
+export function getServerGenerationCompatibilityReport(state: PolicyState): ServerGenerationCompatibilityReport {
+    const executionOwner = state.pluginState.hasProviderPlugin
+        ? 'plugin-executor'
+        : inferServerGenerationProvider(state.preparedRequest ?? null)
+            ? 'builtin-http'
+            : 'unknown'
+
+    const hasPresetEditProcess = hasScriptType(state.presetRegex ?? [], 'editprocess')
+    const hasPresetEditDisplay = hasScriptType(state.presetRegex ?? [], 'editdisplay')
+    const hasPresetEditOutput = hasScriptType(state.presetRegex ?? [], 'editoutput')
+    const hasCharacterEditOutput = hasScriptType(state.currentChar.customscript ?? [], 'editoutput')
+    const hasOutputTriggers = hasScriptType(state.currentChar.triggerscript ?? [], 'output')
+    const hasResponseMutators = (
+        state.pluginState.hasEditOutputPlugin ||
+        state.pluginState.hasAfterRequestPlugin ||
+        hasCharacterEditOutput ||
+        hasOutputTriggers ||
+        hasPresetEditOutput
+    )
+
+    const blockers: string[] = []
+
+    if (executionOwner === 'plugin-executor') {
+        blockers.push('Server-owned generation does not support plugin providers yet.')
     }
 
     if (state.pluginState.hasEditOutputPlugin) {
-        return 'Server-owned generation is not compatible with output-editing plugins.'
+        blockers.push('Server-owned generation is not compatible with output-editing plugins.')
     }
 
     if (state.pluginState.hasAfterRequestPlugin) {
-        return 'Server-owned generation is not compatible with response-rewriting plugins.'
+        blockers.push('Server-owned generation is not compatible with response-rewriting plugins.')
     }
 
-    if (state.currentChar.customscript?.some((script) => script?.type === 'editoutput')) {
-        return 'Server-owned generation is not compatible with editoutput scripts.'
+    if (hasCharacterEditOutput) {
+        blockers.push('Server-owned generation is not compatible with editoutput scripts.')
     }
 
-    if (state.currentChar.triggerscript?.some((trigger) => trigger?.type === 'output')) {
-        return 'Server-owned generation is not compatible with output triggers.'
+    if (hasOutputTriggers) {
+        blockers.push('Server-owned generation is not compatible with output triggers.')
+    }
+
+    if (hasPresetEditOutput) {
+        blockers.push('Server-owned generation is not compatible with preset editoutput regex.')
     }
 
     if (hasPreparedToolUse(state.preparedRequest)) {
-        return 'Server-owned generation does not support tool-calling requests yet.'
+        blockers.push('Server-owned generation does not support tool-calling requests yet.')
     }
 
-    if (!inferServerGenerationProvider(state.preparedRequest ?? null)) {
-        return 'Current provider path is not yet supported for server-owned generation.'
+    if (executionOwner === 'unknown') {
+        blockers.push('Current provider path is not yet supported for server-owned generation.')
     }
 
-    return null
+    return {
+        executionOwner,
+        hasRequestMutators: hasPresetEditProcess,
+        hasDisplayMutators: hasPresetEditDisplay,
+        hasResponseMutators,
+        blockers,
+    }
+}
+
+export function getServerGenerationPolicyError(state: PolicyState) {
+    return getServerGenerationCompatibilityReport(state).blockers[0] ?? null
 }
