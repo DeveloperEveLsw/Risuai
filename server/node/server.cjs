@@ -5,6 +5,7 @@ const htmlparser = require('node-html-parser');
 const { existsSync, mkdirSync, readFileSync, writeFileSync } = require('fs');
 const fs = require('fs/promises')
 const nodeCrypto = require('crypto')
+const { createStorageBackend } = require('./storage/index.cjs');
 app.use(express.static(path.join(process.cwd(), 'dist'), {index: false}));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
@@ -17,11 +18,16 @@ const openid = require('openid-client');
 
 let password = ''
 let knownPublicKeysHashes = []
+let serverInstance = null
+let shutdownInProgress = false
 
 const savePath = path.join(process.cwd(), "save")
 if(!existsSync(savePath)){
     mkdirSync(savePath)
 }
+const storageBackend = createStorageBackend({
+    savePath
+});
 
 const passwordPath = path.join(process.cwd(), 'save', '__password')
 if(existsSync(passwordPath)){
@@ -33,6 +39,13 @@ const hexRegex = /^[0-9a-fA-F]+$/;
 
 function isHex(str) {
     return hexRegex.test(str.toUpperCase().trim()) || str === '__password';
+}
+
+function decodeStorageKey(filePathHeader) {
+    if (!filePathHeader || !isHex(filePathHeader)) {
+        return null;
+    }
+    return Buffer.from(filePathHeader, 'hex').toString('utf-8');
 }
 
 async function hashJSON(json){
@@ -58,6 +71,13 @@ app.get('/', async (req, res, next) => {
         console.log(error)
         next(error)
     }
+})
+
+app.get('/healthz', (_req, res) => {
+    res.status(200).send({
+        status: 'ok',
+        storage: storageBackend.type,
+    });
 })
 
 async function checkAuth(req, res, returnOnlyStatus = false){
@@ -548,19 +568,21 @@ app.get('/api/read', async (req, res, next) => {
         return;
     }
 
-    if(!isHex(filePath)){
+    const storageKey = decodeStorageKey(filePath);
+    if(!storageKey){
         res.status(400).send({
             error:'Invaild Path'
         });
         return;
     }
     try {
-        if(!existsSync(path.join(savePath, filePath))){
+        const stored = await storageBackend.getItem(storageKey);
+        if(!stored){
             res.send();
         }
         else{
             res.setHeader('Content-Type','application/octet-stream');
-            res.sendFile(path.join(savePath, filePath));
+            res.send(Buffer.from(stored));
         }
     } catch (error) {
         next(error);
@@ -578,7 +600,8 @@ app.get('/api/remove', async (req, res, next) => {
         });
         return;
     }
-    if(!isHex(filePath)){
+    const storageKey = decodeStorageKey(filePath);
+    if(!storageKey){
         res.status(400).send({
             error:'Invaild Path'
         });
@@ -586,7 +609,7 @@ app.get('/api/remove', async (req, res, next) => {
     }
 
     try {
-        await fs.rm(path.join(savePath, filePath));
+        await storageBackend.removeItem(storageKey);
         res.send({
             success: true,
         });
@@ -600,9 +623,7 @@ app.get('/api/list', async (req, res, next) => {
         return;
     }
     try {
-        const data = (await fs.readdir(path.join(savePath))).map((v) => {
-            return Buffer.from(v, 'hex').toString('utf-8')
-        })
+        const data = await storageBackend.keys();
         res.send({
             success: true,
             content: data
@@ -618,13 +639,14 @@ app.post('/api/write', async (req, res, next) => {
     }
     const filePath = req.headers['file-path'];
     const fileContent = req.body
-    if (!filePath || !fileContent) {
+    if (!filePath || typeof fileContent === 'undefined') {
         res.status(400).send({
             error:'File path required'
         });
         return;
     }
-    if(!isHex(filePath)){
+    const storageKey = decodeStorageKey(filePath);
+    if(!storageKey){
         res.status(400).send({
             error:'Invaild Path'
         });
@@ -632,7 +654,7 @@ app.post('/api/write', async (req, res, next) => {
     }
 
     try {
-        await fs.writeFile(path.join(savePath, filePath), fileContent);
+        await storageBackend.setItem(storageKey, fileContent);
         res.send({
             success: true
         });
@@ -774,19 +796,20 @@ async function getHttpsOptions() {
 
 async function startServer() {
     try {
-      
         const port = process.env.PORT || 6001;
+        await storageBackend.initialize();
+        console.log(`[Server] Storage backend: ${storageBackend.type}`);
         const httpsOptions = await getHttpsOptions();
 
         if (httpsOptions) {
             // HTTPS
-            https.createServer(httpsOptions, app).listen(port, () => {
+            serverInstance = https.createServer(httpsOptions, app).listen(port, () => {
                 console.log("[Server] HTTPS server is running.");
                 console.log(`[Server] https://localhost:${port}/`);
             });
         } else {
             // HTTP
-            app.listen(port, () => {
+            serverInstance = app.listen(port, () => {
                 console.log("[Server] HTTP server is running.");
                 console.log(`[Server] http://localhost:${port}/`);
             });
@@ -796,6 +819,51 @@ async function startServer() {
         process.exit(1);
     }
 }
+
+async function shutdownServer(signal) {
+    if (shutdownInProgress) {
+        return;
+    }
+
+    shutdownInProgress = true;
+    console.log(`[Server] Received ${signal}, shutting down...`);
+
+    const tasks = [];
+
+    if (serverInstance) {
+        tasks.push(new Promise((resolve, reject) => {
+            serverInstance.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+        }));
+    }
+
+    if (typeof storageBackend.close === 'function') {
+        tasks.push(storageBackend.close());
+    }
+
+    const results = await Promise.allSettled(tasks);
+    const failure = results.find((result) => result.status === 'rejected');
+
+    if (failure) {
+        console.error('[Server] Shutdown failed:', failure.reason);
+        process.exit(1);
+    }
+
+    process.exit(0);
+}
+
+process.on('SIGINT', () => {
+    void shutdownServer('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+    void shutdownServer('SIGTERM');
+});
 
 (async () => {
     await startServer();

@@ -1,1 +1,16 @@
+.git
+.github
+.vscode
+.env
+.env.*
+!.env.example
 node_modules
+dist
+coverage
+save
+target
+src-tauri/target
+*.log
+Dockerfile*
+docker-compose*.yml
+AGENTS.md
