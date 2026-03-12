@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 type MockDatabase = {
     language?: string
     username?: string
+    presetRegex?: any[]
     characters: any[]
 }
 
@@ -348,6 +349,13 @@ describe('serverGeneration live client flow', () => {
     test('ensureLiveServerSubscription applies multiple streamed chat updates', async () => {
         const { mod, mockDBState } = await setupModule({
             language: 'en',
+            presetRegex: [
+                {
+                    type: 'editoutput',
+                    in: 'foo',
+                    out: 'foo!',
+                },
+            ],
             characters: [
                 {
                     chaId: 'char-1',
@@ -399,5 +407,64 @@ describe('serverGeneration live client flow', () => {
         expect(mockDBState.db.characters[0].chats[0].isStreaming).toBe(false)
         expect(mod.getLiveChatRevision('chat:char-1:chat-1')).toBe(3)
         expect(mod.getLiveChatMetadata('chat:char-1:chat-1')?.lastJobStatus).toBe('completed')
+    })
+
+    test('applyLiveChatDocument does not reapply local preset editoutput to server-mutated text', async () => {
+        const { mod, mockDBState } = await setupModule({
+            language: 'en',
+            presetRegex: [
+                {
+                    type: 'editoutput',
+                    in: 'foo',
+                    out: 'foo!',
+                },
+            ],
+            characters: [
+                {
+                    chaId: 'char-1',
+                    name: 'Character',
+                    chats: [
+                        {
+                            id: 'chat-1',
+                            name: 'Chat',
+                            note: '',
+                            localLore: [],
+                            message: [{ role: 'char', data: '', chatId: 'assistant-1' }],
+                            isStreaming: true,
+                        },
+                    ],
+                    chatFolders: [],
+                    chatPage: 0,
+                },
+            ],
+        })
+
+        global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+            const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
+            if (url === '/healthz') {
+                return jsonResponse({ storage: 'postgres' })
+            }
+            if (url.startsWith('/api/live/events?session_key=')) {
+                const encoder = new TextEncoder()
+                return new Response(new ReadableStream({
+                    start(controller) {
+                        controller.enqueue(encoder.encode('event: ready\ndata: {"type":"ready","sessionKey":"database/database.bin"}\n\n'))
+                        controller.enqueue(encoder.encode('event: chat_updated\ndata: {"type":"chat_updated","chatKey":"chat:char-1:chat-1","revision":2,"payload":{"id":"chat-1","name":"Chat","note":"","localLore":[],"message":[{"role":"char","data":"foo!","chatId":"assistant-1","generationInfo":{"serverOutputMutators":{"presetEditOutput":true}}}],"isStreaming":false},"metadata":{"lastJobStatus":"completed"}}\n\n'))
+                        controller.close()
+                    },
+                }), {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'text/event-stream',
+                    },
+                })
+            }
+            throw new Error(`Unexpected fetch: ${url}`)
+        }) as typeof fetch
+
+        await mod.ensureLiveServerSubscription()
+        mod.stopLiveServerSubscription()
+
+        expect(mockDBState.db.characters[0].chats[0].message[0].data).toBe('foo!')
     })
 })

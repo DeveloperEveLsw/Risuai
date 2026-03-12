@@ -1,4 +1,4 @@
-import type { Chat, Message, character } from "../storage/database.svelte";
+import type { Chat, Message, character, customscript } from "../storage/database.svelte";
 
 export type ServerProviderType = 'openai-compatible' | 'anthropic' | 'google';
 
@@ -23,7 +23,7 @@ export type ResolvedServerProvider = {
 
 type PolicyState = {
     currentChar: Pick<character, 'customscript' | 'triggerscript'>
-    presetRegex?: Array<{ type?: string | null } | null>
+    presetRegex?: Array<customscript | { type?: string | null } | null>
     pluginState: {
         hasProviderPlugin: boolean
         hasEditOutputPlugin: boolean
@@ -38,6 +38,10 @@ export type ServerGenerationCompatibilityReport = {
     hasDisplayMutators: boolean
     hasResponseMutators: boolean
     blockers: string[]
+}
+
+export type ServerSafePresetEditOutputRegex = Pick<customscript, 'comment' | 'in' | 'out' | 'flag' | 'ableFlag'> & {
+    type: 'editoutput'
 }
 
 function cloneValue<T>(value: T): T {
@@ -330,6 +334,48 @@ function hasScriptType(scripts: Array<{ type?: string | null } | null | undefine
     return scripts.some((script) => script?.type === type)
 }
 
+function hasFlagActions(script: Pick<customscript, 'flag' | 'ableFlag'>) {
+    return !!(script.ableFlag && script.flag?.includes('<'))
+}
+
+function usesParserInterpolation(script: Pick<customscript, 'in' | 'out'>) {
+    return script.in.includes('{{') || script.out.includes('{{')
+}
+
+export function isServerSafePresetEditOutputRegex(
+    script: Pick<customscript, 'comment' | 'in' | 'out' | 'type' | 'flag' | 'ableFlag'> | null | undefined
+): script is ServerSafePresetEditOutputRegex {
+    if (!script || script.type !== 'editoutput') {
+        return false
+    }
+
+    if (typeof script.in !== 'string' || typeof script.out !== 'string') {
+        return false
+    }
+
+    if (hasFlagActions(script)) {
+        return false
+    }
+
+    if (script.out.startsWith('@@')) {
+        return false
+    }
+
+    if (usesParserInterpolation(script)) {
+        return false
+    }
+
+    return true
+}
+
+export function extractServerSafePresetEditOutputRegex(
+    scripts: Array<customscript | { type?: string | null } | null | undefined> = []
+): ServerSafePresetEditOutputRegex[] {
+    return scripts.filter((script): script is customscript => {
+        return !!script && typeof script === 'object' && 'in' in script && 'out' in script
+    }).filter(isServerSafePresetEditOutputRegex)
+}
+
 export function getServerGenerationCompatibilityReport(state: PolicyState): ServerGenerationCompatibilityReport {
     const executionOwner = state.pluginState.hasProviderPlugin
         ? 'plugin-executor'
@@ -340,6 +386,8 @@ export function getServerGenerationCompatibilityReport(state: PolicyState): Serv
     const hasPresetEditProcess = hasScriptType(state.presetRegex ?? [], 'editprocess')
     const hasPresetEditDisplay = hasScriptType(state.presetRegex ?? [], 'editdisplay')
     const hasPresetEditOutput = hasScriptType(state.presetRegex ?? [], 'editoutput')
+    const safePresetEditOutput = extractServerSafePresetEditOutputRegex((state.presetRegex ?? []) as customscript[])
+    const hasUnsupportedPresetEditOutput = hasPresetEditOutput && safePresetEditOutput.length !== (state.presetRegex ?? []).filter((script) => script?.type === 'editoutput').length
     const hasCharacterEditOutput = hasScriptType(state.currentChar.customscript ?? [], 'editoutput')
     const hasOutputTriggers = hasScriptType(state.currentChar.triggerscript ?? [], 'output')
     const hasResponseMutators = (
@@ -347,7 +395,7 @@ export function getServerGenerationCompatibilityReport(state: PolicyState): Serv
         state.pluginState.hasAfterRequestPlugin ||
         hasCharacterEditOutput ||
         hasOutputTriggers ||
-        hasPresetEditOutput
+        hasUnsupportedPresetEditOutput
     )
 
     const blockers: string[] = []
@@ -372,7 +420,7 @@ export function getServerGenerationCompatibilityReport(state: PolicyState): Serv
         blockers.push('Server-owned generation is not compatible with output triggers.')
     }
 
-    if (hasPresetEditOutput) {
+    if (hasUnsupportedPresetEditOutput) {
         blockers.push('Server-owned generation is not compatible with preset editoutput regex.')
     }
 

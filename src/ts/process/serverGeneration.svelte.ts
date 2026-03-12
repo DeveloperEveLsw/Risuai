@@ -7,6 +7,7 @@ import {
     buildGenerationSubmitChat,
     mergeChatsForLivePatch,
     type ServerProviderType,
+    type ServerSafePresetEditOutputRegex,
 } from "./serverGenerationShared";
 
 export type ServerGenerationJob = {
@@ -872,6 +873,9 @@ export async function submitServerGenerationJob(payload: {
             body: Record<string, any>
             stream: boolean
         }
+    }
+    outputMutators?: {
+        presetEditOutputRegex?: ServerSafePresetEditOutputRegex[]
     }
 }) {
     async function submitOnce(submitPayload: typeof payload) {

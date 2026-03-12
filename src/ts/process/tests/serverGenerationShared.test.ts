@@ -2,9 +2,11 @@ import { describe, expect, test } from 'vitest'
 
 import {
     buildGenerationSubmitChat,
+    extractServerSafePresetEditOutputRegex,
     getServerGenerationCompatibilityReport,
     getServerGenerationPolicyError,
     inferServerGenerationProvider,
+    isServerSafePresetEditOutputRegex,
     mergeChatsForLivePatch,
 } from '../serverGenerationShared'
 
@@ -210,7 +212,7 @@ describe('serverGenerationShared', () => {
         })).toBe(null)
     })
 
-    test('getServerGenerationPolicyError rejects preset editoutput regex', () => {
+    test('getServerGenerationPolicyError allows server-safe preset editoutput regex', () => {
         expect(getServerGenerationPolicyError({
             currentChar: {
                 customscript: [],
@@ -222,7 +224,39 @@ describe('serverGenerationShared', () => {
                 hasAfterRequestPlugin: false,
             },
             presetRegex: [
-                { type: 'editoutput' } as any,
+                {
+                    type: 'editoutput',
+                    in: '<!-- #End of previous response -->',
+                    out: '',
+                } as any,
+            ],
+            preparedRequest: {
+                url: 'https://api.openai.com/v1/chat/completions',
+                headers: {},
+                body: {
+                    messages: [],
+                },
+            },
+        })).toBe(null)
+    })
+
+    test('getServerGenerationPolicyError rejects unsupported preset editoutput regex', () => {
+        expect(getServerGenerationPolicyError({
+            currentChar: {
+                customscript: [],
+                triggerscript: [],
+            },
+            pluginState: {
+                hasProviderPlugin: false,
+                hasEditOutputPlugin: false,
+                hasAfterRequestPlugin: false,
+            },
+            presetRegex: [
+                {
+                    type: 'editoutput',
+                    in: '(.+)',
+                    out: '@@move_top $1',
+                } as any,
             ],
             preparedRequest: {
                 url: 'https://api.openai.com/v1/chat/completions',
@@ -232,6 +266,40 @@ describe('serverGenerationShared', () => {
                 },
             },
         })).toBe('Server-owned generation is not compatible with preset editoutput regex.')
+    })
+
+    test('extractServerSafePresetEditOutputRegex keeps only plain regex replacements', () => {
+        const scripts = extractServerSafePresetEditOutputRegex([
+            {
+                type: 'editoutput',
+                in: '<stats>',
+                out: '<stats>',
+            } as any,
+            {
+                type: 'editoutput',
+                in: '(.+)',
+                out: '@@inject $1',
+            } as any,
+            {
+                type: 'editprocess',
+                in: 'x',
+                out: 'y',
+            } as any,
+            {
+                type: 'editoutput',
+                in: 'foo',
+                out: '{{char}}',
+            } as any,
+        ])
+
+        expect(scripts).toEqual([
+            {
+                type: 'editoutput',
+                in: '<stats>',
+                out: '<stats>',
+            },
+        ])
+        expect(isServerSafePresetEditOutputRegex(scripts[0] as any)).toBe(true)
     })
 
     test('getServerGenerationCompatibilityReport distinguishes request transforms from plugin executors', () => {

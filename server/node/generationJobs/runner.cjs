@@ -1,4 +1,5 @@
 const { runProviderRequest, validateProviderRequest } = require('./providers/index.cjs');
+const { applyPresetEditOutputRegex } = require('./outputMutators.cjs');
 
 class GenerationRunner {
     constructor({ jobRepository, chatService, eventHub }) {
@@ -74,7 +75,11 @@ class GenerationRunner {
         try {
             const requestPayload = job.request_payload ?? {};
             const provider = requestPayload.provider ?? {};
+            const outputMutators = requestPayload.outputMutators ?? {};
             const target = requestPayload.target ?? {};
+            const presetEditOutputRegex = Array.isArray(outputMutators.presetEditOutputRegex)
+                ? outputMutators.presetEditOutputRegex
+                : [];
 
             const providerError = validateProviderRequest(provider);
             if (providerError) {
@@ -84,6 +89,7 @@ class GenerationRunner {
             const result = await runProviderRequest(provider, {
                 abortSignal: abortController.signal,
                 onText: async (textSnapshot) => {
+                    const mutatedTextSnapshot = applyPresetEditOutputRegex(textSnapshot, presetEditOutputRegex);
                     const currentJob = await this.jobRepository.getJob(jobId);
                     if (currentJob?.cancel_requested_at) {
                         abortController.abort();
@@ -99,7 +105,7 @@ class GenerationRunner {
                             chatPayload.isStreaming = true;
                             const message = messages.find((entry) => entry?.chatId === target.assistantMessageChatId);
                             if (message) {
-                                message.data = textSnapshot;
+                                message.data = mutatedTextSnapshot;
                             }
                         },
                         metadata: {
@@ -111,7 +117,7 @@ class GenerationRunner {
                     });
 
                     const eventRow = await this.jobRepository.appendEvent(jobId, 'text_snapshot', {
-                        text: textSnapshot,
+                        text: mutatedTextSnapshot,
                         chatRevision: chatUpdate.document?.revision ?? null,
                     });
 
@@ -120,10 +126,11 @@ class GenerationRunner {
                         jobId,
                         status: 'running',
                         sequenceNo: eventRow.sequence_no,
-                        text: textSnapshot,
+                        text: mutatedTextSnapshot,
                     });
                 },
             });
+            const finalText = applyPresetEditOutputRegex(result.finalText, presetEditOutputRegex);
 
             const completedAt = new Date();
             await this.chatService.patchChatDocument({
@@ -135,7 +142,7 @@ class GenerationRunner {
                     chatPayload.isStreaming = false;
                     const message = messages.find((entry) => entry?.chatId === target.assistantMessageChatId);
                     if (message) {
-                        message.data = result.finalText;
+                        message.data = finalText;
                         message.generationInfo = {
                             ...(message.generationInfo ?? {}),
                             model: result.model ?? message.generationInfo?.model,
@@ -154,14 +161,14 @@ class GenerationRunner {
             const updatedJob = await this.jobRepository.updateJobStatus(jobId, 'completed', {
                 finishedAt: completedAt,
                 resultPayload: {
-                    text: result.finalText,
+                    text: finalText,
                     model: result.model,
                 },
                 errorText: null,
             });
 
             const completedEvent = await this.jobRepository.appendEvent(jobId, 'generation_completed', {
-                text: result.finalText,
+                text: finalText,
                 model: result.model,
             });
 
@@ -170,7 +177,7 @@ class GenerationRunner {
                 jobId,
                 status: updatedJob?.status ?? 'completed',
                 sequenceNo: completedEvent.sequence_no,
-                text: result.finalText,
+                text: finalText,
                 model: result.model,
             });
         }

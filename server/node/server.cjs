@@ -1142,6 +1142,7 @@ app.post('/api/generation-jobs', async (req, res, next) => {
     const assistantMessage = body.assistantMessage ?? {};
     const userMessage = body.userMessage ?? null;
     const provider = body.provider ?? {};
+    const outputMutators = body.outputMutators ?? {};
     const chatSnapshot = body.chatSnapshot ?? { id: chatId, message: [] };
     const clientRequestId = body.clientRequestId ?? assistantMessage.chatId ?? null;
 
@@ -1252,6 +1253,7 @@ app.post('/api/generation-jobs', async (req, res, next) => {
             requestPayloadVersion: 1,
             requestPayload: {
                 provider,
+                outputMutators,
                 target: {
                     sessionKey,
                     characterId,

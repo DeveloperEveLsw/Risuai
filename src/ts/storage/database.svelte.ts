@@ -1718,6 +1718,9 @@ export interface MessageGenerationInfo{
     generationId?: string
     inputTokens?: number
     outputTokens?: number
+    serverOutputMutators?: {
+        presetEditOutput?: boolean
+    }
     maxContext?: number
     stageTiming?: {
         stage1?: number

@@ -34,7 +34,7 @@ import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
 import { getLiveChatRevision, isServerGenerationSupported, submitServerGenerationJob } from "./serverGeneration.svelte";
 import { pluginV2 } from "../plugins/plugins.svelte";
-import { getServerGenerationPolicyError, inferServerGenerationProvider } from "./serverGenerationShared";
+import { extractServerSafePresetEditOutputRegex, getServerGenerationPolicyError, inferServerGenerationProvider } from "./serverGenerationShared";
 
 export interface OpenAIChat{
     role: 'system'|'user'|'assistant'|'function'
@@ -1535,6 +1535,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
 
                     const currentChatSnapshot = safeStructuredClone(DBState.db.characters[selectedChar].chats[selectedChat])
                     const lastMessage = currentChatSnapshot.message.at(-1)
+                    const serverSafePresetEditOutputRegex = extractServerSafePresetEditOutputRegex(DBState.db.presetRegex)
                     if(lastMessage?.role === 'user' && !lastMessage.chatId){
                         lastMessage.chatId = v4()
                         lastMessage.time ??= Date.now()
@@ -1550,7 +1551,16 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                         data: '',
                         saying: currentChar.chaId,
                         time: Date.now(),
-                        generationInfo,
+                        generationInfo: {
+                            ...generationInfo,
+                            ...(serverSafePresetEditOutputRegex.length > 0
+                                ? {
+                                    serverOutputMutators: {
+                                        presetEditOutput: true,
+                                    },
+                                }
+                                : {}),
+                        },
                         promptInfo,
                         chatId: generationId,
                     }
@@ -1563,7 +1573,10 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                         userMessage,
                         assistantMessage,
                         clientRequestId: generationId,
-                        provider: resolvedProvider
+                        provider: resolvedProvider,
+                        outputMutators: {
+                            presetEditOutputRegex: serverSafePresetEditOutputRegex,
+                        },
                     })
 
                     stageTimings.stage3Duration = Date.now() - stageTimings.stage3Start
