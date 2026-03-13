@@ -40,7 +40,7 @@ import { fetch as TauriHTTPFetch } from '@tauri-apps/plugin-http';
 import { moduleUpdate } from "./process/modules";
 import type { AccountStorage } from "./storage/accountStorage";
 import { makeColdData } from "./process/coldstorage.svelte";
-import { flushLiveStateToServer, isServerGenerationSupported, syncLiveChatDocumentsFromServer } from "./process/serverGeneration.svelte";
+import { flushLiveStateToServer, isServerGenerationSupported } from "./process/serverGeneration.svelte";
 import { isTauri, isNodeServer } from "./platform";
 
 export const forageStorage = new AutoStorage()
@@ -360,7 +360,7 @@ export async function saveDb() {
             }
             if (DBState?.db?.characters?.[selIdState]) {
                 for (const key in DBState.db.characters[selIdState]) {
-                    if (key !== 'chats') {
+                    if (key !== 'chats' && key !== 'reloadKeys') {
                         $state.snapshot(DBState.db.characters[selIdState][key])
                     }
                 }
@@ -422,7 +422,6 @@ export async function saveDb() {
 
             if (await isServerGenerationSupported()) {
                 await flushLiveStateToServer()
-                await syncLiveChatDocumentsFromServer()
                 db = getDatabase()
             }
 

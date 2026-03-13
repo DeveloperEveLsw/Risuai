@@ -122,6 +122,7 @@ function buildRootDocumentPayload(database: Database) {
 
         const stripped = cloneValue(entry);
         stripped.chats = [];
+        delete stripped.reloadKeys;
         return stripped;
     });
     return payload;
@@ -130,6 +131,7 @@ function buildRootDocumentPayload(database: Database) {
 function buildCharacterDocumentPayload(character: any) {
     const payload = cloneValue(character);
     payload.chats = [];
+    delete payload.reloadKeys;
     return payload;
 }
 
@@ -275,6 +277,11 @@ function findChatIndicesByKey(chatKey: string) {
 }
 
 function applyLiveRootDocument(payload: Database, revision?: number) {
+    const currentRevision = get(liveRootRevision);
+    if (revision != null && currentRevision != null && revision < currentRevision) {
+        return;
+    }
+
     const currentCharacters = new Map(
         (DBState.db.characters ?? [])
             .filter((entry: any) => entry?.chaId)
@@ -313,7 +320,13 @@ function applyLiveCharacterDocument(characterKey: string, payload: any, revision
         return;
     }
 
+    const currentRevision = get(liveCharacterRevisions)[characterKey];
+    if (revision != null && currentRevision != null && revision < currentRevision) {
+        return;
+    }
+
     const nextPayload = cloneValue(payload);
+    delete nextPayload.reloadKeys;
     const characterIndex = DBState.db.characters?.findIndex((entry: any) => entry?.chaId === characterId) ?? -1;
     if (characterIndex === -1) {
         DBState.db.characters.push({
@@ -329,8 +342,6 @@ function applyLiveCharacterDocument(characterKey: string, payload: any, revision
             ...nextPayload,
             chats: cloneValue(existing?.chats ?? []),
         };
-        DBState.db.characters[characterIndex].reloadKeys ??= 0;
-        DBState.db.characters[characterIndex].reloadKeys += 1;
     }
 
     if (revision != null) {
@@ -349,6 +360,11 @@ function applyLiveCharacterDocument(characterKey: string, payload: any, revision
 function applyLiveChatDocument(chatKey: string, payload: Chat, revision?: number, metadata?: Record<string, any>) {
     const parts = chatKey.split(':');
     if (parts.length !== 3 || parts[0] !== 'chat') {
+        return;
+    }
+
+    const currentRevision = get(liveChatRevisions)[chatKey];
+    if (revision != null && currentRevision != null && revision < currentRevision) {
         return;
     }
 
@@ -385,8 +401,6 @@ function applyLiveChatDocument(chatKey: string, payload: Chat, revision?: number
         character.chats[chatIndex] = nextChatPayload;
     }
 
-    character.reloadKeys ??= 0;
-    character.reloadKeys += 1;
     if (revision != null) {
         liveChatRevisions.update((current) => ({ ...current, [chatKey]: revision }));
     }

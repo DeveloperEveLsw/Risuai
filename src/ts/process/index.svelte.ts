@@ -1671,11 +1671,9 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                 let result2 = await processScriptFull(nowChatroom, reformatContent(prefix + result), 'editoutput', msgIndex)
                 DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex].data = result2.data
                 emoChanged = result2.emoChanged
-                DBState.db.characters[selectedChar].reloadKeys += 1
             }
             if(readed.done){
                 DBState.db.characters[selectedChar].chats[selectedChat].isStreaming = false
-                DBState.db.characters[selectedChar].reloadKeys += 1
                 break
             }   
         }
@@ -1760,7 +1758,6 @@ export async function sendChat(chatProcessIndex = -1,arg:{
             else{
                 mrerolls.push(result)
             }
-            DBState.db.characters[selectedChar].reloadKeys += 1
             if(DBState.db.ttsAutoSpeech){
                 await sayTTS(currentChar, result)
             }
