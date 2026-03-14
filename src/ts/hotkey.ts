@@ -5,7 +5,8 @@ import { alertStore, MobileGUIStack, MobileSideBar, openPersonaList, openPresetL
 import { language } from "src/lang"
 import { updateTextThemeAndCSS } from "./gui/colorscheme"
 import { defaultHotkeys } from "./defaulthotkeys"
-import { doingChat, previewBody, sendChat } from "./process/index.svelte"
+import { doingChat, previewBody } from "./process/index.svelte"
+import { createRuntimeStartCommand, startRuntimeRequest } from "./process/runtimeClient"
 
 export function initHotkey(){
     document.addEventListener('keydown', async (ev) => {
@@ -150,14 +151,13 @@ export function initHotkey(){
                     alertWait("Loading...")
                     ev.preventDefault()
                     ev.stopPropagation()
-                    await sendChat(-1, {
+                    await startRuntimeRequest(createRuntimeStartCommand({
                         previewPrompt: true
-                    })
+                    })).promise
 
                     let md = ''
                     md += '### Prompt\n'
                     md += '```json\n' + JSON.stringify(JSON.parse(previewBody), null, 2).replaceAll('```', '\\`\\`\\`') + '\n```\n'
-                    doingChat.set(false)
                     alertMd(md)
                     return
                 }

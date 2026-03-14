@@ -1,10 +1,50 @@
 import { language } from 'src/lang'
 import { alertConfirm } from 'src/ts/alert'
 import { type character, type groupChat, type loreBook } from 'src/ts/storage/database.svelte'
-import { DBState } from 'src/ts/stores.svelte'
 import { pickHashRand } from 'src/ts/util'
 import { type MCPTool, MCPToolHandler, type RPCToolCallContent } from '../mcplib'
-import { getCharacter } from './utils'
+import { getRequestRuntimeContext } from '../../runtimeContext'
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+  return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+  return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+  return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function getSelectedCharacterIndex() {
+  return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
+
+function getCharacterRecord(id: string) {
+  const db = getDatabase()
+  const index = id
+    ? db.characters.findIndex((char) => char.chaId === id || char.name === id)
+    : getSelectedCharacterIndex()
+
+  if (index < 0) {
+    return {
+      db,
+      char: null as character | groupChat | null,
+      index,
+    }
+  }
+
+  return {
+    db,
+    char: id ? db.characters[index] : getCurrentCharacter(),
+    index,
+  }
+}
+
+function getCharacter(id: string) {
+  return getCharacterRecord(id).char
+}
 
 export class CharacterHandler extends MCPToolHandler {
   private promptAccess(tool: string, action: string) {
@@ -522,7 +562,7 @@ export class CharacterHandler extends MCPToolHandler {
   }
 
   async setCharacterInfo(id: string, data: any): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -572,6 +612,7 @@ export class CharacterHandler extends MCPToolHandler {
         ]
       }
     }
+    setDatabase(db)
 
     return [
       {
@@ -589,7 +630,7 @@ export class CharacterHandler extends MCPToolHandler {
     newName?: string,
     alwaysActive?: boolean
   ): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -637,6 +678,7 @@ export class CharacterHandler extends MCPToolHandler {
         mode: 'normal',
       }
       char.globalLore.push(newEntry)
+      setDatabase(db)
       return [
         {
           type: 'text',
@@ -662,6 +704,7 @@ export class CharacterHandler extends MCPToolHandler {
         entry.key = ''
       }
     }
+    setDatabase(db)
 
     return [
       {
@@ -672,7 +715,7 @@ export class CharacterHandler extends MCPToolHandler {
   }
 
   async deleteCharacterLorebook(id: string, name: string): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -718,6 +761,7 @@ export class CharacterHandler extends MCPToolHandler {
     }
 
     char.globalLore.splice(entryIndex, 1)
+    setDatabase(db)
 
     return [
       {
@@ -775,7 +819,7 @@ export class CharacterHandler extends MCPToolHandler {
     flag?: string,
     ableFlag?: boolean
   ): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -826,6 +870,7 @@ export class CharacterHandler extends MCPToolHandler {
       }
 
       char.customscript.push(newScript)
+      setDatabase(db)
       return [
         {
           type: 'text',
@@ -842,6 +887,7 @@ export class CharacterHandler extends MCPToolHandler {
     if (type !== undefined) script.type = type
     if (flag !== undefined) script.flag = flag
     if (ableFlag !== undefined) script.ableFlag = ableFlag
+    setDatabase(db)
 
     return [
       {
@@ -852,7 +898,7 @@ export class CharacterHandler extends MCPToolHandler {
   }
 
   async deleteCharacterRegexScripts(id: string, name: string): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -902,6 +948,7 @@ export class CharacterHandler extends MCPToolHandler {
     }
 
     char.customscript.splice(scriptIndex, 1)
+    setDatabase(db)
 
     return [
       {
@@ -945,7 +992,7 @@ export class CharacterHandler extends MCPToolHandler {
   }
 
   async deleteCharacterAdditionalAssets(id: string, assetName: string): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -995,6 +1042,7 @@ export class CharacterHandler extends MCPToolHandler {
     }
 
     char.additionalAssets.splice(assetIndex, 1)
+    setDatabase(db)
 
     return [
       {
@@ -1042,7 +1090,7 @@ export class CharacterHandler extends MCPToolHandler {
   }
 
   async setCharacterLuaScript(id: string, code: string): Promise<RPCToolCallContent[]> {
-    const char: character | groupChat = getCharacter(id)
+    const { db, char } = getCharacterRecord(id)
     if (!char) {
       return [
         {
@@ -1072,6 +1120,7 @@ export class CharacterHandler extends MCPToolHandler {
     const firstTrigger = char.triggerscript?.[0]
     if (firstTrigger?.effect?.[0]?.type === 'triggerlua') {
       firstTrigger.effect[0].code = code
+      setDatabase(db)
       return [
         {
           type: 'text',
@@ -1093,7 +1142,8 @@ export class CharacterHandler extends MCPToolHandler {
     if (count < 1) count = 1
     if (offset < 0) offset = 0
 
-    const characters = DBState.db.characters.slice(offset, offset + count).map((char) => ({
+    const db = getDatabase()
+    const characters = db.characters.slice(offset, offset + count).map((char) => ({
       id: char.chaId,
       name: char.name || 'Unnamed',
       type: char.type,

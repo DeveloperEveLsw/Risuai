@@ -1,4 +1,8 @@
-import { getDatabase } from "src/ts/storage/database.svelte";
+import { getRequestRuntimeContext } from "../runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export function getGenerationModelString(name?:string){
     const db = getDatabase()

@@ -672,6 +672,10 @@ export function getCurrentCharacter(options:getDatabaseOptions = {}):character|g
     return char
 }
 
+export function getCurrentCharacterIndex(){
+    return get(selectedCharID)
+}
+
 export function setCurrentCharacter(char:character|groupChat){
     if(!DBState.db.characters){
         DBState.db.characters = []

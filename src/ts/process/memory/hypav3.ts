@@ -11,7 +11,6 @@ import {
     type Chat,
     type character,
     type groupChat,
-    getDatabase,
 } from "src/ts/storage/database.svelte";
 import { type OpenAIChat } from "../index.svelte";
 import { requestChatData } from "../request/request";
@@ -19,6 +18,11 @@ import { chatCompletion, unloadEngine } from "../webllm";
 import { hypaV3ProgressStore } from "src/ts/stores.svelte";
 import { type ChatTokenizer } from "src/ts/tokenizer";
 import { inlayTokenRegex } from "src/ts/util/inlayTokens";
+import { getRequestRuntimeContext } from "../runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export interface HypaV3Preset {
     name: string;

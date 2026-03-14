@@ -1,6 +1,5 @@
 import { fetchNative, textifyReadableStream } from "src/ts/globalApi.svelte"
 import { LLMFlags, LLMFormat, type LLMModel } from "src/ts/model/modellist"
-import { getDatabase, setDatabase } from "src/ts/storage/database.svelte"
 import { base64url, simplifySchema } from "src/ts/util"
 import { v4 } from "uuid"
 import { saveInlayedSignature, setInlayAsset, writeInlayImage, type InlaySignature } from "../files/inlays"
@@ -11,6 +10,7 @@ import { addFetchLog } from "src/ts/globalApi.svelte"
 import type { RequestDataArgumentExtended, requestDataResponse, StreamResponseChunk } from './request'
 import { applyParameters, type LLMParameter } from './shared'
 import { bodyIntercepterStore } from "src/ts/stores.svelte"
+import { getRequestRuntimeContext } from "../runtimeContext"
 
 type GeminiFunctionCall = {
     id?: string;
@@ -34,6 +34,14 @@ interface GeminiPart{
     },
     functionCall?: GeminiFunctionCall
     functionResponse?: GeminiFunctionResponse
+}
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
 }
 
 interface GeminiChat {

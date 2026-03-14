@@ -1,9 +1,13 @@
 import localforage from "localforage";
 import { v4 } from "uuid";
 import { getImageType } from "src/ts/media";
-import { getDatabase } from "../../storage/database.svelte";
 import { getModelInfo, LLMFlags, LLMFormat } from "src/ts/model/modellist";
 import { asBuffer } from "../../util";
+import { getRequestRuntimeContext } from "../runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export type InlayAsset = {
     data: string | Blob

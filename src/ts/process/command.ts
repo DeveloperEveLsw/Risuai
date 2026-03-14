@@ -1,12 +1,34 @@
-import { get } from "svelte/store";
-import { getCurrentCharacter, getCurrentChat, getDatabase, setCurrentChat, setDatabase } from "../storage/database.svelte";
-import { selectedCharID } from "../stores.svelte";
 import { alertInput, alertMd, alertNormal, alertSelect } from "../alert";
 import { sayTTS } from "./tts";
 import { risuChatParser } from "../parser/parser.svelte";
 import { sendChat } from "./index.svelte";
 import { loadLoreBookV3Prompt } from "./lorebook.svelte";
 import { runTrigger } from "./triggers";
+import { getRequestRuntimeContext } from "./runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function getCurrentChat() {
+    return getRequestRuntimeContext().getCurrentChat()
+}
+
+function setCurrentChat(chat: Parameters<ReturnType<typeof getRequestRuntimeContext>["setCurrentChat"]>[0]) {
+    return getRequestRuntimeContext().setCurrentChat(chat)
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
 
 export async function processMultiCommand(command:string) {
     let pipe = ''
@@ -41,7 +63,8 @@ export async function processMultiCommand(command:string) {
 
 async function processCommand(command:string, pipe:string):Promise<false | string>{
     const db = getDatabase()
-    const currentChar = db.characters[get(selectedCharID)]
+    const selectedChar = getSelectedCharacterIndex()
+    const currentChar = db.characters[selectedChar]
     const currentChat = currentChar.chats[currentChar.chatPage]
     let {commandName, arg, namedArg} = commandParser(command, pipe)
 
@@ -182,7 +205,7 @@ async function processCommand(command:string, pipe:string):Promise<false | strin
         case 'setvar':{
             console.log(namedArg, arg)
             const db = getDatabase()
-            const selectedChar = get(selectedCharID)
+            const selectedChar = getSelectedCharacterIndex()
             const char = db.characters[selectedChar]
             const chat = char.chats[char.chatPage]
             chat.scriptstate = chat.scriptstate ?? {}
@@ -196,7 +219,7 @@ async function processCommand(command:string, pipe:string):Promise<false | strin
         }
         case 'addvar':{
             const db = getDatabase()
-            const selectedChar = get(selectedCharID)
+            const selectedChar = getSelectedCharacterIndex()
             const char = db.characters[selectedChar]
             const chat = char.chats[char.chatPage]
             chat.scriptstate = chat.scriptstate ?? {}
@@ -209,7 +232,7 @@ async function processCommand(command:string, pipe:string):Promise<false | strin
         }
         case 'getvar':{
             const db = getDatabase()
-            const selectedChar = get(selectedCharID)
+            const selectedChar = getSelectedCharacterIndex()
             const char = db.characters[selectedChar]
             const chat = char.chats[char.chatPage]
             chat.scriptstate = chat.scriptstate ?? {}

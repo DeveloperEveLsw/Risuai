@@ -1,5 +1,5 @@
 import type { OpenAIChat } from "../index.svelte";
-import { getDatabase, type Chat, type character, type groupChat } from "../../storage/database.svelte";
+import { type Chat, type character, type groupChat } from "../../storage/database.svelte";
 import { tokenize, type ChatTokenizer } from "../../tokenizer";
 import { requestChatData } from "../request/request";
 import { HypaProcesser } from "./hypamemory";
@@ -8,6 +8,11 @@ import { globalFetch } from "src/ts/globalApi.svelte";
 import { runSummarizer } from "../transformers";
 import { parseChatML } from "src/ts/parser/chatML";
 import { getUserName } from "src/ts/util";
+import { getRequestRuntimeContext } from "../runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export async function supaMemory(
         chats:OpenAIChat[],
@@ -428,4 +433,3 @@ export async function supaMemory(
 }
 
 type HypaData = {id:string,supa:string,hypa:string[]}
-

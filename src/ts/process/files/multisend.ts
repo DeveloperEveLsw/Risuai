@@ -1,12 +1,22 @@
-import { getDatabase, setDatabase } from 'src/ts/storage/database.svelte';
-import { selectedCharID } from 'src/ts/stores.svelte';
-import { get } from 'svelte/store';
-import { doingChat, sendChat } from '../index.svelte';
+import { sendChat } from '../index.svelte';
 import { downloadFile } from 'src/ts/globalApi.svelte';
 import { isTauri } from "src/ts/platform"
 import { HypaProcesser } from '../memory/hypamemory';
 import { BufferToText as BufferToText, selectMultipleFile } from 'src/ts/util';
 import { postInlayAsset } from './inlays';
+import { getRequestRuntimeContext } from '../runtimeContext';
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
 
 type sendFileArg = {
     file:string
@@ -21,7 +31,7 @@ async function sendPofile(arg:sendFileArg){
     let speaker = ''
     let parseMode = 0
     const db = getDatabase()
-    let currentChar = db.characters[get(selectedCharID)]
+    let currentChar = db.characters[getSelectedCharacterIndex()]
     let currentChat = currentChar.chats[currentChar.chatPage]
     const lines = arg.file.split('\n')
     for(let i=0;i<lines.length;i++){
@@ -44,11 +54,10 @@ async function sendPofile(arg:sendFileArg){
                 data: text
             })
             currentChar.chats[currentChar.chatPage] = currentChat
-            db.characters[get(selectedCharID)] = currentChar
+            db.characters[getSelectedCharacterIndex()] = currentChar
             setDatabase(db)
-            doingChat.set(false)
             await sendChat(-1);
-            currentChar = db.characters[get(selectedCharID)]
+            currentChar = db.characters[getSelectedCharacterIndex()]
             currentChat = currentChar.chats[currentChar.chatPage]
             const res = currentChat.message[currentChat.message.length-1]
             const msgStr = res.data.split('\n').filter((a) => {

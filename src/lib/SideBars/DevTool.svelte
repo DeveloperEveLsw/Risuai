@@ -13,7 +13,8 @@
     import TextAreaInput from "../UI/GUI/TextAreaInput.svelte";
     import { HardDriveUploadIcon, PlusIcon, TrashIcon } from "@lucide/svelte";
     import { selectSingleFile } from "src/ts/util";
-    import { doingChat, previewFormated, previewBody, sendChat } from "src/ts/process/index.svelte";
+    import { doingChat, previewFormated, previewBody } from "src/ts/process/index.svelte";
+    import { createRuntimeStartCommand, startRuntimeRequest } from "src/ts/process/runtimeClient";
     import SelectInput from "../UI/GUI/SelectInput.svelte";
     import { applyChatTemplate, chatTemplates } from "src/ts/process/templates/chatTemplate";
     import OptionInput from "../UI/GUI/OptionInput.svelte";
@@ -30,10 +31,10 @@
             return false
         }
         alertWait("Loading...")
-        await sendChat(-1, {
+        await startRuntimeRequest(createRuntimeStartCommand({
             preview: previewJoin !== 'prompt',
             previewPrompt: previewJoin === 'prompt'
-        })
+        })).promise
 
         let md = ''
         const styledRole = {
@@ -46,7 +47,6 @@
         if(previewJoin === 'prompt'){
             md += '### Prompt\n'
             md += '```json\n' + JSON.stringify(JSON.parse(previewBody), null, 2).replaceAll('```', '\\`\\`\\`') + '\n```\n'
-            $doingChat = false
             alertMd(md)
             return
         }
@@ -77,7 +77,6 @@
 
             md += '### Instruction\n'
             md += '```\n' + instructed.replaceAll('```', '\\`\\`\\`') + '\n```\n'
-            $doingChat = false
             alertMd(md)
             return
         }
@@ -101,7 +100,6 @@
 
             md += '```\n' + formated[i].content.replaceAll('```', '\\`\\`\\`') + '\n```\n'
         }
-        $doingChat = false
         alertMd(md)
     }
     
@@ -229,12 +227,10 @@
             }
             currentChar.chats[currentChar.chatPage] = currentChat
             db.characters[$selectedCharID] = currentChar
-            doingChat.set(false)
-            await sendChat(i);
+            await startRuntimeRequest(createRuntimeStartCommand({}, i)).promise;
             currentChar = db.characters[$selectedCharID]
             currentChat = currentChar.chats[currentChar.chatPage]
         }
-        doingChat.set(false)
     }}>Run</Button>
 </Accordion>
 

@@ -1,7 +1,6 @@
-import { get, writable, type Writable } from "svelte/store"
+import { writable, type Writable } from "svelte/store"
 import type { Database, Message } from "./storage/database.svelte"
-import { getDatabase } from "./storage/database.svelte"
-import { selectedCharID } from "./stores.svelte"
+import { getRequestRuntimeContext } from "./process/runtimeContext"
 import {open} from '@tauri-apps/plugin-dialog'
 import { readFile } from "@tauri-apps/plugin-fs"
 import { basename } from "@tauri-apps/api/path"
@@ -12,6 +11,22 @@ import type { Attachment } from "svelte/attachments"
 import { mount, unmount, type Snippet } from "svelte"
 import PopupList from "src/lib/UI/PopupList.svelte"
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function getCurrentChat() {
+    return getRequestRuntimeContext().getCurrentChat()
+}
 
 export interface Messagec extends Message{
     index: number
@@ -99,9 +114,7 @@ export async function selectMultipleFile(ext:string[]){
 }
 
 export const replacePlaceholders = (msg:string, name:string) => {
-    let db = getDatabase()
-    let selectedChar = get(selectedCharID)
-    let currentChar = db.characters[selectedChar]
+    let currentChar = getCurrentCharacter()
     return msg  .replace(/({{char}})|({{Char}})|(<Char>)|(<char>)/gi, currentChar.name)
                 .replace(/({{user}})|({{User}})|(<User>)|(<user>)/gi, getUserName())
                 .replace(/(\{\{((set)|(get))var::.+?\}\})/gu,'')
@@ -110,9 +123,8 @@ export const replacePlaceholders = (msg:string, name:string) => {
 function checkPersonaBinded(){
     try {
         let db = getDatabase()
-        const selectedChar = get(selectedCharID)
-        const character = db.characters[selectedChar]
-        const chat = character.chats[character.chatPage]
+        const character = getCurrentCharacter()
+        const chat = getCurrentChat()
         if(!chat.bindedPersona){
             return null
         }
@@ -289,7 +301,7 @@ export function defaultEmotion(em:[string,string][]){
 }
 
 export async function getEmotion(db:Database,chaEmotion:{[key:string]: [string, string, number][]}, type:'contain'|'plain'|'css'){
-    const selectedChar = get(selectedCharID)
+    const selectedChar = getSelectedCharacterIndex()
     const currentDat = db.characters[selectedChar]
     if(!currentDat){
         return []

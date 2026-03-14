@@ -4,12 +4,12 @@ import { SignatureV4 } from "@smithy/signature-v4"
 import { fetchNative, globalFetch, textifyReadableStream } from "src/ts/globalApi.svelte"
 import { LLMFlags, LLMFormat } from "src/ts/model/modellist"
 import { registerClaudeObserver } from "src/ts/observer.svelte"
-import { getDatabase } from "src/ts/storage/database.svelte"
 import { replaceAsync, simplifySchema, sleep } from "src/ts/util"
 import { v4 } from "uuid"
 import type { MultiModal } from "../index.svelte"
 import { extractJSON } from "../templates/jsonSchema"
 import { callTool, decodeToolCall, encodeToolCall } from "../mcp/mcp"
+import { getRequestRuntimeContext } from "../runtimeContext"
 import type { RequestDataArgumentExtended, requestDataResponse, StreamResponseChunk } from './request'
 import { applyParameters } from './shared'
 
@@ -33,6 +33,10 @@ interface Claude3ImageBlock {
         "type": "ephemeral"
         "ttl"?: "5m" | "1h"
     }
+}
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
 }
 
 interface Claude3ToolUseBlock {

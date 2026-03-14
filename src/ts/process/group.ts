@@ -2,13 +2,23 @@ import shuffle from "lodash/shuffle";
 import { findCharacterbyId } from "../util";
 import { alertConfirm, alertError, alertSelectChar } from "../alert";
 import { language } from "src/lang";
-import { get } from "svelte/store";
-import { getDatabase, setDatabase } from "../storage/database.svelte";
-import { selectedCharID } from "../stores.svelte";
+import { getRequestRuntimeContext } from "./runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
 
 export async function addGroupChar(){
     let db = getDatabase()
-    let selectedId = get(selectedCharID)
+    let selectedId = getSelectedCharacterIndex()
     let group = db.characters[selectedId]
     if(group.type === 'group'){
         const res = await alertSelectChar()
@@ -37,7 +47,7 @@ export async function addGroupChar(){
 
 export function rmCharFromGroup(index:number){
     let db = getDatabase()
-    let selectedId = get(selectedCharID)
+    let selectedId = getSelectedCharacterIndex()
     let group = db.characters[selectedId]
     if(group.type === 'group'){
         group.characters.splice(index, 1)

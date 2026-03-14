@@ -38,6 +38,7 @@ import { updateLorebooks } from "./characters";
 import { initMobileGesture } from "./hotkey";
 import { fetch as TauriHTTPFetch } from '@tauri-apps/plugin-http';
 import { moduleUpdate } from "./process/modules";
+import { clearRuntimeTraceEntries, getRuntimeTraceEntries, getRuntimeTraceLog } from "./process/runtimeTrace";
 import type { AccountStorage } from "./storage/accountStorage";
 import { makeColdData } from "./process/coldstorage.svelte";
 import { isTauri, isNodeServer } from "./platform";
@@ -1050,6 +1051,18 @@ export function getRequestLog() {
  */
 export function getFetchLogs() {
     return fetchLog
+}
+
+export function getRuntimeRequestTraceLogs() {
+    return getRuntimeTraceEntries()
+}
+
+export function getRuntimeRequestTraceLog() {
+    return getRuntimeTraceLog()
+}
+
+export function clearRuntimeRequestTraceLogs() {
+    clearRuntimeTraceEntries()
 }
 
 /**

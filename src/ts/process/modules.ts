@@ -1,6 +1,6 @@
 import { language } from "src/lang"
 import { alertClear, alertConfirm, alertError, alertModuleSelect, alertNormal, alertStore, alertWait } from "../alert"
-import { getCurrentCharacter, getCurrentChat, getDatabase, setCurrentCharacter, setDatabase, type customscript, type loreBook, type triggerscript } from "../storage/database.svelte"
+import { type customscript, type loreBook, type triggerscript } from "../storage/database.svelte"
 import { AppendableBuffer, downloadFile, forageStorage, readImage, saveAsset } from "../globalApi.svelte"
 import { selectSingleFile, sleep } from "../util"
 import { v4 } from "uuid"
@@ -8,6 +8,7 @@ import { convertExternalLorebook } from "./lorebook.svelte"
 import { compressImage } from '../media'
 import { decodeRPack, encodeRPack } from "../rpack/rpack_js"
 import { HideIconStore, moduleBackgroundEmbedding, ReloadGUIPointer } from "../stores.svelte"
+import { getRequestRuntimeContext } from "./runtimeContext"
 import {get} from "svelte/store"
 
 export interface MCPModule{
@@ -29,6 +30,26 @@ export interface RisuModule{
     namespace?:string
     customModuleToggle?:string
     mcp?:MCPModule
+}
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function setCurrentCharacter(char: Parameters<ReturnType<typeof getRequestRuntimeContext>["setCurrentCharacter"]>[0]) {
+    return getRequestRuntimeContext().setCurrentCharacter(char)
+}
+
+function getCurrentChat() {
+    return getRequestRuntimeContext().getCurrentChat()
 }
 
 export async function exportModule(module:RisuModule, arg:{

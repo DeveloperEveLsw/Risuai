@@ -1,4 +1,4 @@
-import { getDatabase } from 'src/ts/storage/database.svelte'
+import { getRequestRuntimeContext } from '../runtimeContext'
 
 export type LLMParameter =
     | 'temperature'
@@ -14,6 +14,10 @@ export type LLMParameter =
     | 'verbosity'
 
 export type ModelModeExtended = 'model' | 'submodel' | 'memory' | 'emotion' | 'otherAx' | 'translate'
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export function setObjectValue<T>(obj: T, key: string, value: any): T {
     const splitKey = key.split('.')

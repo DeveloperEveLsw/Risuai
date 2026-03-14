@@ -8,7 +8,7 @@
     import { type Message } from "../../ts/storage/database.svelte";
     import { DBState } from 'src/ts/stores.svelte';
     import { getCharImage } from "../../ts/characters";
-    import { chatProcessStage, doingChat, sendChat } from "../../ts/process/index.svelte";
+    import { chatProcessStage, doingChat } from "../../ts/process/index.svelte";
     import { sleep } from "../../ts/util";
     import { language } from "../../lang";
     import { isExpTranslator, translate } from "../../ts/translator/translator";
@@ -28,6 +28,8 @@
     import { getInlayAsset } from 'src/ts/process/files/inlays';
     import { ConnectionOpenStore } from 'src/ts/sync/multiuser';
     import { coldStorageHeader, preLoadChat } from 'src/ts/process/coldstorage.svelte';
+    import { bindAbortTrace, finishRuntimeTraceScope, startRuntimeTraceScope, traceRuntimeEvent } from 'src/ts/process/runtimeTrace';
+    import { abortRuntimeRequest, createRuntimeStartCommand, startRuntimeRequest } from 'src/ts/process/runtimeClient';
     import Chats from './Chats.svelte';
     import Button from '../UI/GUI/Button.svelte';
     import PluginDefinedIcon from '../Others/PluginDefinedIcon.svelte';
@@ -141,8 +143,19 @@
     }
 
     async function sendMain(continueResponse:boolean) {
+        const traceScope = startRuntimeTraceScope('ui.sendMain', {
+            continueResponse,
+            selectedCharId: $selectedCharID,
+            messageLength: messageInput.length,
+            attachmentCount: fileInput.length,
+        })
+        let traceStatus:'ok'|'error' = 'ok'
+        try {
         let selectedChar = $selectedCharID
         if($doingChat){
+            traceRuntimeEvent('ui.sendMain.skipped_doing_chat', {
+                selectedCharId: selectedChar,
+            })
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -155,12 +168,19 @@
         if(messageInput.startsWith('/')){
             const commandProcessed = await processMultiCommand(messageInput)
             if(commandProcessed !== false){
+                traceRuntimeEvent('ui.sendMain.command_consumed', {
+                    selectedCharId: selectedChar,
+                })
                 messageInput = ''
                 return
             }
         }
 
         if(fileInput.length > 0){
+            traceRuntimeEvent('ui.sendMain.attachments_inlayed', {
+                selectedCharId: selectedChar,
+                attachmentCount: fileInput.length,
+            })
             for(const file of fileInput){
                 messageInput += `{{inlayed::${file}}}`
             }
@@ -179,6 +199,10 @@
                     }
                 }
             }
+            traceRuntimeEvent('ui.sendMain.empty_message_processed', {
+                selectedCharId: selectedChar,
+                chatLength: cha.length,
+            })
         }
         else{
             const char = DBState.db.characters[selectedChar]
@@ -188,14 +212,27 @@
                     cha = triggerResult.chat.message
                 }
 
+                const editedInput = await processScript(char,messageInput,'editinput')
+                traceRuntimeEvent('ui.sendMain.user_message_appended', {
+                    selectedCharId: selectedChar,
+                    chatLength: cha.length + 1,
+                    editedLength: editedInput.length,
+                    usedInputTrigger: Boolean(triggerResult),
+                })
                 cha.push({
                     role: 'user',
-                    data: await processScript(char,messageInput,'editinput'),
+                    data: editedInput,
                     time: Date.now(),
                     name: $ConnectionOpenStore ? DBState.db.username : null
                 })
             }
             else{
+                traceRuntimeEvent('ui.sendMain.user_message_appended', {
+                    selectedCharId: selectedChar,
+                    chatLength: cha.length + 1,
+                    editedLength: messageInput.length,
+                    usedInputTrigger: false,
+                })
                 cha.push({
                     role: 'user',
                     data: messageInput,
@@ -211,7 +248,20 @@
         await sleep(10)
         updateInputSizeAll()
         await sendChatMain(continueResponse)
-
+        }
+        catch (error) {
+            traceStatus = 'error'
+            traceRuntimeEvent('ui.sendMain.error', {
+                selectedCharId: $selectedCharID,
+                error,
+            })
+            throw error
+        }
+        finally {
+            finishRuntimeTraceScope(traceScope, traceStatus, {
+                selectedCharId: $selectedCharID,
+            })
+        }
     }
 
     async function reroll() {
@@ -299,37 +349,101 @@
         }
     }
 
-    let abortController:null|AbortController = null
+    let activeRuntimeRequestId:string|null = null
+    let activeRuntimeAbortSignal:AbortSignal|null = null
 
     async function sendChatMain(continued:boolean = false) {
-
+        const traceScope = startRuntimeTraceScope('ui.sendChatMain', {
+            continued,
+            selectedCharId: $selectedCharID,
+        })
+        let traceStatus:'ok'|'error'|'aborted' = 'ok'
         let previousLength = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length
         messageInput = ''
-        abortController = new AbortController()
+        const runtimeCommand = createRuntimeStartCommand({
+            continue: continued
+        })
+        const activeRuntimeRequest = startRuntimeRequest(runtimeCommand)
+        const requestId = activeRuntimeRequest.requestId
+        activeRuntimeRequestId = requestId
+        activeRuntimeAbortSignal = activeRuntimeRequest.signal
+        const detachAbortTrace = bindAbortTrace(activeRuntimeRequest.signal, 'ui.sendChatMain.abort_signal', {
+            continued,
+            selectedCharId: $selectedCharID,
+            requestId,
+        })
         try {
-            await sendChat(-1, {
-                signal:abortController.signal,
-                continue:continued
+            traceRuntimeEvent('ui.sendChatMain.dispatch_runtime_request', {
+                continued,
+                selectedCharId: $selectedCharID,
+                previousLength,
+                requestId,
+            })
+            const runtimeState = await activeRuntimeRequest.promise
+            if(runtimeState.status === 'aborted'){
+                traceStatus = 'aborted'
+            }
+            else if(runtimeState.status === 'failed'){
+                traceStatus = 'error'
+            }
+            traceRuntimeEvent('ui.sendChatMain.runtime_request_resolved', {
+                continued,
+                selectedCharId: $selectedCharID,
+                requestId,
+                status: runtimeState.status,
+                stage: runtimeState.stage,
+                generationId: runtimeState.generationId ?? null,
+                error: runtimeState.error ?? null,
             })
             if(previousLength < DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length){
                 rerolls.push(safeStructuredClone(DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message).slice(previousLength))
                 rerollid = rerolls.length - 1
             }
+            if(runtimeState.status === 'failed' && runtimeState.error && runtimeState.error !== 'sendChat returned false'){
+                console.error(runtimeState.error)
+                alertError(runtimeState.error)
+            }
         } catch (error) {
+            traceStatus = activeRuntimeRequest.signal.aborted ? 'aborted' : 'error'
+            traceRuntimeEvent('ui.sendChatMain.error', {
+                continued,
+                selectedCharId: $selectedCharID,
+                requestId,
+                error,
+            })
             console.error(error)
             alertError(error)
         }
-        lastCharId = $selectedCharID
-        $doingChat = false
-        if(DBState.db.playMessage){
-            const audio = new Audio(sendSound);
-            audio.play().catch(() => {});
+        finally {
+            detachAbortTrace()
+            lastCharId = $selectedCharID
+            if(activeRuntimeRequestId === requestId){
+                activeRuntimeRequestId = null
+                activeRuntimeAbortSignal = null
+            }
+            if(DBState.db.playMessage){
+                const audio = new Audio(sendSound);
+                audio.play().catch(() => {});
+            }
+            finishRuntimeTraceScope(traceScope, activeRuntimeRequest.signal.aborted && traceStatus === 'ok' ? 'aborted' : traceStatus, {
+                continued,
+                selectedCharId: $selectedCharID,
+                requestId,
+                previousLength,
+                currentLength: DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length,
+            })
         }
     }
 
     function abortChat(){
-        if(abortController){
-            abortController.abort()
+        traceRuntimeEvent('ui.abortChat.requested', {
+            selectedCharId: $selectedCharID,
+            requestId: activeRuntimeRequestId,
+            hasActiveRuntimeRequest: Boolean(activeRuntimeRequestId),
+            alreadyAborted: activeRuntimeAbortSignal?.aborted ?? false,
+        })
+        if(activeRuntimeRequestId){
+            abortRuntimeRequest(activeRuntimeRequestId)
         }
     }
 

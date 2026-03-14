@@ -1,14 +1,12 @@
 import DOMPurify from 'dompurify';
 import markdownit from 'markdown-it'
-import { appVer, getCurrentCharacter, getDatabase, type Database, type character, type customscript, type groupChat, type triggerscript } from '../storage/database.svelte';
+import { appVer, type Database, type character, type customscript, type groupChat, type triggerscript } from '../storage/database.svelte';
 import { DBState, selIdState } from '../stores.svelte';
 import { aiWatermarkingLawApplies, getFileSrc } from '../globalApi.svelte';
 import { isTauri, isNodeServer } from "src/ts/platform"
 import { getChatVar, setChatVar, getGlobalChatVar } from './chatVar.svelte';
 import { processScriptFull } from '../process/scripts';
-import { get } from 'svelte/store';
 import css, { type CssAtRuleAST } from '@adobe/css-tools'
-import { selectedCharID } from '../stores.svelte';
 import { calcString } from '../process/infunctions';
 import { findCharacterbyId, getPersonaPrompt, getUserIcon, getUserName, pickHashRand, replaceAsync} from '../util';
 import { getInlayAssetBlob } from '../process/files/inlays';
@@ -20,6 +18,28 @@ import katex from 'katex'
 import { getModelInfo } from '../model/modellist';
 import { registerCBS, type matcherArg, type RegisterCallback } from '../cbs';
 import cssSelectorParser from 'postcss-selector-parser'
+import { getRequestRuntimeContext } from '../process/runtimeContext';
+
+function getRuntimeDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function getRuntimeCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
+
+// Foreground-only display settings still come from UI state.
+function getForegroundDisplayDatabase() {
+    return DBState.db
+}
+
+function getForegroundSelectedCharacterIndex() {
+    return selIdState.selId
+}
 
 const markdownItOptions = {
     html: true,
@@ -52,7 +72,7 @@ DOMPurify.addHook("uponSanitizeElement", (node: HTMLElement, data) => {
     }
     if(data.tagName === 'img'){
         // Hide external images when hideAllImages is enabled
-        if(DBState.db?.hideAllImages){
+        if(getForegroundDisplayDatabase()?.hideAllImages){
             const src = node.getAttribute("src") || "";
             // Replace with placeholder if it's an external/loaded image
             if(src && !src.startsWith('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP')){
@@ -77,7 +97,7 @@ DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
     switch(data.attrName){
         case 'style':{
             // Remove background-image URLs when hideAllImages is enabled
-            if(DBState.db?.hideAllImages && data.attrValue){
+            if(getForegroundDisplayDatabase()?.hideAllImages && data.attrValue){
                 // Remove background-image property from inline styles
                 data.attrValue = data.attrValue.replace(/background(-image)?:\s*url\([^)]*\);?/gi, '')
                 // Also remove background property if it contains url()
@@ -151,8 +171,8 @@ export function risuEscape(text:string){
 
 function renderMarkdown(md:markdownit, data:string){
     let quotes = ['“', '”', '‘', '’']
-    if(DBState.db?.customQuotes){
-        quotes = DBState.db.customQuotesData ?? quotes
+    if(getForegroundDisplayDatabase()?.customQuotes){
+        quotes = getForegroundDisplayDatabase().customQuotesData ?? quotes
     }
     data = data.replace(/\$\$(.*?)\$\$/gs, (
         match:string,
@@ -178,11 +198,11 @@ function renderMarkdown(md:markdownit, data:string){
     })
     let text = risuUnescape(md.render(data.replace(/“|”/g, '"').replace(/‘|’/g, "'")))
 
-    if(DBState.db?.unformatQuotes){
+    if(getForegroundDisplayDatabase()?.unformatQuotes){
         text = text.replace(/\uE9b0/gu, quotes[0]).replace(/\uE9b1/gu, quotes[1])
         text = text.replace(/\uE9b2/gu, quotes[2]).replace(/\uE9b3/gu, quotes[3])
     }
-    else if(DBState.db?.blockquoteStyling){
+    else if(getForegroundDisplayDatabase()?.blockquoteStyling){
         text = text.replace(/\uE9b0(.+?)\uE9b1/gum, (full, content) => {
             content = content.replace(/\uE9b2/gu, '<mark risu-mark="quote1">' + quotes[2]).replace(/\uE9b3/gu, quotes[3] + '</mark>')
             return `<br><br><mark risu-mark="blockquote2">${quotes[0]}${content}${quotes[1]}</mark><br><br>`
@@ -462,8 +482,8 @@ export function resetAssetsCache(charAssets: string[][], emoAssets: string[][], 
 
 $effect.root(() => {
     $effect(() => {
-        const charId = selIdState.selId
-        const char = DBState.db.characters?.[charId]
+        const charId = getForegroundSelectedCharacterIndex()
+        const char = getForegroundDisplayDatabase().characters?.[charId]
         if (!char || char.type !== 'character') {
             return
         }
@@ -480,7 +500,8 @@ const imageCBS = ['img', 'image', 'emotion', 'asset', 'bg', 'raw', 'path']
 const videoExtensions = ['mp4', 'webm', 'avi', 'm4p', 'm4v']
 
 async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|character, mode:'normal'|'back', arg:{ch:number}){
-    const assetWidthString = (DBState.db.assetWidth && DBState.db.assetWidth !== -1 || DBState.db.assetWidth === 0) ? `max-width:${DBState.db.assetWidth}rem;` : ''
+    const displayDb = getForegroundDisplayDatabase()
+    const assetWidthString = (displayDb.assetWidth && displayDb.assetWidth !== -1 || displayDb.assetWidth === 0) ? `max-width:${displayDb.assetWidth}rem;` : ''
 
     if (char.type === 'character' && (!assetsCache || !emoAssetsCache)) {
         resetAssetsCache(char.additionalAssets ?? [], char.emotionImages, getModuleAssets())
@@ -497,7 +518,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
 
         // Skip image-related assets when hideAllImages is enabled
         // raw and path are also included as they're used in CSS background-image
-        if(DBState.db.hideAllImages && imageCBS.includes(type)){
+        if(displayDb.hideAllImages && imageCBS.includes(type)){
             return ''  // Hide the image asset
         }
 
@@ -525,7 +546,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
         let match = assetPaths?.[name]
 
         if(!match){
-            if(DBState.db.legacyMediaFindings){
+            if(displayDb.legacyMediaFindings){
                 return ''
             }
 
@@ -582,7 +603,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
     })
 
     if(needsSourceAccess){
-        const chara = getCurrentCharacter()
+        const chara = getRuntimeCurrentCharacter()
         if(chara.image){}
         data = data.replace(/\uE9b4CHAR\uE9b4/g,
             chara.image ? (await getFileSrc(chara.image)) : ''
@@ -598,6 +619,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
 
 function getClosestMatch(char: simpleCharacterArgument|character, name:string, assetPaths:AssetPaths){   
     if(!char.additionalAssets) return null
+    const displayDb = getForegroundDisplayDatabase()
 
     let closest = ''
     let closestDist = 999999
@@ -616,7 +638,7 @@ function getClosestMatch(char: simpleCharacterArgument|character, name:string, a
         }
     }
     
-    if(closestDist > DBState.db.assetMaxDifference){
+    if(closestDist > displayDb.assetMaxDifference){
         return null
     }
 
@@ -664,6 +686,7 @@ function trimmer(str:string){
 const blobUrlCache = new Map<string, string>()
 
 async function parseInlayAssets(data:string){
+    const displayDb = getForegroundDisplayDatabase()
     const inlayMatch = data.match(/{{(inlay|inlayed|inlayeddata)::(.+?)}}/g)
     if(inlayMatch){
         for(const inlay of inlayMatch){
@@ -681,7 +704,7 @@ async function parseInlayAssets(data:string){
             switch(asset?.type){
                 case 'image':
                     // Hide inlay images when hideAllImages is enabled
-                    if(DBState.db.hideAllImages){
+                    if(displayDb.hideAllImages){
                         data = data.replace(inlay, '')
                         break
                     }
@@ -931,7 +954,7 @@ function decodeStyle(text:string){
             })}</style>`
 
         } catch (error) {
-            if(DBState.db.returnCSSError){
+            if(getForegroundDisplayDatabase().returnCSSError){
                 return `CSS ERROR: ${error}`
             }
             return ""
@@ -973,7 +996,7 @@ function initMatcher(){
                 matcherMap.set(name, callback)
             }
         },
-        getDatabase: getDatabase,
+        getDatabase: getRuntimeDatabase,
         getUserName: getUserName,
         getPersonaPrompt: getPersonaPrompt,
         risuChatParser: risuChatParser,
@@ -990,7 +1013,7 @@ function initMatcher(){
         getModuleLorebooks: getModuleLorebooks,
         pickHashRand: pickHashRand,
         getSelectedCharID: () => {
-            return get(selectedCharID)
+            return getSelectedCharacterIndex()
         },
         getModelInfo: getModelInfo,
         callInternalFunction: function (args: string[]): string {
@@ -1523,7 +1546,7 @@ export function risuChatParser(da:string, arg:{
     cbsConditions?:CbsConditions
 } = {}):string{
     const chatID = arg.chatID ?? -1
-    const db = arg.db ?? DBState.db
+    const db = arg.db ?? getRuntimeDatabase()
     const aChara = arg.chara
     let chara:character|string = null
 
@@ -1544,8 +1567,8 @@ export function risuChatParser(da:string, arg:{
         }
     }
     if(arg.tokenizeAccurate){
-        const db = arg.db ?? DBState.db
-        const selchar = chara ?? db.characters[get(selectedCharID)]
+        const db = arg.db ?? getRuntimeDatabase()
+        const selchar = chara ?? db.characters[getSelectedCharacterIndex()]
         if(!selchar){
             chara = 'bot'
         }

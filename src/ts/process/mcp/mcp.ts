@@ -1,6 +1,4 @@
-import { getDatabase } from "src/ts/storage/database.svelte";
 import { MCPClient, type JsonRPC, type MCPTool, type RPCToolCallContent } from "./mcplib";
-import { DBState } from "src/ts/stores.svelte";
 import { getModuleMcps } from "../modules";
 import { alertError, alertInput, alertNormal } from "src/ts/alert";
 import { v4 } from "uuid";
@@ -9,12 +7,17 @@ import localforage from "localforage";
 import { isTauri } from "src/ts/platform"
 import { sleep } from "src/ts/util";
 import { registeredCustomPluginMCPs } from "./pluginmcp";
+import { getRequestRuntimeContext } from "../runtimeContext";
 
 export type MCPToolWithURL = MCPTool & {
     mcpURL: string;
 };
 
 export const MCPs:Record<string,MCPClient|MCPClientLike> = {};
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export async function initializeMCPs(additionalMCPs?:string[]) {
     const db = getDatabase()
@@ -172,14 +175,15 @@ export async function initializeMCPs(additionalMCPs?:string[]) {
             }
 
             const registerRefresh:typeof MCPClient.prototype.registerRefreshToken = (arg) => {
-                DBState.db.authRefreshes.push({
+                const db = getDatabase()
+                db.authRefreshes.push({
                     url: mcp,
                     ...arg
                 })
             }
 
             const getRefresh:typeof MCPClient.prototype.getRefreshToken = async () => {
-                return DBState.db.authRefreshes.find(refresh => refresh.url === mcp);
+                return getDatabase().authRefreshes.find(refresh => refresh.url === mcp);
             }
 
             try {

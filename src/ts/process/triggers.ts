@@ -1,10 +1,10 @@
 import { parseChatML } from "../parser/chatML";
 import { risuChatParser } from "../parser/parser.svelte";
-import { getCurrentCharacter, getCurrentChat, getDatabase, setCurrentCharacter, setDatabase, type Chat, type character } from "../storage/database.svelte";
+import { type Chat, type character } from "../storage/database.svelte";
 import { tokenize } from "../tokenizer";
 import { getModuleTriggers } from "./modules";
 import { get } from "svelte/store";
-import { ReloadChatPointer, ReloadGUIPointer, selectedCharID, CurrentTriggerIdStore } from "../stores.svelte";
+import { ReloadChatPointer, ReloadGUIPointer, CurrentTriggerIdStore } from "../stores.svelte";
 import { processMultiCommand } from "./command";
 import { parseKeyValue, sleep } from "../util";
 import { alertError, alertInput, alertNormal, alertSelect } from "../alert";
@@ -13,6 +13,8 @@ import { HypaProcesser } from "./memory/hypamemory";
 import { requestChatData } from "./request/request";
 import { generateAIImage } from "./stableDiff";
 import { writeInlayImage } from "./files/inlays";
+import { getRequestRuntimeContext } from "./runtimeContext";
+import { finishRuntimeTraceScope, startRuntimeTraceScope, traceRuntimeEvent } from "./runtimeTrace";
 import { runScripted } from "./scriptings";
 import { calcString } from "./infunctions";
 
@@ -1034,6 +1036,30 @@ export const requestAllowList = [
     ...safeSubset
 ]
 
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function setCurrentCharacter(char: Parameters<ReturnType<typeof getRequestRuntimeContext>["setCurrentCharacter"]>[0]) {
+    return getRequestRuntimeContext().setCurrentCharacter(char)
+}
+
+function getCurrentChat() {
+    return getRequestRuntimeContext().getCurrentChat()
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
+
 export async function runTrigger(char:character,mode:triggerMode, arg:{
     chat: Chat,
     recursiveCount?: number
@@ -1064,24 +1090,39 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
     const db = getDatabase()
     const defaultVariables = parseKeyValue(char.defaultVariables).concat(parseKeyValue(db.templateDefaultVariables))
     let chat = arg.displayMode ? arg.chat : safeStructuredClone(arg.chat ?? char.chats[char.chatPage])
+    const traceScope = startRuntimeTraceScope('trigger.runTrigger', {
+        mode,
+        charId: char.chaId,
+        displayMode: Boolean(arg.displayMode),
+        recursiveCount: arg.recursiveCount,
+        manualName: arg.manualName ?? null,
+        triggerCount: triggers.length,
+    })
+    let traceStatus:'ok'|'error' = 'ok'
+    let matchedTriggerCount = 0
     
     const previousTriggerId = get(CurrentTriggerIdStore)
     const shouldSetTriggerId = !arg.displayMode && mode !== 'display'
-    if (shouldSetTriggerId) {
-        CurrentTriggerIdStore.set(arg.triggerId || null)
-    }
-    
-    if((!triggers) || (triggers.length === 0)){
+    try {
         if (shouldSetTriggerId) {
-            CurrentTriggerIdStore.set(previousTriggerId)
+            CurrentTriggerIdStore.set(arg.triggerId || null)
         }
-        return null
-    }
+        
+        if((!triggers) || (triggers.length === 0)){
+            traceRuntimeEvent('trigger.runTrigger.empty', {
+                mode,
+                charId: char.chaId,
+            })
+            if (shouldSetTriggerId) {
+                CurrentTriggerIdStore.set(previousTriggerId)
+            }
+            return null
+        }
 
-    let tempVars:Record<string, string> = arg.tempVars ?? {}
-    
-    let localVarScopes: Record<number, Record<string, string>>[] = [{}]
-    let currentIndent = 0
+        let tempVars:Record<string, string> = arg.tempVars ?? {}
+        
+        let localVarScopes: Record<number, Record<string, string>>[] = [{}]
+        let currentIndent = 0
     
 
     function getLocalVar(key: string): string | null {
@@ -1186,7 +1227,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
             return
         }
         
-        const selectedCharId = get(selectedCharID)
+        const selectedCharId = getSelectedCharacterIndex()
         const currentCharacter = getCurrentCharacter()
         const db = getDatabase()
         varChanged = true
@@ -1293,6 +1334,16 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
         if(!pass){
             continue
         }
+
+        matchedTriggerCount += 1
+        traceRuntimeEvent('trigger.runTrigger.matched', {
+            mode,
+            charId: char.chaId,
+            triggerComment: trigger.comment || null,
+            effectCount: trigger.effect.length,
+            lowLevelAccess: Boolean(trigger.lowLevelAccess),
+            displayMode: Boolean(arg.displayMode),
+        })
 
         for(let index = 0; index < trigger.effect.length; index++){
             const effect = trigger.effect[index]
@@ -1949,7 +2000,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                     }
 
                     const db = getDatabase()
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     db.characters[selectedCharId].globalLore = char.globalLore
                     setCurrentCharacter(db.characters[selectedCharId])
                     break
@@ -1981,7 +2032,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                     let value = effect.value
                     char.globalLore[index][2] = value
 
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase()
                     db.characters[selectedCharId].globalLore = char.globalLore
                     setCurrentCharacter(char)
@@ -2085,7 +2136,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                 case 'v2SetCharacterDesc':{
                     let value = effect.valueType === 'value' ? risuChatParser(effect.value,{chara:char}) : getVar(risuChatParser(effect.value,{chara:char}))
                     char.desc = value
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase();
                     (db.characters[selectedCharId] as character).desc = value
                     setCurrentCharacter(char)
@@ -2115,7 +2166,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                 case 'v2SetReplaceGlobalNote':{
                     const value = effect.valueType === 'value' ? risuChatParser(effect.value,{chara:char}) : getVar(risuChatParser(effect.value,{chara:char}))
                     char.replaceGlobalNote = value
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase();
                     (db.characters[selectedCharId] as character).replaceGlobalNote = value
                     setCurrentCharacter(char)
@@ -2490,7 +2541,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                         selective: false
                     })
 
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase()
                     db.characters[selectedCharId].globalLore = char.globalLore
                     setCurrentCharacter(char)
@@ -2525,7 +2576,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                         char.globalLore[index].insertorder = insertOrderNum
                     }
 
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase()
                     db.characters[selectedCharId].globalLore = char.globalLore
                     setCurrentCharacter(char)
@@ -2541,7 +2592,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
 
                     char.globalLore.splice(index, 1)
 
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase()
                     db.characters[selectedCharId].globalLore = char.globalLore
                     setCurrentCharacter(char)
@@ -2562,7 +2613,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
 
                     char.globalLore[index].alwaysActive = effect.value
 
-                    const selectedCharId = get(selectedCharID)
+                    const selectedCharId = getSelectedCharacterIndex()
                     const db = getDatabase()
                     db.characters[selectedCharId].globalLore = char.globalLore
                     setCurrentCharacter(char)
@@ -2590,7 +2641,7 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
                     chat.note = value
                     
                     if(!arg.displayMode){
-                        const selectedCharId = get(selectedCharID)
+                        const selectedCharId = getSelectedCharacterIndex()
                         const currentCharacter = getCurrentCharacter()
                         const db = getDatabase()
                         currentCharacter.chats[currentCharacter.chatPage].note = value
@@ -2771,26 +2822,58 @@ export async function runTrigger(char:character,mode:triggerMode, arg:{
         }
     }
     
-    let caculatedTokens = 0
-    if(additonalSysPrompt.start){
-        caculatedTokens += await tokenize(additonalSysPrompt.start)
-    }
-    if(additonalSysPrompt.historyend){
-        caculatedTokens += await tokenize(additonalSysPrompt.historyend)
-    }
-    if(additonalSysPrompt.promptend){
-        caculatedTokens += await tokenize(additonalSysPrompt.promptend)
-    }
-    if(varChanged){
-        const currentChat = getCurrentChat()
-        currentChat.scriptstate = chat.scriptstate
-        ReloadGUIPointer.set(get(ReloadGUIPointer) + 1)
-    }
+        let caculatedTokens = 0
+        if(additonalSysPrompt.start){
+            caculatedTokens += await tokenize(additonalSysPrompt.start)
+        }
+        if(additonalSysPrompt.historyend){
+            caculatedTokens += await tokenize(additonalSysPrompt.historyend)
+        }
+        if(additonalSysPrompt.promptend){
+            caculatedTokens += await tokenize(additonalSysPrompt.promptend)
+        }
+        if(varChanged){
+            const currentChat = getCurrentChat()
+            currentChat.scriptstate = chat.scriptstate
+            ReloadGUIPointer.set(get(ReloadGUIPointer) + 1)
+        }
 
-    if (shouldSetTriggerId && mode !== 'manual') {
-        CurrentTriggerIdStore.set(previousTriggerId)
-    }
-    
-    return {additonalSysPrompt, chat, tokens:caculatedTokens, stopSending, sendAIprompt, displayData: arg.displayData, tempVars: arg.tempVars}
+        if (shouldSetTriggerId && mode !== 'manual') {
+            CurrentTriggerIdStore.set(previousTriggerId)
+        }
 
+        traceRuntimeEvent('trigger.runTrigger.summary', {
+            mode,
+            charId: char.chaId,
+            matchedTriggerCount,
+            stopSending,
+            sendAIprompt,
+            varChanged,
+            displayMode: Boolean(arg.displayMode),
+            tokens: caculatedTokens,
+        })
+        
+        return {additonalSysPrompt, chat, tokens:caculatedTokens, stopSending, sendAIprompt, displayData: arg.displayData, tempVars: arg.tempVars}
+    }
+    catch (error) {
+        traceStatus = 'error'
+        traceRuntimeEvent('trigger.runTrigger.error', {
+            mode,
+            charId: char.chaId,
+            error,
+        })
+        throw error
+    }
+    finally {
+        if (shouldSetTriggerId && mode !== 'manual') {
+            CurrentTriggerIdStore.set(previousTriggerId)
+        }
+        finishRuntimeTraceScope(traceScope, traceStatus, {
+            mode,
+            charId: char.chaId,
+            matchedTriggerCount,
+            stopSending,
+            sendAIprompt,
+        })
+    }
 }

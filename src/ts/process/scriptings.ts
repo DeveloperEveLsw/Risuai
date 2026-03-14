@@ -2,9 +2,9 @@ import { asBuffer } from 'src/ts/util';
 import { getChatVar, getGlobalChatVar, setChatVar } from "../parser/chatVar.svelte";
 import { hasher, type simpleCharacterArgument, risuChatParser } from "../parser/parser.svelte";
 import { LuaEngine, LuaFactory } from "wasmoon";
-import { getCurrentCharacter, getCurrentChat, getDatabase, setDatabase, type Chat, type character, type groupChat, type triggerscript } from "../storage/database.svelte";
+import { type Chat, type character, type groupChat, type triggerscript } from "../storage/database.svelte";
 import { get } from "svelte/store";
-import { ReloadChatPointer, ReloadGUIPointer, selectedCharID } from "../stores.svelte";
+import { ReloadChatPointer, ReloadGUIPointer } from "../stores.svelte";
 import { alertSelect, alertError, alertInput, alertNormal, alertConfirm } from "../alert";
 import { HypaProcesser } from "./memory/hypamemory";
 import { generateAIImage } from "./stableDiff";
@@ -18,12 +18,33 @@ import { tokenize } from "../tokenizer";
 import { fetchNative, readImage } from "../globalApi.svelte";
 import { loadLoreBookV3Prompt } from './lorebook.svelte';
 import { getPersonaPrompt, getUserName, getUserIcon } from '../util';
+import { getRequestRuntimeContext } from './runtimeContext';
 let luaFactory:LuaFactory
 let ScriptingSafeIds = new Set<string>()
 let ScriptingEditDisplayIds = new Set<string>()
 let ScriptingLowLevelIds = new Set<string>()
 let lastRequestResetTime = 0
 let lastRequestsCount = 0
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function getCurrentChat() {
+    return getRequestRuntimeContext().getCurrentChat()
+}
+
+function getSelectedCharacterIndex() {
+    return getRequestRuntimeContext().getSelectedCharacterIndex()
+}
 
 interface BasicScriptingEngineState {
     code?: string;
@@ -377,7 +398,7 @@ export async function runScripted(code:string, arg:{
             declareAPI('getCharacterImageMain', async (id:string) => {
                 try {
                     const db = getDatabase()
-                    const selectedChar = get(selectedCharID)
+                    const selectedChar = getSelectedCharacterIndex()
 
                     if (selectedChar < 0 || selectedChar >= db.characters.length) {
                         return ''
@@ -571,7 +592,7 @@ export async function runScripted(code:string, arg:{
             
             declareAPI('getName', (id:string) => {
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char = db.characters[selectedChar]
                 return char.name
             })
@@ -581,7 +602,7 @@ export async function runScripted(code:string, arg:{
                     return
                 }
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 if(typeof name !== 'string'){
                     throw('Invalid data type')
                 }
@@ -594,7 +615,7 @@ export async function runScripted(code:string, arg:{
                     return
                 }
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char = db.characters[selectedChar]
                 if(char.type === 'group'){
                     throw('Character is a group')
@@ -607,7 +628,7 @@ export async function runScripted(code:string, arg:{
                     return
                 }
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char =db.characters[selectedChar]
                 if(typeof data !== 'string'){
                     throw('Invalid data type')
@@ -622,7 +643,7 @@ export async function runScripted(code:string, arg:{
 
             declareAPI('getCharacterFirstMessage', (id:string) => {
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char = db.characters[selectedChar]
                 return char.firstMessage
             })
@@ -632,7 +653,7 @@ export async function runScripted(code:string, arg:{
                     return
                 }
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char = db.characters[selectedChar]
                 if(typeof data !== 'string'){
                     return false
@@ -649,7 +670,7 @@ export async function runScripted(code:string, arg:{
 
             declareAPI('getPersonaDescription', (id:string) => {
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char = db.characters[selectedChar]
 
                 return risuChatParser(getPersonaPrompt(), { chara: char })
@@ -664,7 +685,7 @@ export async function runScripted(code:string, arg:{
                     return
                 }
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 const char = db.characters[selectedChar]
                 return char.backgroundHTML
             })
@@ -674,7 +695,7 @@ export async function runScripted(code:string, arg:{
                     return
                 }
                 const db = getDatabase()
-                const selectedChar = get(selectedCharID)
+                const selectedChar = getSelectedCharacterIndex()
                 if(typeof data !== 'string'){
                     return false
                 }
@@ -686,7 +707,7 @@ export async function runScripted(code:string, arg:{
             // Lore books
             declareAPI('getLoreBooksMain', (id:string, search:string) => {
                 const db = getDatabase()
-                const selectedChar = db.characters[get(selectedCharID)]
+                const selectedChar = db.characters[getSelectedCharacterIndex()]
                 if (selectedChar.type !== 'character') {
                     return
                 }
@@ -746,7 +767,7 @@ export async function runScripted(code:string, arg:{
 
                 const db = getDatabase()
 
-                const selectedChar = db.characters[get(selectedCharID)]
+                const selectedChar = db.characters[getSelectedCharacterIndex()]
 
                 if (selectedChar.type !== 'character') {
                     return
@@ -884,7 +905,7 @@ export async function runScripted(code:string, arg:{
                 }
 
                 const db = getDatabase()
-                const selchar = db.characters[get(selectedCharID)]
+                const selchar = db.characters[getSelectedCharacterIndex()]
 
                 let pointer = chat.message.length - 1
                 while (pointer >= 0) {
@@ -923,7 +944,7 @@ export async function runScripted(code:string, arg:{
                 }
 
                 const db = getDatabase()
-                const selchar = db.characters[get(selectedCharID)]
+                const selchar = db.characters[getSelectedCharacterIndex()]
 
                 let pointer = chat.message.length - 1
                 while (pointer >= 0) {

@@ -1,8 +1,16 @@
 import { language } from 'src/lang'
 import { alertConfirm } from 'src/ts/alert'
-import { DBState } from 'src/ts/stores.svelte'
 import { pickHashRand } from 'src/ts/util'
 import { type MCPTool, MCPToolHandler, type RPCToolCallContent } from '../mcplib'
+import { getRequestRuntimeContext } from '../../runtimeContext'
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+  return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+  return getRequestRuntimeContext().setDatabase(data)
+}
 
 const moduleNotFound = (id: string): RPCToolCallContent[] => [
   {
@@ -346,8 +354,9 @@ export class ModuleHandler extends MCPToolHandler {
     if (count < 1) count = 1
     if (offset < 0) offset = 0
 
-    const modules = DBState.db.modules.filter((m) => !m.mcp)
-    const enabledModules = new Set(DBState.db.enabledModules || [])
+    const db = getDatabase()
+    const modules = db.modules.filter((m) => !m.mcp)
+    const enabledModules = new Set(db.enabledModules || [])
 
     const slicedModules = modules.slice(offset, offset + count)
 
@@ -367,13 +376,14 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async getModuleInfo(id: string, fields?: string[]): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
 
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
 
-    const enabledModules = new Set(DBState.db.enabledModules || [])
+    const enabledModules = new Set(db.enabledModules || [])
     const defaultFields = ['name', 'description', 'id', 'enabled']
     const targetFields = fields && fields.length > 0 ? fields : defaultFields
 
@@ -411,7 +421,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async setModuleInfo(id: string, data: any): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return [
         {
@@ -443,18 +454,19 @@ export class ModuleHandler extends MCPToolHandler {
       if (!allowedFields.includes(key)) continue
 
       if (key === 'enabled') {
-        const enabledModules = new Set(DBState.db.enabledModules || [])
+        const enabledModules = new Set(db.enabledModules || [])
         if (value) {
           enabledModules.add(id)
         } else {
           enabledModules.delete(id)
         }
-        DBState.db.enabledModules = Array.from(enabledModules)
+        db.enabledModules = Array.from(enabledModules)
       } else {
         // @ts-ignore
         module[key] = value
       }
     }
+    setDatabase(db)
 
     return [
       {
@@ -465,7 +477,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async listModuleLorebooks(id: string, count: number = 100, offset: number = 0): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -492,7 +505,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async getModuleLorebook(id: string, names: string[]): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -534,7 +548,8 @@ export class ModuleHandler extends MCPToolHandler {
     newName?: string,
     alwaysActive?: boolean
   ): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -569,6 +584,7 @@ export class ModuleHandler extends MCPToolHandler {
         mode: 'normal' as const,
       }
       module.lorebook.push(newEntry)
+      setDatabase(db)
       return [
         {
           type: 'text',
@@ -594,6 +610,7 @@ export class ModuleHandler extends MCPToolHandler {
         entry.key = ''
       }
     }
+    setDatabase(db)
 
     return [
       {
@@ -604,7 +621,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async deleteModuleLorebook(id: string, name: string): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -637,6 +655,7 @@ export class ModuleHandler extends MCPToolHandler {
     }
 
     module.lorebook.splice(index, 1)
+    setDatabase(db)
 
     return [
       {
@@ -647,7 +666,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async getModuleRegexScripts(id: string): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
 
     if (!module || module.mcp) {
       return moduleNotFound(id)
@@ -682,7 +702,8 @@ export class ModuleHandler extends MCPToolHandler {
     flag?: string,
     ableFlag?: boolean
   ): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -715,6 +736,7 @@ export class ModuleHandler extends MCPToolHandler {
         ableFlag: ableFlag !== undefined ? ableFlag : true,
       }
       module.regex.push(newScript)
+      setDatabase(db)
       return [
         {
           type: 'text',
@@ -731,6 +753,7 @@ export class ModuleHandler extends MCPToolHandler {
     if (type !== undefined) script.type = type
     if (flag !== undefined) script.flag = flag
     if (ableFlag !== undefined) script.ableFlag = ableFlag
+    setDatabase(db)
 
     return [
       {
@@ -741,7 +764,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async deleteModuleRegexScript(id: string, name: string): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -774,6 +798,7 @@ export class ModuleHandler extends MCPToolHandler {
     }
 
     module.regex.splice(index, 1)
+    setDatabase(db)
 
     return [
       {
@@ -784,7 +809,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async getModuleLuaScript(id: string): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -808,7 +834,8 @@ export class ModuleHandler extends MCPToolHandler {
   }
 
   async setModuleLuaScript(id: string, code: string): Promise<RPCToolCallContent[]> {
-    const module = DBState.db.modules.find((m) => m.id === id)
+    const db = getDatabase()
+    const module = db.modules.find((m) => m.id === id)
     if (!module || module.mcp) {
       return moduleNotFound(id)
     }
@@ -826,6 +853,7 @@ export class ModuleHandler extends MCPToolHandler {
     if (firstTrigger?.effect?.[0]?.type === 'triggerlua') {
       // @ts-ignore
       firstTrigger.effect[0].code = code
+      setDatabase(db)
       return [
         {
           type: 'text',

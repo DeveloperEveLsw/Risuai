@@ -4,7 +4,7 @@ import { globalFetch } from "../../globalApi.svelte";
 import { getModelInfo, LLMFlags, LLMFormat, type LLMModel } from "../../model/modellist";
 import { risuChatParser, risuEscape, risuUnescape } from "../../parser/parser.svelte";
 import { pluginProcess, pluginV2 } from "../../plugins/plugins.svelte";
-import { getCurrentCharacter, getCurrentChat, getDatabase, type character } from "../../storage/database.svelte";
+import { type character } from "../../storage/database.svelte";
 import { tokenizeNum } from "../../tokenizer";
 import { sleep } from "../../util";
 import type { OpenAIChat } from "../index.svelte";
@@ -16,6 +16,8 @@ import { getStopStrings, stringlizeAINChat, unstringlizeAIN, unstringlizeChat } 
 import { applyChatTemplate } from "../templates/chatTemplate";
 import { runTransformers } from "../transformers";
 import { runTrigger } from "../triggers";
+import { getRequestRuntimeContext } from "../runtimeContext";
+import { bindAbortTrace, finishRuntimeTraceScope, startRuntimeTraceScope, traceRuntimeEvent } from "../runtimeTrace";
 import { requestClaude } from './anthropic';
 import { requestGoogleCloudVertex } from './google';
 import { requestOpenAI, requestOpenAILegacyInstruct, requestOpenAIResponseAPI } from "./openAI/requests";
@@ -24,6 +26,18 @@ import { applyParameters, type ModelModeExtended } from './shared';
 export type ToolCall = {
     name: string;
     arguments: string;
+}
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function getCurrentCharacter(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getCurrentCharacter"]>[0] = {}) {
+    return getRequestRuntimeContext().getCurrentCharacter(options)
+}
+
+function getCurrentChat() {
+    return getRequestRuntimeContext().getCurrentChat()
 }
 
 interface requestDataArgument{
@@ -91,143 +105,305 @@ export type requestDataResponse = {
 export interface StreamResponseChunk{[key:string]:string}
 
 export async function requestChatData(arg:requestDataArgument, model:ModelModeExtended, abortSignal:AbortSignal=null):Promise<requestDataResponse> {
+    const traceScope = startRuntimeTraceScope('request.requestChatData', {
+        model,
+        chatId: arg.chatId ?? null,
+        messageCount: arg.formated?.length ?? 0,
+        useStreaming: Boolean(arg.useStreaming),
+        continue: Boolean(arg.continue),
+        noMultiGen: Boolean(arg.noMultiGen),
+        escape: Boolean(arg.escape),
+    })
+    let traceStatus:'ok'|'error'|'aborted' = 'ok'
+    let currentFallbackIndex = -1
+    let currentTry = 0
+    const detachAbortTrace = bindAbortTrace(abortSignal, 'request.requestChatData.abort_signal', () => ({
+        model,
+        chatId: arg.chatId ?? null,
+        fallbackIndex: currentFallbackIndex,
+        tryIndex: currentTry,
+    }))
+
     const db = getDatabase()
     const fallBackModels:string[] = safeStructuredClone(db?.fallbackModels?.[model] ?? [])
     const tools = await getTools()
     fallBackModels.push('')
     let da:requestDataResponse
 
-    if(arg.escape){
-        arg.useStreaming = false
-        console.warn('Escape is enabled, disabling streaming')
-    }
-
-    const originalFormated = safeStructuredClone(arg.formated).map(m => {
-        m.content = risuUnescape(m.content)
-        return m
-    })
-
-    for(let fallbackIndex=0;fallbackIndex<fallBackModels.length;fallbackIndex++){
-        let trys = 0
-        arg.formated = safeStructuredClone(originalFormated)
-
-        if(fallbackIndex !== 0 && !fallBackModels[fallbackIndex]){
-            continue
+    try {
+        if(arg.escape){
+            arg.useStreaming = false
+            traceRuntimeEvent('request.escape_disables_streaming', {
+                model,
+                chatId: arg.chatId ?? null,
+            })
+            console.warn('Escape is enabled, disabling streaming')
         }
 
-        while(true){
-            
-            if(abortSignal?.aborted){
-                return {
-                    type: 'fail',
-                    result: 'Aborted'
-                }
+        const originalFormated = safeStructuredClone(arg.formated).map(m => {
+            m.content = risuUnescape(m.content)
+            return m
+        })
+
+        for(let fallbackIndex=0;fallbackIndex<fallBackModels.length;fallbackIndex++){
+            currentFallbackIndex = fallbackIndex
+            let trys = 0
+            arg.formated = safeStructuredClone(originalFormated)
+
+            if(fallbackIndex !== 0 && !fallBackModels[fallbackIndex]){
+                continue
             }
-    
-            if(pluginV2.replacerbeforeRequest.size > 0){
-                for(const replacer of pluginV2.replacerbeforeRequest){
-                    arg.formated = await replacer(arg.formated, model)
-                }
-            }
-            
-            try{
-                const currentChar = getCurrentCharacter()
-                if(currentChar?.type !== 'group'){
-                    const perf = performance.now()
-                    const d = await runTrigger(currentChar, 'request', {
-                        chat: getCurrentChat(),
-                        displayMode: true,
-                        displayData: JSON.stringify(arg.formated)
+
+            traceRuntimeEvent('request.fallback.enter', {
+                model,
+                chatId: arg.chatId ?? null,
+                fallbackIndex,
+                fallbackModel: fallBackModels[fallbackIndex] || null,
+                retryLimit: db.requestRetrys,
+            })
+
+            while(true){
+                currentTry = trys
+
+                if(abortSignal?.aborted){
+                    traceStatus = 'aborted'
+                    traceRuntimeEvent('request.aborted.before_dispatch', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        fallbackIndex,
+                        tryIndex: trys,
                     })
-        
-                    const got = JSON.parse(d.displayData)
-                    if(!got || !Array.isArray(got)){
-                        throw new Error('Invalid return')
+                    return {
+                        type: 'fail',
+                        result: 'Aborted'
                     }
-                    arg.formated = got
-                    console.log('Trigger time', performance.now() - perf)
                 }
-            }
-            catch(e){
-                console.error(e)
-            }
-            
-    
-            da = await requestChatDataMain({
-                ...arg,
-                staticModel: fallBackModels[fallbackIndex],
-                tools: tools,
-            }, model, abortSignal)
 
-            if(abortSignal?.aborted){
-                return {
-                    type: 'fail',
-                    result: 'Aborted'
+                if(pluginV2.replacerbeforeRequest.size > 0){
+                    traceRuntimeEvent('request.plugin_before.start', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        replacerCount: pluginV2.replacerbeforeRequest.size,
+                    })
+                    let replacerIndex = 0
+                    for(const replacer of pluginV2.replacerbeforeRequest){
+                        arg.formated = await replacer(arg.formated, model)
+                        traceRuntimeEvent('request.plugin_before.applied', {
+                            model,
+                            chatId: arg.chatId ?? null,
+                            replacerIndex,
+                            messageCount: arg.formated.length,
+                        })
+                        replacerIndex += 1
+                    }
                 }
-            }
 
-            if(da.type === 'success' && arg.escape){
-                da.result = risuEscape(da.result)
-            }
-    
-            if(da.type === 'success' && pluginV2.replacerafterRequest.size > 0){
-                for(const replacer of pluginV2.replacerafterRequest){
-                    da.result = await replacer(da.result, model)
+                try{
+                    const currentChar = getCurrentCharacter()
+                    if(currentChar?.type !== 'group'){
+                        traceRuntimeEvent('request.trigger.request.start', {
+                            model,
+                            chatId: arg.chatId ?? null,
+                            charId: currentChar.chaId,
+                            messageCount: arg.formated.length,
+                        })
+                        const perf = performance.now()
+                        const d = await runTrigger(currentChar, 'request', {
+                            chat: getCurrentChat(),
+                            displayMode: true,
+                            displayData: JSON.stringify(arg.formated)
+                        })
+
+                        const got = JSON.parse(d.displayData)
+                        if(!got || !Array.isArray(got)){
+                            throw new Error('Invalid return')
+                        }
+                        arg.formated = got
+                        traceRuntimeEvent('request.trigger.request.end', {
+                            model,
+                            chatId: arg.chatId ?? null,
+                            durationMs: performance.now() - perf,
+                            messageCount: arg.formated.length,
+                        })
+                        console.log('Trigger time', performance.now() - perf)
+                    }
                 }
-            }
-    
-            if(da.type === 'success' && db.banCharacterset?.length > 0){
-                let failed = false
-                for(const set of db.banCharacterset){
-                    console.log(set)
-                    const checkRegex = new RegExp(`\\p{Script=${set}}`, 'gu')
-    
-                    if(checkRegex.test(da.result)){
-                        trys += 1
-                        failed = true
+                catch(e){
+                    traceRuntimeEvent('request.trigger.request.error', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        error: e,
+                    })
+                    console.error(e)
+                }
+
+                traceRuntimeEvent('request.dispatch.main', {
+                    model,
+                    chatId: arg.chatId ?? null,
+                    fallbackIndex,
+                    tryIndex: trys,
+                    staticModel: fallBackModels[fallbackIndex] || null,
+                    toolCount: tools.length,
+                    messageCount: arg.formated.length,
+                })
+                da = await requestChatDataMain({
+                    ...arg,
+                    staticModel: fallBackModels[fallbackIndex],
+                    tools: tools,
+                }, model, abortSignal)
+                traceRuntimeEvent('request.dispatch.result', {
+                    model,
+                    chatId: arg.chatId ?? null,
+                    fallbackIndex,
+                    tryIndex: trys,
+                    responseType: da.type,
+                    returnedModel: da.model ?? null,
+                    failByServerError: da.type === 'fail' ? Boolean(da.failByServerError) : false,
+                })
+
+                if(abortSignal?.aborted){
+                    traceStatus = 'aborted'
+                    return {
+                        type: 'fail',
+                        result: 'Aborted'
+                    }
+                }
+
+                if(da.type === 'success' && arg.escape){
+                    da.result = risuEscape(da.result)
+                }
+
+                if(da.type === 'success' && pluginV2.replacerafterRequest.size > 0){
+                    traceRuntimeEvent('request.plugin_after.start', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        replacerCount: pluginV2.replacerafterRequest.size,
+                    })
+                    let replacerIndex = 0
+                    for(const replacer of pluginV2.replacerafterRequest){
+                        da.result = await replacer(da.result, model)
+                        traceRuntimeEvent('request.plugin_after.applied', {
+                            model,
+                            chatId: arg.chatId ?? null,
+                            replacerIndex,
+                            resultLength: da.result.length,
+                        })
+                        replacerIndex += 1
+                    }
+                }
+
+                if(da.type === 'success' && db.banCharacterset?.length > 0){
+                    let failed = false
+                    for(const set of db.banCharacterset){
+                        console.log(set)
+                        const checkRegex = new RegExp(`\\p{Script=${set}}`, 'gu')
+
+                        if(checkRegex.test(da.result)){
+                            traceRuntimeEvent('request.retry.banned_characterset', {
+                                model,
+                                chatId: arg.chatId ?? null,
+                                fallbackIndex,
+                                tryIndex: trys,
+                                bannedSet: set,
+                            })
+                            trys += 1
+                            failed = true
+                            break
+                        }
+                    }
+
+                    if(failed){
+                        continue
+                    }
+                }
+
+                if(da.type === 'success' && fallbackIndex !== fallBackModels.length-1 && db.fallbackWhenBlankResponse){
+                    if(da.result.trim() === ''){
+                        traceRuntimeEvent('request.fallback.blank_response', {
+                            model,
+                            chatId: arg.chatId ?? null,
+                            fallbackIndex,
+                            tryIndex: trys,
+                        })
                         break
                     }
                 }
-    
-                if(failed){
-                    continue
+
+                if(da.type !== 'fail' || da.noRetry){
+                    traceRuntimeEvent('request.return', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        fallbackIndex,
+                        tryIndex: trys,
+                        responseType: da.type,
+                        noRetry: da.type === 'fail' ? Boolean(da.noRetry) : false,
+                    })
+                    if(da.type === 'fail'){
+                        traceStatus = abortSignal?.aborted ? 'aborted' : 'error'
+                    }
+                    return {
+                        ...da,
+                        model: fallBackModels[fallbackIndex]
+                    }
                 }
-            }
-    
-            if(da.type === 'success' && fallbackIndex !== fallBackModels.length-1 && db.fallbackWhenBlankResponse){
-                if(da.result.trim() === ''){
+
+                if(da.failByServerError){
+                    traceRuntimeEvent('request.retry.server_error', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        fallbackIndex,
+                        tryIndex: trys,
+                        antiServerOverloads: Boolean(db.antiServerOverloads),
+                    })
+                    await sleep(1000)
+                    if(db.antiServerOverloads){
+                        trys -= 0.5 // reduce trys by 0.5, so that it will retry twice as much
+                    }
+                }
+
+                trys += 1
+                traceRuntimeEvent('request.retry.increment', {
+                    model,
+                    chatId: arg.chatId ?? null,
+                    fallbackIndex,
+                    tryIndex: trys,
+                })
+                if(trys > db.requestRetrys){
+                    traceRuntimeEvent('request.retry.exhausted', {
+                        model,
+                        chatId: arg.chatId ?? null,
+                        fallbackIndex,
+                        tryIndex: trys,
+                        returnedModel: da.model ?? null,
+                    })
+                    if(fallbackIndex === fallBackModels.length-1 || da.model === 'custom'){
+                        traceStatus = abortSignal?.aborted ? 'aborted' : 'error'
+                        return da
+                    }
                     break
                 }
             }
-    
-            if(da.type !== 'fail' || da.noRetry){
-                return {
-                    ...da,
-                    model: fallBackModels[fallbackIndex]
-                }
-            }
-    
-            if(da.failByServerError){
-                await sleep(1000)
-                if(db.antiServerOverloads){
-                    trys -= 0.5 // reduce trys by 0.5, so that it will retry twice as much
-                }
-            }
-            
-            trys += 1
-            if(trys > db.requestRetrys){
-                if(fallbackIndex === fallBackModels.length-1 || da.model === 'custom'){
-                    return da
-                }
-                break
-            }
-        }   
+        }
+
+
+        traceStatus = 'error'
+        traceRuntimeEvent('request.all_models_failed', {
+            model,
+            chatId: arg.chatId ?? null,
+        })
+        return da ?? {
+            type: 'fail',
+            result: "All models failed"
+        }
     }
-
-
-    return da ?? {
-        type: 'fail',
-        result: "All models failed"
+    finally {
+        detachAbortTrace()
+        finishRuntimeTraceScope(traceScope, abortSignal?.aborted && traceStatus === 'ok' ? 'aborted' : traceStatus, {
+            model,
+            chatId: arg.chatId ?? null,
+            fallbackIndex: currentFallbackIndex,
+            tryIndex: currentTry,
+        })
     }
 }
 
@@ -359,6 +535,15 @@ export async function requestChatDataMain(arg:requestDataArgument, model:ModelMo
     const format = targ.modelInfo.format
 
     targ.formated = reformater(targ.formated, targ.modelInfo)
+    traceRuntimeEvent('request.requestChatDataMain.dispatch', {
+        mode: model,
+        chatId: arg.chatId ?? null,
+        aiModel: targ.aiModel,
+        format: targ.modelInfo.format,
+        useStreaming: Boolean(targ.useStreaming),
+        multiGen: Boolean(targ.multiGen),
+        messageCount: targ.formated.length,
+    })
 
     switch(format){
         case LLMFormat.OpenAICompatible:

@@ -1,6 +1,11 @@
-import { getDatabase, type Chat, type character } from "src/ts/storage/database.svelte";
+import { type Chat, type character } from "src/ts/storage/database.svelte";
 import { HypaProcesser } from '../memory/hypamemory'
 import { getUserName } from "src/ts/util";
+import { getRequestRuntimeContext } from "../runtimeContext";
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
 
 export async function additionalInformations(char: character,chats:Chat,){
     const processer = new HypaProcesser()

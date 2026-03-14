@@ -8,11 +8,19 @@ import {
 } from "@tauri-apps/plugin-fs"
 import { forageStorage } from "../globalApi.svelte"
 import { isTauri, isNodeServer } from "src/ts/platform"
-import { DBState } from "../stores.svelte"
 import type { NodeStorage } from "../storage/nodeStorage"
 import { fetchProtectedResource } from "../sionyw"
+import { getRequestRuntimeContext } from "./runtimeContext"
 
 export const coldStorageHeader = '\uEF01COLDSTORAGE\uEF01'
+
+function getDatabase(options: Parameters<ReturnType<typeof getRequestRuntimeContext>["getDatabase"]>[0] = {}) {
+    return getRequestRuntimeContext().getDatabase(options)
+}
+
+function setDatabase(data: Parameters<ReturnType<typeof getRequestRuntimeContext>["setDatabase"]>[0]) {
+    return getRequestRuntimeContext().setDatabase(data)
+}
 
 async function decompress(data:Uint8Array) {
     const fflate = await import('fflate')
@@ -173,18 +181,20 @@ async function removeColdStorageItem(key:string) {
 }
 
 export async function makeColdData(){
+    const db = getDatabase()
+    let changed = false
 
-    if(!DBState.db.chatCompression){
+    if(!db.chatCompression){
         return
     }
 
     const currentTime = Date.now()
     const coldTime = currentTime - 1000 * 60 * 60 * 24 * 30 //30 days before now
 
-    for(let i=0;i<DBState.db.characters.length;i++){
-        for(let j=0;j<DBState.db.characters[i].chats.length;j++){
+    for(let i=0;i<db.characters.length;i++){
+        for(let j=0;j<db.characters[i].chats.length;j++){
             
-            const chat = DBState.db.characters[i].chats[j]
+            const chat = db.characters[i].chats[j]
             let greatestTime = chat.lastDate ?? 0
 
             if(chat.message.length < 4){
@@ -234,14 +244,20 @@ export async function makeColdData(){
                 }
                 chat.scriptstate = {}
                 chat.localLore = []
+                changed = true
 
             }
         }
     }
+
+    if(changed){
+        setDatabase(db)
+    }
 }
 
 export async function preLoadChat(characterIndex:number, chatIndex:number){
-    const chat = DBState.db?.characters?.[characterIndex]?.chats?.[chatIndex]   
+    const db = getDatabase()
+    const chat = db?.characters?.[characterIndex]?.chats?.[chatIndex]   
 
     if(!chat){
         return
@@ -265,6 +281,7 @@ export async function preLoadChat(characterIndex:number, chatIndex:number){
         await setColdStorageItem(coldDataKey + '_accessMeta', {
             lastAccess: Date.now()
         })
+        setDatabase(db)
     }
 
 }
