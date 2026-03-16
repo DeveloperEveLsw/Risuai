@@ -41,7 +41,7 @@ import {
     setUsingSw,
     checkCharOrder
 } from "./globalApi.svelte";
-import { isTauri } from "./platform";
+import { isNodeServer, isTauri } from "./platform";
 import { registerModelDynamic } from "./model/modellist";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
@@ -106,33 +106,59 @@ export async function loadData() {
             else {
                 await forageStorage.Init()
 
-                LoadingStatusState.text = "Loading Local Save File..."
-                let gotStorage: Uint8Array = await forageStorage.getItem('database/database.bin') as unknown as Uint8Array
-                LoadingStatusState.text = "Decoding Local Save File..."
-                if (checkNullish(gotStorage)) {
-                    gotStorage = encodeRisuSaveLegacy({})
-                    await forageStorage.setItem('database/database.bin', gotStorage)
-                }
-                try {
-                    const decoded = await decodeRisuSave(gotStorage)
-                    console.log(decoded)
-                    setDatabase(decoded)
-                } catch (error) {
-                    console.error(error)
-                    const backups = await getDbBackups()
-                    let backupLoaded = false
-                    for (const backup of backups) {
-                        try {
-                            LoadingStatusState.text = `Reading Backup File ${backup}...`
-                            const backupData: Uint8Array = await forageStorage.getItem(`database/dbbackup-${backup}.bin`) as unknown as Uint8Array
-                            setDatabase(
-                                await decodeRisuSave(backupData)
-                            )
-                            backupLoaded = true
-                        } catch (error) { }
+                let loadedFromStructuredDb = false
+
+                if (isNodeServer) {
+                    try {
+                        LoadingStatusState.text = "Loading Relational Save Data..."
+                        const relationalDb = await forageStorage.exportStructuredDb()
+                        if (relationalDb) {
+                            setDatabase(relationalDb)
+                            loadedFromStructuredDb = true
+                        }
+                    } catch (error) {
+                        console.error(error)
                     }
-                    if (!backupLoaded) {
-                        throw "Forage: Your save file is corrupted"
+                }
+
+                if (!loadedFromStructuredDb) {
+                    LoadingStatusState.text = "Loading Local Save File..."
+                    let gotStorage: Uint8Array = await forageStorage.getItem('database/database.bin') as unknown as Uint8Array
+                    LoadingStatusState.text = "Decoding Local Save File..."
+                    if (checkNullish(gotStorage)) {
+                        gotStorage = encodeRisuSaveLegacy({})
+                        await forageStorage.setItem('database/database.bin', gotStorage)
+                    }
+                    try {
+                        const decoded = await decodeRisuSave(gotStorage)
+                        console.log(decoded)
+                        setDatabase(decoded)
+                    } catch (error) {
+                        console.error(error)
+                        const backups = await getDbBackups()
+                        let backupLoaded = false
+                        for (const backup of backups) {
+                            try {
+                                LoadingStatusState.text = `Reading Backup File ${backup}...`
+                                const backupData: Uint8Array = await forageStorage.getItem(`database/dbbackup-${backup}.bin`) as unknown as Uint8Array
+                                setDatabase(
+                                    await decodeRisuSave(backupData)
+                                )
+                                backupLoaded = true
+                            } catch (error) { }
+                        }
+                        if (!backupLoaded) {
+                            throw "Forage: Your save file is corrupted"
+                        }
+                    }
+
+                    if (isNodeServer) {
+                        try {
+                            LoadingStatusState.text = "Migrating Save Data To Relational DB..."
+                            await forageStorage.importStructuredDb(getDatabase({ snapshot: true }))
+                        } catch (error) {
+                            console.error(error)
+                        }
                     }
                 }
 

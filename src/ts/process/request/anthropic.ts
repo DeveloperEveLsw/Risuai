@@ -725,7 +725,6 @@ async function requestClaudeHTTP(replacerURL:string, headers:{[key:string]:strin
             signal: arg.abortSignal,
             interceptor: 'anthropic_streaming'
         })
-
         if(res.status !== 200){
             return {
                 type: 'fail',

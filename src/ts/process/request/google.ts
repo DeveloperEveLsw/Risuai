@@ -653,7 +653,6 @@ async function requestGoogle(url:string, body:any, headers:{[key:string]:string}
             signal: arg.abortSignal,
             interceptor: 'gemini_base_stream'
         })
-
         if(f.status !== 200){
             const text = await textifyReadableStream(f.body)
             if(text.includes('RESOURCE_EXHAUSTED')){

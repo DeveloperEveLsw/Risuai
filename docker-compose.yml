@@ -3,12 +3,36 @@ name: risuai
 services:
   risuai:
     container_name: risuai
-    image: ghcr.io/kwaroran/risuai:latest
+    build: .
+    image: risuai:local
     restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - 6001:6001
+    environment:
+      RISU_STORAGE_DRIVER: postgres
+      DATABASE_URL: postgresql://risuai:risuai@postgres:5432/risuai
+      RISU_STORAGE_IMPORT_FROM_SAVE: "true"
     volumes:
       - risuai-save:/app/save
+  postgres:
+    container_name: risuai-postgres
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: risuai
+      POSTGRES_USER: risuai
+      POSTGRES_PASSWORD: risuai
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U risuai -d risuai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - risuai-pgdata:/var/lib/postgresql/data
 
 volumes:
   risuai-save:
+  risuai-pgdata:

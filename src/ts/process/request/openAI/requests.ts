@@ -547,7 +547,6 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
             chatId: arg.chatId,
             interceptor: 'openai_streaming'
         })
-
         if(da.status !== 200){
             return {
                 type: "fail",

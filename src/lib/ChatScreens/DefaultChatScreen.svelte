@@ -57,7 +57,6 @@
     let { openModuleList = $bindable(false), openChatList = $bindable(false), customStyle = '' }: Props = $props();
     let currentCharacter = $derived(DBState.db.characters[$selectedCharID])
     let currentChat = $derived(currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [])
-
     function scrollToBottom() {
         chatsInstance?.scrollToLatestMessage();
     }
@@ -658,7 +657,7 @@
                 {#if $doingChat || doingChatInputTranslate}
                     <button
                             aria-labelledby="cancel"
-                            class="peer-focus:border-textcolor  flex justify-center border-y border-darkborderc items-center text-gray-100 p-3 hover:bg-blue-500 transition-colors" onclick={abortChat}
+                            class="peer-focus:border-textcolor flex flex-col justify-center border-y border-darkborderc items-center text-gray-100 p-3 hover:bg-blue-500 transition-colors" onclick={abortChat}
                             style:height={inputHeight}
                     >
                         <div class="loadmove chat-process-stage-{$chatProcessStage}" class:autoload={autoMode}></div>

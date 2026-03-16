@@ -1,6 +1,7 @@
 import { language } from "src/lang"
 import { alertError, alertInput, waitAlert } from "../alert"
 import { base64url, getKeypairStore, saveKeypairStore } from "../util"
+import type { Database } from "./database.svelte"
 
 
 export class NodeStorage{
@@ -60,16 +61,22 @@ export class NodeStorage{
 
     }
 
-    async setItem(key:string, value:Uint8Array) {
+    private async getAuthHeaders(extraHeaders:Record<string, string> = {}) {
         await this.checkAuth()
+        return {
+            ...extraHeaders,
+            'risu-auth': await this.createAuth()
+        }
+    }
+
+    async setItem(key:string, value:Uint8Array) {
         const da = await fetch('/api/write', {
             method: "POST",
             body: value as any,
-            headers: {
+            headers: await this.getAuthHeaders({
                 'content-type': 'application/octet-stream',
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
-                'risu-auth': await this.createAuth()
-            }
+                'file-path': Buffer.from(key, 'utf-8').toString('hex')
+            })
         })
         if(da.status < 200 || da.status >= 300){
             throw "setItem Error"
@@ -80,13 +87,11 @@ export class NodeStorage{
         }
     }
     async getItem(key:string):Promise<Buffer> {
-        await this.checkAuth()
         const da = await fetch('/api/read', {
             method: "GET",
-            headers: {
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
-                'risu-auth': await this.createAuth()
-            }
+            headers: await this.getAuthHeaders({
+                'file-path': Buffer.from(key, 'utf-8').toString('hex')
+            })
         })
         if(da.status < 200 || da.status >= 300){
             throw "getItem Error"
@@ -99,12 +104,9 @@ export class NodeStorage{
         return data
     }
     async keys():Promise<string[]>{
-        await this.checkAuth()
         const da = await fetch('/api/list', {
             method: "GET",
-            headers:{
-                'risu-auth': await this.createAuth()
-            }
+            headers: await this.getAuthHeaders()
         })
         if(da.status < 200 || da.status >= 300){
             throw "listItem Error"
@@ -116,13 +118,11 @@ export class NodeStorage{
         return data.content
     }
     async removeItem(key:string){
-        await this.checkAuth()
         const da = await fetch('/api/remove', {
             method: "GET",
-            headers: {
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
-                'risu-auth': await this.createAuth()
-            }
+            headers: await this.getAuthHeaders({
+                'file-path': Buffer.from(key, 'utf-8').toString('hex')
+            })
         })
         if(da.status < 200 || da.status >= 300){
             throw "removeItem Error"
@@ -131,6 +131,41 @@ export class NodeStorage{
         if(data.error){
             throw data.error
         }
+    }
+
+    async exportDatabase():Promise<Database|null> {
+        const response = await fetch('/api/db/export', {
+            method: 'GET',
+            headers: await this.getAuthHeaders()
+        })
+
+        if(response.status === 204 || response.status === 404){
+            return null
+        }
+        if(response.status < 200 || response.status >= 300){
+            throw "exportDatabase Error"
+        }
+
+        return await response.json() as Database
+    }
+
+    async importDatabase(database:Database) {
+        const response = await fetch('/api/db/import', {
+            method: 'POST',
+            headers: await this.getAuthHeaders({
+                'content-type': 'application/json'
+            }),
+            body: JSON.stringify(database)
+        })
+
+        if(response.status === 404){
+            return false
+        }
+        if(response.status < 200 || response.status >= 300){
+            throw "importDatabase Error"
+        }
+
+        return true
     }
 
     private async checkAuth(){

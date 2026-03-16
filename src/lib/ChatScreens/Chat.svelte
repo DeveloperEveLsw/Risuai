@@ -147,7 +147,6 @@
         }, timeout)
     }
 
-
     let blankMessage = $derived((message === '{{none}}' || message === '{{blank}}' || message === '') && idx === -1 || isComment)
 
     $effect.pre(() => {

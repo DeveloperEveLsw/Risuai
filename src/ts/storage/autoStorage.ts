@@ -37,6 +37,22 @@ export class AutoStorage{
         return await this.realStorage.removeItem(key)
     }
 
+    async exportStructuredDb():Promise<Database|null> {
+        await this.Init()
+        if(this.realStorage instanceof NodeStorage){
+            return await this.realStorage.exportDatabase()
+        }
+        return null
+    }
+
+    async importStructuredDb(database:Database):Promise<boolean> {
+        await this.Init()
+        if(this.realStorage instanceof NodeStorage){
+            return await this.realStorage.importDatabase(database)
+        }
+        return false
+    }
+
     async checkAccountSync(){
         let db = getDatabase()
         if(this.isAccount){

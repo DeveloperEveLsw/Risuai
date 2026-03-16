@@ -426,11 +426,15 @@ export async function saveDb() {
                 continue
             }
             const dbData = new Uint8Array(encoded)
+            const structuredDb = isNodeServer ? getDatabase({ snapshot: true }) : null
             if (isTauri) {
                 await writeFile('database/database.bin', dbData, { baseDir: BaseDirectory.AppData });
                 await writeFile(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData, { baseDir: BaseDirectory.AppData });
             }
             else {
+                if (structuredDb) {
+                    await forageStorage.importStructuredDb(structuredDb)
+                }
 
                 await forageStorage.setItem('database/database.bin', dbData)
                 if (!forageStorage.isAccount) {
@@ -1468,7 +1472,7 @@ export async function fetchNative(url: string, arg: {
     const db = getDatabase()
     let throughProxy = (!isTauri) && (!isNodeServer) && (!db.usePlainFetch)
     let fetchLogIndex = addFetchLog({
-        body: new TextDecoder().decode(realBody),
+        body: realBody ? new TextDecoder().decode(realBody) : '',
         headers: arg.headers,
         response: 'Streamed Fetch',
         success: true,

@@ -1651,69 +1651,69 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         if(triggerResult && triggerResult.sendAIprompt){
             resendChat = true
         }
-    }
+        }
 
-    let needsAutoContinue = false
-    const resultTokens = await tokenize(result) + (arg.usedContinueTokens || 0)
-    if(DBState.db.autoContinueMinTokens > 0 && resultTokens < DBState.db.autoContinueMinTokens){
-        needsAutoContinue = true
-    }
+        let needsAutoContinue = false
+        const resultTokens = await tokenize(result) + (arg.usedContinueTokens || 0)
+        if(DBState.db.autoContinueMinTokens > 0 && resultTokens < DBState.db.autoContinueMinTokens){
+            needsAutoContinue = true
+        }
 
-    if(DBState.db.autoContinueChat && (!isLastCharPunctuation(result))){
-        //if result doesn't end with punctuation or special characters, auto continue
-        needsAutoContinue = true
-    }
+        if(DBState.db.autoContinueChat && (!isLastCharPunctuation(result))){
+            //if result doesn't end with punctuation or special characters, auto continue
+            needsAutoContinue = true
+        }
 
-    if(needsAutoContinue){
-        doingChat.set(false)
-        return await sendChat(chatProcessIndex, {
-            chatAdditonalTokens: arg.chatAdditonalTokens,
-            continue: true,
-            signal: abortSignal,
-            usedContinueTokens: resultTokens
-        })
-    }
+        if(needsAutoContinue){
+            doingChat.set(false)
+            return await sendChat(chatProcessIndex, {
+                chatAdditonalTokens: arg.chatAdditonalTokens,
+                continue: true,
+                signal: abortSignal,
+                usedContinueTokens: resultTokens
+            })
+        }
 
-    const igp = risuChatParser(DBState.db.igpPrompt ?? "")
+        const igp = risuChatParser(DBState.db.igpPrompt ?? "")
 
-    if(igp){
-        const igpFormated = parseChatML(igp)
-        const rq = await requestChatData({
-            formated: igpFormated,
-            bias: {}
-        },'emotion', abortSignal)
+        if(igp){
+            const igpFormated = parseChatML(igp)
+            const rq = await requestChatData({
+                formated: igpFormated,
+                bias: {}
+            },'emotion', abortSignal)
 
-        DBState.db.characters[selectedChar].chats[selectedChat].message[DBState.db.characters[selectedChar].chats[selectedChat].message.length - 1].data += rq
-    }
+            DBState.db.characters[selectedChar].chats[selectedChat].message[DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].message.length - 1].data += rq
+        }
 
-    stageTimings.stage3Duration = Date.now() - stageTimings.stage3Start
+        stageTimings.stage3Duration = Date.now() - stageTimings.stage3Start
 
-    if(generationInfo.stageTiming) {
-        generationInfo.stageTiming.stage3 = stageTimings.stage3Duration
-    }
-    chatProcessStage.set(4)
-    stageTimings.stage4Start = Date.now()
-
-    if(resendChat){
-        stageTimings.stage4Duration = Date.now() - stageTimings.stage4Start
-        
         if(generationInfo.stageTiming) {
-            generationInfo.stageTiming.stage1 = stageTimings.stage1Duration
-            generationInfo.stageTiming.stage2 = stageTimings.stage2Duration
             generationInfo.stageTiming.stage3 = stageTimings.stage3Duration
-            generationInfo.stageTiming.stage4 = stageTimings.stage4Duration
         }
-        
-        const lastMessageIndex = DBState.db.characters[selectedChar].chats[selectedChat].message.length - 1
-        if(lastMessageIndex >= 0 && DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo) {
-            DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo = generationInfo
+        chatProcessStage.set(4)
+        stageTimings.stage4Start = Date.now()
+
+        if(resendChat){
+            stageTimings.stage4Duration = Date.now() - stageTimings.stage4Start
+            
+            if(generationInfo.stageTiming) {
+                generationInfo.stageTiming.stage1 = stageTimings.stage1Duration
+                generationInfo.stageTiming.stage2 = stageTimings.stage2Duration
+                generationInfo.stageTiming.stage3 = stageTimings.stage3Duration
+                generationInfo.stageTiming.stage4 = stageTimings.stage4Duration
+            }
+            
+            const lastMessageIndex = DBState.db.characters[selectedChar].chats[selectedChat].message.length - 1
+            if(lastMessageIndex >= 0 && DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo) {
+                DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo = generationInfo
+            }
+            
+            doingChat.set(false)
+            return await sendChat(chatProcessIndex, {
+                signal: abortSignal
+            })
         }
-        
-        doingChat.set(false)
-        return await sendChat(chatProcessIndex, {
-            signal: abortSignal
-        })
-    }
 
     if(DBState.db.notification){
         try {

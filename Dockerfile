@@ -20,6 +20,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-l
 # ------------------------------------------------------------------------------------------
 
 FROM deps AS builder
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 COPY . .
 # Install including dev deps
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile

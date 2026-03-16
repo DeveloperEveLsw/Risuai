@@ -2,9 +2,10 @@ const express = require('express');
 const app = express();
 const path = require('path');
 const htmlparser = require('node-html-parser');
-const { existsSync, mkdirSync, readFileSync, writeFileSync } = require('fs');
+const { existsSync, readFileSync, writeFileSync } = require('fs');
 const fs = require('fs/promises')
 const nodeCrypto = require('crypto')
+const { createStorage } = require('./storage/storageFactory.cjs')
 app.use(express.static(path.join(process.cwd(), 'dist'), {index: false}));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
@@ -17,22 +18,15 @@ const openid = require('openid-client');
 
 let password = ''
 let knownPublicKeysHashes = []
-
-const savePath = path.join(process.cwd(), "save")
-if(!existsSync(savePath)){
-    mkdirSync(savePath)
-}
-
-const passwordPath = path.join(process.cwd(), 'save', '__password')
-if(existsSync(passwordPath)){
-    password = readFileSync(passwordPath, 'utf-8')
-}
-
-const authCodePath = path.join(process.cwd(), 'save', '__authcode')
 const hexRegex = /^[0-9a-fA-F]+$/;
+const { driver: storageDriver, storage } = createStorage()
 
 function isHex(str) {
-    return hexRegex.test(str.toUpperCase().trim()) || str === '__password';
+    return hexRegex.test(str.toUpperCase().trim());
+}
+
+function decodeStorageKey(value) {
+    return Buffer.from(value, 'hex').toString('utf-8')
 }
 
 async function hashJSON(json){
@@ -194,13 +188,11 @@ const reverseProxyFunc = async (req, res, next) => {
     }
 
     if(req.headers['authorization']?.startsWith('X-SERVER-REGISTER')){
-        if(!existsSync(authCodePath)){
+        const authCode = await storage.getSecret('authcode')
+        if(!authCode){
             delete header['authorization']
         }
         else{
-            const authCode = await fs.readFile(authCodePath, {
-                encoding: 'utf-8'
-            })
             header['authorization'] = `Bearer ${authCode}`
         }
     }
@@ -527,7 +519,7 @@ app.post('/api/crypto', async (req, res) => {
 app.post('/api/set_password', async (req, res) => {
     if(password === ''){
         password = req.body.password
-        writeFileSync(passwordPath, password, 'utf-8')
+        await storage.setSecret('password', password)
         res.send({status: 'success'})
     }
     else{
@@ -555,12 +547,13 @@ app.get('/api/read', async (req, res, next) => {
         return;
     }
     try {
-        if(!existsSync(path.join(savePath, filePath))){
+        const data = await storage.readBuffer(decodeStorageKey(filePath))
+        if(!data){
             res.send();
         }
         else{
             res.setHeader('Content-Type','application/octet-stream');
-            res.sendFile(path.join(savePath, filePath));
+            res.send(data);
         }
     } catch (error) {
         next(error);
@@ -586,7 +579,7 @@ app.get('/api/remove', async (req, res, next) => {
     }
 
     try {
-        await fs.rm(path.join(savePath, filePath));
+        await storage.deleteKey(decodeStorageKey(filePath));
         res.send({
             success: true,
         });
@@ -600,9 +593,7 @@ app.get('/api/list', async (req, res, next) => {
         return;
     }
     try {
-        const data = (await fs.readdir(path.join(savePath))).map((v) => {
-            return Buffer.from(v, 'hex').toString('utf-8')
-        })
+        const data = await storage.listKeys()
         res.send({
             success: true,
             content: data
@@ -632,7 +623,7 @@ app.post('/api/write', async (req, res, next) => {
     }
 
     try {
-        await fs.writeFile(path.join(savePath, filePath), fileContent);
+        await storage.writeBuffer(decodeStorageKey(filePath), fileContent);
         res.send({
             success: true
         });
@@ -640,6 +631,50 @@ app.post('/api/write', async (req, res, next) => {
         next(error);
     }
 });
+
+app.get('/api/db/export', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+    if(typeof storage.exportStructuredDatabase !== 'function'){
+        res.status(404).send({ error: 'Structured database export is not supported by this storage driver' })
+        return
+    }
+
+    try {
+        const data = await storage.exportStructuredDatabase()
+        if(!data){
+            res.status(204).end()
+            return
+        }
+        res.send(data)
+    } catch (error) {
+        next(error)
+    }
+})
+
+app.post('/api/db/import', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+    if(typeof storage.importStructuredDatabase !== 'function'){
+        res.status(404).send({ error: 'Structured database import is not supported by this storage driver' })
+        return
+    }
+    if(!req.body || typeof req.body !== 'object'){
+        res.status(400).send({ error: 'Database payload required' })
+        return
+    }
+
+    try {
+        await storage.importStructuredDatabase(req.body)
+        res.send({
+            success: true
+        })
+    } catch (error) {
+        next(error)
+    }
+})
 
 const oauthData = {
     client_id: '',
@@ -742,7 +777,7 @@ app.get('/api/oauth_callback', async (req, res) => {
         },
     )
 
-    fs.writeFileSync(authCodePath, tokens.access_token, 'utf-8')
+    await storage.setSecret('authcode', tokens.access_token)
 
     res.send(tokens)
             
@@ -774,6 +809,9 @@ async function getHttpsOptions() {
 
 async function startServer() {
     try {
+        await storage.init()
+        password = await storage.getSecret('password')
+        console.log(`[Server] Storage driver: ${storageDriver}`)
       
         const port = process.env.PORT || 6001;
         const httpsOptions = await getHttpsOptions();
@@ -796,6 +834,22 @@ async function startServer() {
         process.exit(1);
     }
 }
+
+async function closeStorage() {
+    if (typeof storage.close === 'function') {
+        await storage.close()
+    }
+}
+
+process.on('SIGTERM', async () => {
+    await closeStorage()
+    process.exit(0)
+});
+
+process.on('SIGINT', async () => {
+    await closeStorage()
+    process.exit(0)
+});
 
 (async () => {
     await startServer();
