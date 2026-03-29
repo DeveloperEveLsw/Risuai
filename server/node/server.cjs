@@ -6,6 +6,7 @@ const { existsSync, readFileSync, writeFileSync } = require('fs');
 const fs = require('fs/promises')
 const nodeCrypto = require('crypto')
 const { createStorage } = require('./storage/storageFactory.cjs')
+const { ChunkSessionStore, DEFAULT_CHUNK_SIZE } = require('./chunkSessions.cjs')
 app.use(express.static(path.join(process.cwd(), 'dist'), {index: false}));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.raw({ type: 'application/octet-stream', limit: '100mb' }));
@@ -20,6 +21,7 @@ let password = ''
 let knownPublicKeysHashes = []
 const hexRegex = /^[0-9a-fA-F]+$/;
 const { driver: storageDriver, storage } = createStorage()
+const chunkSessions = new ChunkSessionStore()
 
 function isHex(str) {
     return hexRegex.test(str.toUpperCase().trim());
@@ -33,6 +35,34 @@ async function hashJSON(json){
     const hash = nodeCrypto.createHash('sha256');
     hash.update(JSON.stringify(json));
     return hash.digest('hex');
+}
+
+function parseChunkIndex(value) {
+    const parsed = Number.parseInt(value, 10)
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        return null
+    }
+    return parsed
+}
+
+function handleChunkRouteError(res, error, next) {
+    if (error?.statusCode) {
+        res.status(error.statusCode).send({
+            error: error.message
+        })
+        return
+    }
+    next(error)
+}
+
+function buildChunkManifest(meta) {
+    return {
+        id: meta.id,
+        chunkSize: meta.chunkSize,
+        totalChunks: meta.totalChunks,
+        size: meta.size,
+        contentType: meta.contentType || 'application/octet-stream'
+    }
 }
 
 app.get('/', async (req, res, next) => {
@@ -631,6 +661,205 @@ app.post('/api/write', async (req, res, next) => {
         next(error);
     }
 });
+
+app.post('/api/chunked/upload/init', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    const purpose = req.body?.purpose
+    const key = req.body?.key
+    const size = Number(req.body?.size ?? 0)
+    const chunkSize = Number(req.body?.chunkSize ?? DEFAULT_CHUNK_SIZE)
+
+    if (!['storage', 'db-import'].includes(purpose)) {
+        res.status(400).send({ error: 'Invalid chunk upload purpose' })
+        return
+    }
+    if (purpose === 'storage' && typeof key !== 'string') {
+        res.status(400).send({ error: 'Storage key is required for chunk uploads' })
+        return
+    }
+    if (!Number.isFinite(size) || size < 0) {
+        res.status(400).send({ error: 'Upload size must be a non-negative number' })
+        return
+    }
+    if (purpose === 'db-import' && typeof storage.importStructuredDatabase !== 'function') {
+        res.status(404).send({ error: 'Structured database import is not supported by this storage driver' })
+        return
+    }
+
+    try {
+        const session = await chunkSessions.createUploadSession({
+            purpose,
+            key: key || '',
+            size,
+            chunkSize
+        })
+        res.send({
+            uploadId: session.id,
+            chunkSize: session.chunkSize,
+            totalChunks: session.totalChunks
+        })
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
+
+app.post('/api/chunked/upload/:uploadId/part/:index', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    const chunkIndex = parseChunkIndex(req.params.index)
+    if (chunkIndex === null) {
+        res.status(400).send({ error: 'Chunk index must be a non-negative integer' })
+        return
+    }
+
+    try {
+        const chunk = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '')
+        await chunkSessions.appendUploadChunk(req.params.uploadId, chunkIndex, chunk)
+        res.send({ success: true })
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
+
+app.post('/api/chunked/upload/:uploadId/complete', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    try {
+        const { meta, data } = await chunkSessions.finalizeUpload(req.params.uploadId)
+
+        if (meta.purpose === 'storage') {
+            await storage.writeBuffer(meta.key, data)
+            res.send({ success: true })
+            return
+        }
+
+        if (meta.purpose === 'db-import') {
+            if (typeof storage.importStructuredDatabase !== 'function') {
+                res.status(404).send({ error: 'Structured database import is not supported by this storage driver' })
+                return
+            }
+
+            let payload
+            try {
+                payload = JSON.parse(data.toString('utf-8'))
+            } catch (error) {
+                res.status(400).send({ error: 'Invalid structured database payload' })
+                return
+            }
+
+            if (!payload || typeof payload !== 'object') {
+                res.status(400).send({ error: 'Structured database payload required' })
+                return
+            }
+
+            await storage.importStructuredDatabase(payload)
+            res.send({ success: true })
+            return
+        }
+
+        res.status(400).send({ error: 'Unsupported chunk upload purpose' })
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
+
+app.get('/api/chunked/download/storage/:filePath/manifest', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    const filePath = req.params.filePath
+    if (!filePath || !isHex(filePath)) {
+        res.status(400).send({ error: 'Invaild Path' })
+        return
+    }
+
+    try {
+        const storageKey = decodeStorageKey(filePath)
+        const data = await storage.readBuffer(storageKey)
+        if (!data) {
+            res.status(204).end()
+            return
+        }
+
+        const session = await chunkSessions.createDownloadSession({
+            purpose: 'storage',
+            key: storageKey,
+            data
+        })
+        res.send(buildChunkManifest(session))
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
+
+app.get('/api/chunked/download/db-export/manifest', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    if(typeof storage.exportStructuredDatabase !== 'function'){
+        res.status(404).send({ error: 'Structured database export is not supported by this storage driver' })
+        return
+    }
+
+    try {
+        const data = await storage.exportStructuredDatabase()
+        if(!data){
+            res.status(204).end()
+            return
+        }
+
+        const session = await chunkSessions.createDownloadSession({
+            purpose: 'db-export',
+            data: Buffer.from(JSON.stringify(data), 'utf-8'),
+            contentType: 'application/json'
+        })
+        res.send(buildChunkManifest(session))
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
+
+app.get('/api/chunked/download/:downloadId/part/:index', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    const chunkIndex = parseChunkIndex(req.params.index)
+    if (chunkIndex === null) {
+        res.status(400).send({ error: 'Chunk index must be a non-negative integer' })
+        return
+    }
+
+    try {
+        const { meta, chunk } = await chunkSessions.readDownloadChunk(req.params.downloadId, chunkIndex)
+        res.setHeader('Content-Type', meta.contentType || 'application/octet-stream')
+        res.send(chunk)
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
+
+app.post('/api/chunked/download/:downloadId/complete', async (req, res, next) => {
+    if(!await checkAuth(req, res)){
+        return;
+    }
+
+    try {
+        await chunkSessions.cleanupSession(req.params.downloadId)
+        res.send({ success: true })
+    } catch (error) {
+        handleChunkRouteError(res, error, next)
+    }
+})
 
 app.get('/api/db/export', async (req, res, next) => {
     if(!await checkAuth(req, res)){
