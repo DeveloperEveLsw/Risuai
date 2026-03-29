@@ -85,7 +85,10 @@
         if(btn){
             btn.focus()
         }
-        if($alertStore.type !== 'input'){
+        if($alertStore.type === 'input'){
+            input = $alertStore.defaultValue ?? ''
+        }
+        else{
             input = ''
         }
         if($alertStore.type !== 'branches'){
@@ -132,6 +135,13 @@
         isTranslated = !isTranslated;
     }
 
+    function submitInput() {
+        alertStore.set({
+            type: 'none',
+            msg: input
+        })
+    }
+
     const beautifyJSON = (data:string) =>{
         try {
             return JSON.stringify(JSON.parse(data), null, 2)
@@ -149,6 +159,10 @@
                 msg: JSON.stringify(e.data.msg)
             }
         }
+    }
+}} onkeydown={(ev) => {
+    if($alertStore.type === 'input' && ev.key === 'Enter' && !ev.isComposing){
+        submitInput()
     }
 }}></svelte:window>
 
@@ -300,14 +314,8 @@
                     })
                 }}>OK</Button>
             {:else if $alertStore.type === 'input'}
-                <TextInput value={$alertStore.defaultValue} id="alert-input" autocomplete="off" marginTop list="alert-input-list" />
-                <Button className="mt-4" onclick={() => {
-                    alertStore.set({
-                        type: 'none',
-                        //@ts-expect-error 'value' doesn't exist on Element, but target is HTMLInputElement here
-                        msg: document.querySelector('#alert-input')?.value
-                    })
-                }}>OK</Button>
+                <TextInput bind:value={input} id="alert-input" autocomplete="off" marginTop list="alert-input-list" />
+                <Button className="mt-4" onclick={submitInput}>OK</Button>
                 {#if $alertStore.datalist}
                     <datalist id="alert-input-list">
                         {#each $alertStore.datalist as item}
