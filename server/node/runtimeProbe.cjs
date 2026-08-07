@@ -81,14 +81,23 @@ async function main() {
             const summary = await evaluate(client, `(async () => {
                 let backendReachable = false
                 let backendStatus = 0
+                let backendError = ''
+                const backendController = new AbortController()
+                const backendTimeout = setTimeout(() => backendController.abort(), 5000)
                 try {
-                    const response = await fetch('/logo_32.png', { cache: 'no-store' })
+                    const response = await fetch('/logo_32.png', {
+                        cache: 'no-store',
+                        signal: backendController.signal
+                    })
                     backendReachable = response.ok
                     backendStatus = response.status
                     await response.arrayBuffer()
                 }
-                catch {
-                    // Report the failed browser-origin request in the summary.
+                catch (error) {
+                    backendError = error instanceof Error ? error.name : String(error)
+                }
+                finally {
+                    clearTimeout(backendTimeout)
                 }
 
                 return {
@@ -99,6 +108,7 @@ async function main() {
                     secureContext: globalThis.isSecureContext,
                     backendReachable,
                     backendStatus,
+                    backendError,
                     inputCount: document.querySelectorAll('input, textarea').length,
                     buttonCount: document.querySelectorAll('button').length,
                     bodyText: (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 800)
