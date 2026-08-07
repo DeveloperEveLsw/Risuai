@@ -5,6 +5,8 @@ services:
     container_name: risuai
     build:
       context: .
+      args:
+        VITE_RISU_LEGAL_CONFIGURED: "TRUE"
     image: risuai:server-resident
     restart: always
     ports:
