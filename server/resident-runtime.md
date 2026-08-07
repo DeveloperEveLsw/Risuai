@@ -50,6 +50,12 @@ page. Readiness checks use a static asset so they do not continuously add root
 page access entries to the application log. Docker JSON logs for both services
 rotate at 10 MiB with three files retained per container.
 
+The app keeps the private address configured by `RISU_APP_IPV4` inside
+`RISU_RUNTIME_SUBNET`. Chromium can cache a Docker DNS answer beyond a container
+recreation, so this stable address is required for image updates that replace
+the app while retaining the resident browser profile. Change both values
+together if the default subnet overlaps an existing Docker, LAN, or VPN route.
+
 Chromium's debugging endpoint listens only on loopback inside its own container.
 It is used for health checks and deployment verification and is not published
 to the app container, host, or LAN. The internal `http://risuai:6001` origin is

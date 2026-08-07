@@ -18,6 +18,11 @@ services:
       # Keep the raw RisuAI web app private. The persistent browser below is
       # the only supported interactive client.
       - 127.0.0.1:6001:6001
+    networks:
+      default:
+        # Chromium may retain a positive DNS result longer than a Compose app
+        # recreation. Keep the app address stable across image updates.
+        ipv4_address: ${RISU_APP_IPV4:-172.30.107.10}
     volumes:
       - risuai-save:/app/save
     healthcheck:
@@ -106,3 +111,9 @@ services:
 volumes:
   risuai-save:
   risuai-runtime-profile:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${RISU_RUNTIME_SUBNET:-172.30.107.0/24}
