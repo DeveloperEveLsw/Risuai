@@ -9,6 +9,11 @@ services:
         VITE_RISU_LEGAL_CONFIGURED: "TRUE"
     image: risuai:server-resident
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     ports:
       # Keep the raw RisuAI web app private. The persistent browser below is
       # the only supported interactive client.
@@ -20,7 +25,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:6001/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+        - "fetch('http://127.0.0.1:6001/logo_32.png').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 12
@@ -28,9 +33,14 @@ services:
     stop_grace_period: 30s
 
   browser-runtime:
-    image: ${RISU_CHROMIUM_IMAGE:-ghcr.io/linuxserver/chromium:version-b0ddd401@sha256:47fc8bb18cdb0844199a16e1e14b3b38ba97f6ad1659895c243ba5f2384aad1e}
+    image: ${RISU_CHROMIUM_IMAGE:-ghcr.io/linuxserver/chromium:version-3d7cd855@sha256:6ad21b594a3ad1c9cf77eeac9c713e7d840927a842f706e39de8f6b64c5de6e6}
     container_name: risuai-runtime
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     depends_on:
       risuai:
         condition: service_healthy
@@ -62,7 +72,7 @@ services:
       SELKIES_UI_SIDEBAR_SHOW_APPS: "false"
       SELKIES_FRAMERATE: "30"
       MAX_RES: 3840x2160
-      RISU_RUNTIME_APP_URL: http://risuai:6001/
+      RISU_RUNTIME_READINESS_URL: http://risuai:6001/logo_32.png
       CHROME_CLI: >-
         --app=http://risuai:6001/
         --unsafely-treat-insecure-origin-as-secure=http://risuai:6001
@@ -83,7 +93,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - curl -fsS http://risuai:6001/ >/dev/null && curl -fsS http://127.0.0.1:9222/json/version >/dev/null || exit 1
+        - curl -fsS http://risuai:6001/logo_32.png >/dev/null && curl -fsS http://127.0.0.1:9222/json/version >/dev/null || exit 1
       interval: 10s
       timeout: 5s
       retries: 12

@@ -45,7 +45,9 @@ The browser container runs `server/runtime/wait-for-risuai.sh` before starting
 Chromium. This also covers Docker's host-reboot path, where restart policies do
 not guarantee the Compose `depends_on` startup order. If the app is unavailable,
 the browser waits instead of permanently opening Chromium's connection-error
-page.
+page. Readiness checks use a static asset so they do not continuously add root
+page access entries to the application log. Docker JSON logs for both services
+rotate at 10 MiB with three files retained per container.
 
 Chromium's debugging endpoint listens only on loopback inside its own container.
 It is used for health checks and deployment verification and is not published
