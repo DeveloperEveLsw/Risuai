@@ -30,7 +30,6 @@ services:
     image: ${RISU_CHROMIUM_IMAGE:-ghcr.io/linuxserver/chromium:version-b0ddd401@sha256:47fc8bb18cdb0844199a16e1e14b3b38ba97f6ad1659895c243ba5f2384aad1e}
     container_name: risuai-runtime
     restart: always
-    init: true
     # Sharing the app container's network namespace makes localhost a secure
     # browser context while keeping Chromium's control ports off the network.
     network_mode: service:risuai
