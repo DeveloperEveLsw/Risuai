@@ -50,7 +50,10 @@ async function connect() {
         throw new Error('The resident RisuAI page was not found')
     }
 
-    const socket = new WebSocket(target.webSocketDebuggerUrl)
+    const websocketUrl = new URL(target.webSocketDebuggerUrl)
+    const endpointUrl = new URL(CDP_ENDPOINT)
+    websocketUrl.host = endpointUrl.host
+    const socket = new WebSocket(websocketUrl)
     await new Promise((resolve, reject) => {
         socket.once('open', resolve)
         socket.once('error', reject)

@@ -41,9 +41,11 @@ second page can overwrite newer state.
 Port 6001 is bound to host loopback only. The remote browser is the supported
 interactive entry point.
 
-Chromium's debugging endpoint listens only on loopback inside the shared
-container network namespace. It is used for health checks and deployment
-verification and is not published to the host or LAN.
+Chromium's debugging endpoint is reachable only over the private Compose
+network. It is used for health checks and deployment verification and is not
+published to the host or LAN. The internal `http://risuai:6001` origin is
+explicitly marked as a secure origin in the resident Chromium only; the raw app
+port remains bound to host loopback.
 
 For an administrative readiness check from the app container, run
 `node server/node/runtimeProbe.cjs summary`. The probe talks only to the
