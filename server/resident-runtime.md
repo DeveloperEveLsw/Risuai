@@ -41,15 +41,25 @@ second page can overwrite newer state.
 Port 6001 is bound to host loopback only. The remote browser is the supported
 interactive entry point.
 
-Chromium's debugging endpoint is reachable only over the private Compose
-network. It is used for health checks and deployment verification and is not
-published to the host or LAN. The internal `http://risuai:6001` origin is
+Chromium's debugging endpoint listens only on loopback inside its own container.
+It is used for health checks and deployment verification and is not published
+to the app container, host, or LAN. The internal `http://risuai:6001` origin is
 explicitly marked as a secure origin in the resident Chromium only; the raw app
 port remains bound to host loopback.
 
-For an administrative readiness check from the app container, run
-`node server/node/runtimeProbe.cjs summary`. The probe talks only to the
-private Chromium endpoint.
+For an administrative readiness check, run the application image as a one-off
+probe inside the browser container's network namespace:
+
+```sh
+docker run --rm \
+  --network container:risuai-runtime \
+  --entrypoint node \
+  risuai:server-resident \
+  /app/server/node/runtimeProbe.cjs summary
+```
+
+The probe container exits after the check and cannot make the debugging port
+reachable from outside the browser container.
 
 ## Runtime behavior and limits
 

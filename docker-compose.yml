@@ -9,9 +9,6 @@ services:
         VITE_RISU_LEGAL_CONFIGURED: "TRUE"
     image: risuai:server-resident
     restart: always
-    environment:
-      # Administrative probe traffic stays on the private Compose network.
-      RISU_RUNTIME_CDP: http://browser-runtime:9222
     ports:
       # Keep the raw RisuAI web app private. The persistent browser below is
       # the only supported interactive client.
@@ -68,7 +65,6 @@ services:
       CHROME_CLI: >-
         --app=http://risuai:6001/
         --unsafely-treat-insecure-origin-as-secure=http://risuai:6001
-        --remote-debugging-address=0.0.0.0
         --remote-debugging-port=9222
         --no-first-run
         --no-default-browser-check
