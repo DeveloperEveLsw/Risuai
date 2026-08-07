@@ -62,6 +62,7 @@ services:
       SELKIES_UI_SIDEBAR_SHOW_APPS: "false"
       SELKIES_FRAMERATE: "30"
       MAX_RES: 3840x2160
+      RISU_RUNTIME_APP_URL: http://risuai:6001/
       CHROME_CLI: >-
         --app=http://risuai:6001/
         --unsafely-treat-insecure-origin-as-secure=http://risuai:6001
@@ -77,11 +78,12 @@ services:
         --password-store=basic
     volumes:
       - risuai-runtime-profile:/config
+      - ./server/runtime/wait-for-risuai.sh:/custom-cont-init.d/10-wait-for-risuai:ro
     shm_size: 1gb
     healthcheck:
       test:
         - CMD-SHELL
-        - curl -fsS http://127.0.0.1:9222/json/version >/dev/null || exit 1
+        - curl -fsS http://risuai:6001/ >/dev/null && curl -fsS http://127.0.0.1:9222/json/version >/dev/null || exit 1
       interval: 10s
       timeout: 5s
       retries: 12

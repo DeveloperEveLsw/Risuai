@@ -41,6 +41,12 @@ second page can overwrite newer state.
 Port 6001 is bound to host loopback only. The remote browser is the supported
 interactive entry point.
 
+The browser container runs `server/runtime/wait-for-risuai.sh` before starting
+Chromium. This also covers Docker's host-reboot path, where restart policies do
+not guarantee the Compose `depends_on` startup order. If the app is unavailable,
+the browser waits instead of permanently opening Chromium's connection-error
+page.
+
 Chromium's debugging endpoint listens only on loopback inside its own container.
 It is used for health checks and deployment verification and is not published
 to the app container, host, or LAN. The internal `http://risuai:6001` origin is
