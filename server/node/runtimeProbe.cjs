@@ -77,18 +77,42 @@ async function main() {
     const command = process.argv[2] || 'summary'
     const client = await connect()
     try {
-        if (command === 'summary') {
-            const summary = await evaluate(client, `(() => ({
-                title: document.title,
-                url: location.href,
-                readyState: document.readyState,
-                nodeMode: globalThis.__NODE__ === true,
-                secureContext: globalThis.isSecureContext,
-                inputCount: document.querySelectorAll('input, textarea').length,
-                buttonCount: document.querySelectorAll('button').length,
-                bodyText: (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 800)
-            }))()`)
+        if (command === 'summary' || command === 'verify') {
+            const summary = await evaluate(client, `(async () => {
+                let backendReachable = false
+                let backendStatus = 0
+                try {
+                    const response = await fetch('/logo_32.png', { cache: 'no-store' })
+                    backendReachable = response.ok
+                    backendStatus = response.status
+                    await response.arrayBuffer()
+                }
+                catch {
+                    // Report the failed browser-origin request in the summary.
+                }
+
+                return {
+                    title: document.title,
+                    url: location.href,
+                    readyState: document.readyState,
+                    nodeMode: globalThis.__NODE__ === true,
+                    secureContext: globalThis.isSecureContext,
+                    backendReachable,
+                    backendStatus,
+                    inputCount: document.querySelectorAll('input, textarea').length,
+                    buttonCount: document.querySelectorAll('button').length,
+                    bodyText: (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 800)
+                }
+            })()`)
             process.stdout.write(`${JSON.stringify(summary)}\n`)
+            if (command === 'verify' && !(
+                summary.readyState === 'complete' &&
+                summary.nodeMode === true &&
+                summary.secureContext === true &&
+                summary.backendReachable === true
+            )) {
+                throw new Error('The resident RisuAI page failed its readiness checks')
+            }
             return
         }
 

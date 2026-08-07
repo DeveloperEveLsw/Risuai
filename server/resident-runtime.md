@@ -71,11 +71,13 @@ docker run --rm \
   --network container:risuai-runtime \
   --entrypoint node \
   risuai:server-resident \
-  /app/server/node/runtimeProbe.cjs summary
+  /app/server/node/runtimeProbe.cjs verify
 ```
 
 The probe container exits after the check and cannot make the debugging port
-reachable from outside the browser container.
+reachable from outside the browser container. Verification performs a
+cache-bypassing fetch from inside the already-running RisuAI page, so it also
+detects a stale browser-side Docker DNS result after an app replacement.
 
 ## Runtime behavior and limits
 
