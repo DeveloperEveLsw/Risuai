@@ -41,6 +41,10 @@ second page can overwrite newer state.
 Port 6001 is bound to host loopback only. The remote browser is the supported
 interactive entry point.
 
+Chromium's debugging endpoint listens only on loopback inside the shared
+container network namespace. It is used for health checks and deployment
+verification and is not published to the host or LAN.
+
 ## Runtime behavior and limits
 
 - Closing the viewer, changing local tabs, or shutting down the viewer device

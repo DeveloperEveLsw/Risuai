@@ -61,6 +61,8 @@ services:
       MAX_RES: 3840x2160
       CHROME_CLI: >-
         --app=http://127.0.0.1:6001/
+        --remote-debugging-address=127.0.0.1
+        --remote-debugging-port=9222
         --no-first-run
         --no-default-browser-check
         --disable-sync
@@ -73,6 +75,14 @@ services:
     volumes:
       - risuai-runtime-profile:/config
     shm_size: 1gb
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://127.0.0.1:9222/json/version >/dev/null || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     stop_grace_period: 30s
 
 volumes:
