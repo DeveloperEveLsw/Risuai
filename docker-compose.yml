@@ -59,6 +59,9 @@ services:
       SELKIES_SECOND_SCREEN: "false"
       SELKIES_FILE_TRANSFERS: upload,download
       SELKIES_CLIPBOARD_ENABLED: "true"
+      SELKIES_UI_SIDEBAR_SHOW_FILES: "true"
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false"
+      SELKIES_UI_SIDEBAR_SHOW_APPS: "false"
       SELKIES_FRAMERATE: "30"
       MAX_RES: 3840x2160
       CHROME_CLI: >-
