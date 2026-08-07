@@ -3,12 +3,79 @@ name: risuai
 services:
   risuai:
     container_name: risuai
-    image: ghcr.io/kwaroran/risuai:latest
+    build:
+      context: .
+    image: risuai:server-resident
     restart: always
     ports:
-      - 6001:6001
+      # Keep the raw RisuAI web app private. The persistent browser below is
+      # the only supported interactive client and shares this network stack.
+      - 127.0.0.1:6001:6001
+      - ${RISU_RUNTIME_PORT:-6002}:3001
     volumes:
       - risuai-save:/app/save
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:6001/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    stop_grace_period: 30s
+
+  browser-runtime:
+    image: ${RISU_CHROMIUM_IMAGE:-ghcr.io/linuxserver/chromium:version-b0ddd401}
+    container_name: risuai-runtime
+    restart: always
+    init: true
+    # Sharing the app container's network namespace makes localhost a secure
+    # browser context while keeping Chromium's control ports off the network.
+    network_mode: service:risuai
+    depends_on:
+      risuai:
+        condition: service_healthy
+    environment:
+      PUID: ${RISU_RUNTIME_PUID:-1000}
+      PGID: ${RISU_RUNTIME_PGID:-1000}
+      TZ: ${TZ:-Asia/Seoul}
+      LC_ALL: ko_KR.UTF-8
+      CUSTOM_USER: ${RISU_RUNTIME_USER:-risu}
+      PASSWORD: ${RISU_RUNTIME_PASSWORD:?Set RISU_RUNTIME_PASSWORD in .env}
+      TITLE: RisuAI Server Runtime
+      PIXELFLUX_WAYLAND: "false"
+      NO_DECOR: "true"
+      HARDEN_DESKTOP: "true"
+      HARDEN_OPENBOX: "true"
+      DISABLE_SUDO: "true"
+      DISABLE_TERMINALS: "true"
+      RESTART_APP: "true"
+      SELKIES_ENABLE_SHARING: "false"
+      SELKIES_ENABLE_COLLAB: "false"
+      SELKIES_ENABLE_SHARED: "false"
+      SELKIES_SECOND_SCREEN: "false"
+      SELKIES_FILE_TRANSFERS: upload,download
+      SELKIES_CLIPBOARD_ENABLED: "true"
+      SELKIES_FRAMERATE: "30"
+      MAX_RES: 3840x2160
+      CHROME_CLI: >-
+        --app=http://127.0.0.1:6001/
+        --no-first-run
+        --no-default-browser-check
+        --disable-sync
+        --disable-session-crashed-bubble
+        --disable-background-timer-throttling
+        --disable-backgrounding-occluded-windows
+        --disable-renderer-backgrounding
+        --disable-features=Translate,OptimizationHints,MediaRouter
+        --password-store=basic
+    volumes:
+      - risuai-runtime-profile:/config
+    shm_size: 1gb
+    stop_grace_period: 30s
 
 volumes:
   risuai-save:
+  risuai-runtime-profile:
