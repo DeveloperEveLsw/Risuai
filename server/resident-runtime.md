@@ -45,6 +45,10 @@ Chromium's debugging endpoint listens only on loopback inside the shared
 container network namespace. It is used for health checks and deployment
 verification and is not published to the host or LAN.
 
+For an administrative readiness check from the app container, run
+`node server/node/runtimeProbe.cjs summary`. The probe talks only to the
+private Chromium endpoint.
+
 ## Runtime behavior and limits
 
 - Closing the viewer, changing local tabs, or shutting down the viewer device
