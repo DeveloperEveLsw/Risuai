@@ -45,6 +45,8 @@ __pycache__/
 dist.zip
 /scripts/
 .env
+.env.*
+!.env.example
 /server/node/ssl/certificate
 
 

@@ -44,8 +44,11 @@ services:
     depends_on:
       risuai:
         condition: service_healthy
+        # Explicit Compose updates of the app must reload the resident tab so
+        # it cannot keep running an older cached upstream bundle.
+        restart: true
     ports:
-      - ${RISU_RUNTIME_PORT:-6002}:3001
+      - ${RISU_RUNTIME_BIND:-127.0.0.1}:${RISU_RUNTIME_PORT:-6002}:3001
     environment:
       PUID: ${RISU_RUNTIME_PUID:-1000}
       PGID: ${RISU_RUNTIME_PGID:-1000}

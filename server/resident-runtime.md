@@ -29,8 +29,9 @@ second page can overwrite newer state.
 
 ## Start
 
-1. Copy `.env.example` to `.env` and set a long random
-   `RISU_RUNTIME_PASSWORD`.
+1. Copy `.env.example` to `.env`, set a long random
+   `RISU_RUNTIME_PASSWORD`, and set `RISU_RUNTIME_BIND` to the server's LAN or
+   VPN address when remote access is required.
 2. Run `docker compose up -d --build`.
 3. Open `https://SERVER:6002/`, accept the locally generated TLS certificate,
    and sign in with `RISU_RUNTIME_USER` and `RISU_RUNTIME_PASSWORD`.
@@ -89,4 +90,6 @@ Keep the fork's application code close to upstream `main`. Fast-forward or
 rebase this deployment commit onto the reviewed upstream revision, rebuild the
 `risuai` image, and then verify at least one Lua/trigger-heavy character before
 removing the prior image. Update `RISU_CHROMIUM_IMAGE` explicitly after
-reviewing a new browser image.
+reviewing a new browser image. The `depends_on.restart` relation makes an
+explicit Compose app update restart the browser service as well, preserving its
+profile but forcing the resident tab to load the newly built upstream bundle.
