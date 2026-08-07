@@ -54,6 +54,9 @@ services:
         restart: true
     ports:
       - ${RISU_RUNTIME_BIND:-127.0.0.1}:${RISU_RUNTIME_PORT:-6002}:3001
+    networks:
+      default:
+        ipv4_address: ${RISU_BROWSER_IPV4:-172.30.107.20}
     environment:
       PUID: ${RISU_RUNTIME_PUID:-1000}
       PGID: ${RISU_RUNTIME_PGID:-1000}
