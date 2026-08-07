@@ -1,1 +1,11 @@
+.git
 node_modules
+dist
+coverage
+
+# Never send deployment credentials or local environment backups to BuildKit.
+.env
+.env.*
+!.env.example
+
+*.log
