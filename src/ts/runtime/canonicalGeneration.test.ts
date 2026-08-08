@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     processMultiCommand: vi.fn(),
     processScript: vi.fn(),
     runTrigger: vi.fn(),
+    runLuaButtonTrigger: vi.fn(),
     prereroll: vi.fn(),
     preUnreroll: vi.fn(),
 }))
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../stores.svelte', async () => {
     const { writable } = await import('svelte/store')
     return {
+        CurrentTriggerIdStore: writable<string | null>(null),
         DBState: mocks.dbState,
         selectedCharID: writable(-1),
     }
@@ -34,6 +36,7 @@ vi.mock('../process/index.svelte', async () => {
 vi.mock('../process/command', () => ({ processMultiCommand: mocks.processMultiCommand }))
 vi.mock('../process/scripts', () => ({ processScript: mocks.processScript }))
 vi.mock('../process/triggers', () => ({ runTrigger: mocks.runTrigger }))
+vi.mock('../process/scriptings', () => ({ runLuaButtonTrigger: mocks.runLuaButtonTrigger }))
 vi.mock('../process/prereroll', () => ({
     Prereroll: mocks.prereroll,
     PreUnreroll: mocks.preUnreroll,
@@ -46,6 +49,8 @@ import { doingChat } from '../process/index.svelte'
 import {
     CanonicalGenerationTargetError,
     executeCanonicalGenerate,
+    executeCanonicalLuaButton,
+    executeCanonicalManualTrigger,
     executeCanonicalReroll,
     executeCanonicalSend,
     executeCanonicalUnreroll,
@@ -84,6 +89,7 @@ describe('canonical resident generation boundary', () => {
         mocks.processMultiCommand.mockReset().mockResolvedValue(false)
         mocks.processScript.mockReset().mockImplementation(async (_character, input) => `edited:${input}`)
         mocks.runTrigger.mockReset().mockResolvedValue(null)
+        mocks.runLuaButtonTrigger.mockReset().mockResolvedValue(null)
         mocks.prereroll.mockReset().mockReturnValue(null)
         mocks.preUnreroll.mockReset().mockReturnValue(null)
     })
@@ -188,6 +194,58 @@ describe('canonical resident generation boundary', () => {
             usedContinueTokens: 7,
         })
         expect(result).toMatchObject({ generated: true, previousLength: 1 })
+    })
+
+    it('runs a manual trigger against the canonical resident chat and keeps its mutation', async () => {
+        const mutatedChat = {
+            id: 'chat-a',
+            message: [{ role: 'char', data: 'manual LLM result' }],
+        }
+        mocks.runTrigger.mockResolvedValue({
+            chat: mutatedChat,
+            additonalSysPrompt: { start: '', historyend: '', promptend: '' },
+            stopSending: false,
+        })
+
+        const result = await executeCanonicalManualTrigger({
+            characterId: 'character-a',
+            chatId: 'chat-a',
+            manualName: 'community-action',
+            triggerId: 'trigger-7',
+        })
+
+        expect(mocks.runTrigger).toHaveBeenCalledWith(
+            mocks.dbState.db.characters[0],
+            'manual',
+            {
+                chat: expect.objectContaining({ id: 'chat-a' }),
+                manualName: 'community-action',
+                triggerId: 'trigger-7',
+            },
+        )
+        expect(mocks.dbState.db.characters[0].chats[0]).toBe(mutatedChat)
+        expect(result).toEqual({ generated: false, previousLength: 0, currentLength: 1 })
+    })
+
+    it('runs a Lua chat button against the canonical resident chat', async () => {
+        const mutatedChat = {
+            id: 'chat-b',
+            message: [{ role: 'char', data: 'Lua LLM result' }],
+        }
+        mocks.runLuaButtonTrigger.mockResolvedValue({ chat: mutatedChat })
+
+        const result = await executeCanonicalLuaButton({
+            characterId: 'character-a',
+            chatId: 'chat-b',
+            data: 'community-button-payload',
+        })
+
+        expect(mocks.runLuaButtonTrigger).toHaveBeenCalledWith(
+            mocks.dbState.db.characters[0],
+            'community-button-payload',
+        )
+        expect(mocks.dbState.db.characters[0].chats[1]).toBe(mutatedChat)
+        expect(result).toEqual({ generated: false, previousLength: 0, currentLength: 1 })
     })
 
     it('runs unreroll against the resident cache and canonical target', () => {

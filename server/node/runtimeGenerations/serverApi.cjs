@@ -35,6 +35,8 @@ const RUNTIME_GENERATION_ACTIONS = Object.freeze([
     'unreroll',
     'auto',
     'generate',
+    'manual-trigger',
+    'lua-button',
 ]);
 const RUNTIME_GENERATION_ACTION_SET = new Set(RUNTIME_GENERATION_ACTIONS);
 

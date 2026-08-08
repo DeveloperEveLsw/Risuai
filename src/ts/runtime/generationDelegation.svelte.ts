@@ -272,6 +272,62 @@ export async function queueRuntimeGeneration(
     }
 }
 
+export type RuntimeChatInteractionInput = RuntimeGenerationTargetFilter & {
+    characterId: string
+    chatId: string
+} & (
+    | { action: 'manual-trigger', manualName: string, triggerId?: string }
+    | { action: 'lua-button', data: string }
+)
+
+/** Delegate an interaction originating from rendered chat HTML. The complete
+ * trigger/Lua callback runs under the resident command fence, including any
+ * low-level LLM calls and the resulting canonical chat mutation. */
+export async function delegateRuntimeChatInteraction(
+    input: RuntimeChatInteractionInput,
+): Promise<boolean | null> {
+    if (!shouldDelegateGeneration()) {
+        return null
+    }
+    if (!waitForRuntimePersistence) {
+        throw new Error('Runtime generation delegation has not been installed')
+    }
+
+    const persisted = await waitForRuntimePersistence()
+    const payload: Record<string, unknown> = {
+        databaseRevision: persisted?.revision ?? null,
+    }
+    if (input.action === 'manual-trigger') {
+        payload.manualName = input.manualName
+        if (input.triggerId !== undefined) {
+            payload.triggerId = input.triggerId
+        }
+    }
+    else {
+        payload.data = input.data
+    }
+
+    const command = await queueRuntimeGeneration({
+        action: input.action,
+        characterId: input.characterId,
+        chatId: input.chatId,
+        payload,
+    })
+    const terminal = await waitForRuntimeGenerationTerminal(command)
+    await waitForCompletedRevision(terminal)
+    if (terminal.state === 'completed') {
+        return true
+    }
+    if (terminal.state === 'cancelled') {
+        return false
+    }
+    throw new Error(
+        terminal.error
+            ? `Server chat interaction ${terminal.state}: ${terminal.error}`
+            : `Server chat interaction ended as ${terminal.state}`,
+    )
+}
+
 function isTerminal(command: RuntimeGenerationCommand) {
     return command.state === 'completed'
         || command.state === 'failed'

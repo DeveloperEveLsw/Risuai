@@ -48,6 +48,10 @@
         shouldRestoreRuntimeDraft,
         waitForRuntimeGenerationTerminal,
     } from 'src/ts/runtime/generationDelegation.svelte';
+    import {
+        isRuntimeGenerationKeepaliveSafe,
+        type RuntimeGenerationCreateInput,
+    } from 'src/ts/runtime/generationClient';
 
     const loadPlaygroundMenu = () => import('../Playground/PlaygroundMenu.svelte').then(m => m.default);
     
@@ -216,7 +220,8 @@
                 let restoreDraftAfterFailure = true
                 const intentAbort = new AbortController()
                 abortController = intentAbort
-                const commandPromise = queueRuntimeGeneration({
+                const runtimeInput: RuntimeGenerationCreateInput = {
+                    requestId: v4(),
                     action: continueResponse ? 'continue' : 'send',
                     characterId: character.chaId,
                     chatId: chat.id,
@@ -225,55 +230,73 @@
                         files: originalFiles,
                         databaseRevision: canonicalHead.revision,
                     },
-                }, intentAbort.signal)
+                }
+                const keepaliveSafe = isRuntimeGenerationKeepaliveSafe(runtimeInput)
+                const commandPromise = queueRuntimeGeneration(runtimeInput, intentAbort.signal)
 
-                try {
-                    runNodeDatabaseEphemeralMutation(() => {
-                        const liveCharacter = DBState.db.characters.find(
-                            (candidate) => candidate.chaId === character.chaId,
-                        )
-                        const liveChat = liveCharacter?.chats.find(
-                            (candidate) => candidate.id === chat.id,
-                        )
-                        if(!liveCharacter || !liveChat){
-                            return
-                        }
-                        const displayInput = originalInput + originalFiles
-                            .map((file) => `{{inlayed::${file}}}`)
-                            .join('')
-                        if(displayInput === ''){
-                            if(
-                                liveCharacter.type !== 'group'
-                                && (liveChat.message.length === 0 || liveChat.message.at(-1)?.role !== 'user')
-                                && DBState.db.useSayNothing
-                            ){
+                const addOptimisticBubble = () => {
+                    if(optimisticAdded){
+                        return
+                    }
+                    try {
+                        runNodeDatabaseEphemeralMutation(() => {
+                            const liveCharacter = DBState.db.characters.find(
+                                (candidate) => candidate.chaId === character.chaId,
+                            )
+                            const liveChat = liveCharacter?.chats.find(
+                                (candidate) => candidate.id === chat.id,
+                            )
+                            if(!liveCharacter || !liveChat){
+                                return
+                            }
+                            const displayInput = originalInput + originalFiles
+                                .map((file) => `{{inlayed::${file}}}`)
+                                .join('')
+                            if(displayInput === ''){
+                                if(
+                                    liveCharacter.type !== 'group'
+                                    && (liveChat.message.length === 0 || liveChat.message.at(-1)?.role !== 'user')
+                                    && DBState.db.useSayNothing
+                                ){
+                                    liveChat.message.push({
+                                        role: 'user',
+                                        data: '*says nothing*',
+                                        name: $ConnectionOpenStore ? DBState.db.username : null,
+                                        __risuRuntimeOptimisticId: optimisticId,
+                                    } as Message)
+                                    optimisticAdded = true
+                                }
+                            }
+                            else{
                                 liveChat.message.push({
                                     role: 'user',
-                                    data: '*says nothing*',
+                                    data: displayInput,
+                                    time: Date.now(),
                                     name: $ConnectionOpenStore ? DBState.db.username : null,
                                     __risuRuntimeOptimisticId: optimisticId,
                                 } as Message)
                                 optimisticAdded = true
                             }
-                        }
-                        else{
-                            liveChat.message.push({
-                                role: 'user',
-                                data: displayInput,
-                                time: Date.now(),
-                                name: $ConnectionOpenStore ? DBState.db.username : null,
-                                __risuRuntimeOptimisticId: optimisticId,
-                            } as Message)
-                            optimisticAdded = true
-                        }
-                    })
-                } catch (error) {
-                    console.info('[Runtime Generation] Optimistic bubble was skipped:', error)
+                        })
+                    } catch (error) {
+                        console.info('[Runtime Generation] Optimistic bubble was skipped:', error)
+                    }
+                }
+
+                // A keepalive-safe command is eligible for browser continuation
+                // during navigation. A larger command remains a cancellable
+                // pending upload, so it is not shown as sent until the server
+                // durably accepts it.
+                if(keepaliveSafe){
+                    addOptimisticBubble()
                 }
 
                 try {
                     const command = await commandPromise
                     commandAccepted = true
+                    if(!keepaliveSafe){
+                        addOptimisticBubble()
+                    }
                     if(messageInput === originalInput){
                         messageInput = ''
                         messageInputTranslate = ''
@@ -344,7 +367,9 @@
                         }
                     }
                     else{
-                        alertError(error)
+                        if(!intentAbort.signal.aborted){
+                            alertError(error)
+                        }
                     }
                 }
 

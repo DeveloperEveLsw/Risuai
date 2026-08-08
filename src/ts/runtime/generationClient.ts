@@ -56,6 +56,38 @@ export interface RuntimeGenerationCreateInput extends CanonicalGenerationTarget 
     payload?: Record<string, unknown>
 }
 
+export const RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES = 60 * 1024
+
+// crypto.randomUUID() always serializes to 36 ASCII bytes. This placeholder
+// lets callers decide whether an input is keepalive-safe before a concrete ID
+// is allocated, while an explicit requestId keeps the classification exact.
+const runtimeGenerationRequestIdPlaceholder = '00000000-0000-4000-8000-000000000000'
+
+function prepareRuntimeGenerationCreate(
+    input: RuntimeGenerationCreateInput,
+    requestId: string,
+) {
+    const body = JSON.stringify({
+        requestId,
+        action: input.action,
+        characterId: input.characterId,
+        chatId: input.chatId,
+        payload: input.payload ?? {},
+    })
+    return {
+        body,
+        keepaliveSafe: new TextEncoder().encode(body).byteLength
+            <= RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES,
+    }
+}
+
+export function isRuntimeGenerationKeepaliveSafe(
+    input: RuntimeGenerationCreateInput,
+    requestId = input.requestId ?? runtimeGenerationRequestIdPlaceholder,
+) {
+    return prepareRuntimeGenerationCreate(input, requestId).keepaliveSafe
+}
+
 export interface RuntimeGenerationWatchHandlers {
     onSnapshot?: (snapshot: RuntimeGenerationSnapshot) => void
     onEvent?: (event: RuntimeGenerationEvent) => void
@@ -228,24 +260,18 @@ export class RuntimeGenerationClient {
         signal?: AbortSignal,
     ): Promise<RuntimeGenerationCommand> {
         const requestId = input.requestId ?? this.cryptoImpl.randomUUID()
-        const body = JSON.stringify({
-            requestId,
-            action: input.action,
-            characterId: input.characterId,
-            chatId: input.chatId,
-            payload: input.payload ?? {},
-        })
+        const prepared = prepareRuntimeGenerationCreate(input, requestId)
         // Fetch keepalive has a browser-wide 64 KiB request-body quota. It is
         // valuable for ordinary sends that may be followed immediately by a
         // navigation, but forcing it on a long prompt makes fetch throw before
         // the request reaches the durable/idempotent server endpoint.
-        const useKeepalive = new TextEncoder().encode(body).byteLength <= 60 * 1024
+        const useKeepalive = prepared.keepaliveSafe
         const init: RequestInit = {
             method: 'POST',
             ...(useKeepalive ? { keepalive: true } : {}),
             signal,
             headers: { 'Idempotency-Key': requestId },
-            body,
+            body: prepared.body,
         }
         while (true) {
             try {

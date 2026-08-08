@@ -1,16 +1,25 @@
 import { get } from 'svelte/store'
 import { ConnectionOpenStore } from '../sync/multiuser'
-import { DBState, selectedCharID } from '../stores.svelte'
+import { CurrentTriggerIdStore, DBState, selectedCharID } from '../stores.svelte'
 import type { Message, character, groupChat } from '../storage/database.svelte'
 import { processMultiCommand } from '../process/command'
 import { doingChat, sendChat, type SendChatOptions } from '../process/index.svelte'
 import { Prereroll, PreUnreroll } from '../process/prereroll'
 import { processScript } from '../process/scripts'
+import { runLuaButtonTrigger } from '../process/scriptings'
 import { runTrigger } from '../process/triggers'
 import { safeStructuredClone } from '../polyfill'
 import { sleep } from '../util'
 
-export type CanonicalGenerationAction = 'send' | 'continue' | 'reroll' | 'unreroll' | 'auto' | 'generate'
+export type CanonicalGenerationAction =
+    | 'send'
+    | 'continue'
+    | 'reroll'
+    | 'unreroll'
+    | 'auto'
+    | 'generate'
+    | 'manual-trigger'
+    | 'lua-button'
 
 export interface CanonicalGenerationTarget {
     characterId: string
@@ -216,6 +225,58 @@ export async function executeCanonicalGenerate(
     const target = resolveTarget(input)
     clearRerollHistory(input)
     return await runGenerationOnly(target, input)
+}
+
+/** Runs a chat HTML manual trigger in the resident browser. Keeping the whole
+ * trigger on this side ensures low-level runLLM effects use the same provider
+ * pipeline and survive the direct browser closing after command acceptance. */
+export async function executeCanonicalManualTrigger(input: CanonicalGenerationTarget & {
+    manualName: string
+    triggerId?: string
+}): Promise<CanonicalGenerationResult> {
+    const target = resolveTarget(input)
+    const previousLength = currentLength(target)
+    if (target.character.type !== 'character') {
+        throw new CanonicalGenerationTargetError('Manual triggers require a character target')
+    }
+    const result = await runTrigger(target.character, 'manual', {
+        chat: target.character.chats[target.chatIndex],
+        manualName: input.manualName,
+        triggerId: input.triggerId,
+    })
+    if (result) {
+        target.character.chats[target.chatIndex] = result.chat
+    }
+    if (input.triggerId) {
+        setTimeout(() => CurrentTriggerIdStore.set(null), 100)
+    }
+    return {
+        generated: false,
+        previousLength,
+        currentLength: currentLength(target),
+    }
+}
+
+/** Runs a Lua `risu-btn` callback in the resident for the same reason as a
+ * manual trigger: its LLM helpers and state mutations must not live in the
+ * disposable PC/phone tab. */
+export async function executeCanonicalLuaButton(input: CanonicalGenerationTarget & {
+    data: string
+}): Promise<CanonicalGenerationResult> {
+    const target = resolveTarget(input)
+    const previousLength = currentLength(target)
+    if (target.character.type !== 'character') {
+        throw new CanonicalGenerationTargetError('Lua buttons require a character target')
+    }
+    const result = await runLuaButtonTrigger(target.character, input.data)
+    if (result?.chat) {
+        target.character.chats[target.chatIndex] = result.chat
+    }
+    return {
+        generated: false,
+        previousLength,
+        currentLength: currentLength(target),
+    }
 }
 
 export async function executeCanonicalReroll(

@@ -7,6 +7,10 @@
     import { runLuaButtonTrigger } from 'src/ts/process/scriptings'
     import { risuChatParser } from "src/ts/process/scripts"
     import { runTrigger } from 'src/ts/process/triggers'
+    import {
+        delegateRuntimeChatInteraction,
+        shouldDelegateGeneration,
+    } from 'src/ts/runtime/generationDelegation.svelte'
     import { sayTTS } from "src/ts/process/tts"
     import { DBState, ReloadChatPointer, CurrentTriggerIdStore, popupStore } from 'src/ts/stores.svelte'
     import { ConnectionOpenStore } from "src/ts/sync/multiuser"
@@ -244,19 +248,49 @@
         const triggerId = origin.getAttribute('risu-id')
         const btnEvent = origin.getAttribute('risu-btn')
 
-        const triggerResult =
-            triggerName ?
-                await runTrigger(currentChar, 'manual', {
+        let triggerResult = null
+        let handledByResident = false
+        if (shouldDelegateGeneration()) {
+            if (triggerName) {
+                // Preserve {{trigger_id}} rendering in the direct viewer while
+                // the actual trigger and its parser run in the resident.
+                CurrentTriggerIdStore.set(triggerId || null)
+            }
+            const chat = getCurrentChat()
+            const delegated = triggerName
+                ? await delegateRuntimeChatInteraction({
+                    action: 'manual-trigger',
+                    characterId: currentChar.chaId,
+                    chatId: chat.id,
+                    manualName: triggerName,
+                    triggerId: triggerId || undefined,
+                })
+                : btnEvent
+                    ? await delegateRuntimeChatInteraction({
+                        action: 'lua-button',
+                        characterId: currentChar.chaId,
+                        chatId: chat.id,
+                        data: btnEvent,
+                    })
+                    : null
+            handledByResident = delegated !== null
+        }
+        else {
+            triggerResult = triggerName
+                ? await runTrigger(currentChar, 'manual', {
                     chat: getCurrentChat(),
                     manualName: triggerName,
                     triggerId: triggerId || undefined,
-                }) :
-            btnEvent ?
-                await runLuaButtonTrigger(currentChar, btnEvent) :
-            null
+                })
+                : btnEvent
+                    ? await runLuaButtonTrigger(currentChar, btnEvent)
+                    : null
+        }
 
         if(triggerResult) {
             setCurrentChat(triggerResult.chat)
+        }
+        if(triggerResult || handledByResident) {
             ReloadChatPointer.update((v) => {
                 v[idx] = (v[idx] ?? 0) + 1
                 return v

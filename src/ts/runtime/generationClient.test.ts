@@ -4,7 +4,13 @@ vi.mock('../storage/nodeStorage', () => ({
     getNodeServerProxyAuth: vi.fn(async () => 'default-auth'),
 }))
 
-import { RuntimeGenerationClient, RuntimeGenerationHttpError } from './generationClient'
+import {
+    isRuntimeGenerationKeepaliveSafe,
+    RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES,
+    RuntimeGenerationClient,
+    RuntimeGenerationHttpError,
+    type RuntimeGenerationCreateInput,
+} from './generationClient'
 
 function command(overrides: Record<string, unknown> = {}) {
     return {
@@ -70,6 +76,46 @@ class FakeWebSocket {
 }
 
 describe('RuntimeGenerationClient', () => {
+    it('classifies the exact serialized UTF-8 keepalive boundary', () => {
+        const requestId = '00000000-0000-4000-8000-000000000010'
+        const input: RuntimeGenerationCreateInput = {
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: '' },
+        }
+        const emptyBody = JSON.stringify({
+            requestId,
+            action: input.action,
+            characterId: input.characterId,
+            chatId: input.chatId,
+            payload: input.payload,
+        })
+        const emptyBytes = new TextEncoder().encode(emptyBody).byteLength
+        const exactInput: RuntimeGenerationCreateInput = {
+            ...input,
+            payload: {
+                input: 'a'.repeat(RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES - emptyBytes),
+            },
+        }
+        const exactBody = JSON.stringify({
+            requestId,
+            action: exactInput.action,
+            characterId: exactInput.characterId,
+            chatId: exactInput.chatId,
+            payload: exactInput.payload,
+        })
+
+        expect(new TextEncoder().encode(exactBody).byteLength)
+            .toBe(RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES)
+        expect(isRuntimeGenerationKeepaliveSafe(exactInput)).toBe(true)
+        expect(isRuntimeGenerationKeepaliveSafe({
+            ...exactInput,
+            payload: { input: `${exactInput.payload?.input}가` },
+        })).toBe(false)
+    })
+
     it('creates an idempotent keepalive command suitable for page navigation', async () => {
         const requestId = '00000000-0000-4000-8000-000000000001'
         const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>

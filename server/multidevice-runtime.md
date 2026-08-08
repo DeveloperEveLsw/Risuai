@@ -66,15 +66,20 @@ cannot silently replace or be replaced by an in-flight edit.
 ## Generation queue and fencing
 
 Direct clients submit idempotent commands to `POST /runtime-generations`.
-Supported actions are `send`, `continue`, `reroll`, `unreroll`, `auto`, and the
-lower-level `generate` compatibility path. Commands are globally serialized;
+Supported actions are `send`, `continue`, `reroll`, `unreroll`, `auto`, the
+lower-level `generate` compatibility path, and resident `manual-trigger` /
+`lua-button` interactions originating in rendered chat HTML. Commands are globally serialized;
 there is one resident executor lease for the entire instance, while any number
 of devices may observe the queue.
 
 For the normal send/continue UI, the direct browser first submits the raw input
 and attachment references against the exact clean canonical database revision.
 Only after durable acceptance does it clear the draft; the visible user bubble
-is an in-memory optimistic view. The resident runs input triggers/scripts and
+is an in-memory optimistic view. Requests no larger than 60 KiB use browser
+`fetch(..., { keepalive: true })` and retain the original immediate bubble.
+Larger requests cannot be given the same leave-immediately guarantee by browser
+APIs, so they remain visibly pending and keep their draft/files until the
+server returns durable acceptance. The resident runs input triggers/scripts and
 the rest of the upstream pipeline exactly once, then its committed snapshot
 replaces that bubble. The executor requires revision equality, not merely a
 newer revision. If two devices submit against the same head, commands are not
@@ -206,3 +211,23 @@ again to register a new key.
 8. On an upgraded profile, render an old MCP tool call from the profile that
    owns its legacy record, then reload on the other device and verify the
    server-backed detail remains visible.
+
+The isolated real-browser acceptance test automates the most important parts
+of checks 2, 3, 4, and 6 without reading an installed Risu save or using fixed
+ports:
+
+```sh
+pnpm test:runtime-browser
+RISU_BROWSER_E2E_SKIP_BUILD=1 pnpm test:runtime-browser
+```
+
+It starts the production Node server, a mock OpenAI-compatible streaming
+provider, and three separate Chromium storage contexts (resident, desktop, and
+mobile). The desktop target is physically closed during streaming. The test
+then verifies mobile observation/completion, exactly one provider request and
+canonical response, fenced Stop/cancellation, and the original Lua -> V2.1
+plugin -> module-regex post-processing chain. It also reports browser storage
+records, CacheStorage, service workers, and the canonical RisuSave size. On the
+reference Chromium run, each direct context used 6,894 bytes: one DPoP key plus
+empty compatibility database shells, with no canonical Risu or MCP records,
+CacheStorage entries, or service worker.

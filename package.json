@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "test:runtime-browser": "node server/node/runtimeGenerations/browserE2E.cjs",
     "tauri": "tauri",
     "buildsite": "vite build --outDir dist",
     "runserver": "node server/node/server.cjs",

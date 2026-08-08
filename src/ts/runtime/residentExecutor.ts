@@ -5,6 +5,8 @@ import { isServerResidentExecutor } from '../platform'
 import {
     executeCanonicalAuto,
     executeCanonicalGenerate,
+    executeCanonicalLuaButton,
+    executeCanonicalManualTrigger,
     executeCanonicalReroll,
     executeCanonicalSend,
     executeCanonicalUnreroll,
@@ -137,6 +139,28 @@ async function executeCommand(command: RuntimeGenerationCommand, signal: AbortSi
                 usedContinueTokens: optionalFiniteNumber(payload, 'usedContinueTokens'),
                 signal,
             })
+        }
+        case 'manual-trigger': {
+            const manualName = payload.manualName
+            const triggerId = payload.triggerId
+            if (typeof manualName !== 'string' || manualName === '') {
+                throw new TypeError('Manual trigger command requires a non-empty manualName')
+            }
+            if (triggerId !== undefined && typeof triggerId !== 'string') {
+                throw new TypeError('Manual trigger command triggerId must be a string')
+            }
+            return await executeCanonicalManualTrigger({
+                ...target,
+                manualName,
+                triggerId: typeof triggerId === 'string' ? triggerId : undefined,
+            })
+        }
+        case 'lua-button': {
+            const data = payload.data
+            if (typeof data !== 'string') {
+                throw new TypeError('Lua button command data must be a string')
+            }
+            return await executeCanonicalLuaButton({ ...target, data })
         }
         default:
             throw new TypeError(`Unsupported generation command action: ${String(command.action)}`)

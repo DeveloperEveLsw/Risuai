@@ -127,6 +127,8 @@ async function finishDelegate(
 describe('public low-level sendChat delegation', () => {
     let installRuntimeGenerationDelegation:
         typeof import('./generationDelegation.svelte').installRuntimeGenerationDelegation
+    let delegateRuntimeChatInteraction:
+        typeof import('./generationDelegation.svelte').delegateRuntimeChatInteraction
     let queueRuntimeGeneration:
         typeof import('./generationDelegation.svelte').queueRuntimeGeneration
     let waitForRuntimeGenerationTerminal:
@@ -167,6 +169,7 @@ describe('public low-level sendChat delegation', () => {
         const { selectedCharID } = await import('../stores.svelte')
         selectedCharID.set(0)
         installRuntimeGenerationDelegation = delegation.installRuntimeGenerationDelegation
+        delegateRuntimeChatInteraction = delegation.delegateRuntimeChatInteraction
         queueRuntimeGeneration = delegation.queueRuntimeGeneration
         waitForRuntimeGenerationTerminal = delegation.waitForRuntimeGenerationTerminal
         cancelActiveRuntimeGeneration = delegation.cancelActiveRuntimeGeneration
@@ -215,6 +218,72 @@ describe('public low-level sendChat delegation', () => {
         }))).resolves.toBe(true)
     })
 
+    it('queues a manual chat trigger only after the follower revision is durable', async () => {
+        const waitForPersistence = vi.fn()
+            .mockResolvedValueOnce({ revision: 51 })
+            .mockResolvedValue({ revision: 52 })
+        mocks.create.mockResolvedValue(command('queued', { action: 'manual-trigger' }))
+        installRuntimeGenerationDelegation(waitForPersistence)
+
+        const pending = delegateRuntimeChatInteraction({
+            action: 'manual-trigger',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            manualName: 'community-action',
+            triggerId: 'trigger-7',
+        })
+        await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledOnce())
+        expect(mocks.create).toHaveBeenCalledWith({
+            action: 'manual-trigger',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: {
+                databaseRevision: 51,
+                manualName: 'community-action',
+                triggerId: 'trigger-7',
+            },
+        })
+
+        await expect(finishDelegate(pending, command('completed', {
+            action: 'manual-trigger',
+            finishedAt: 2,
+            result: { generated: false, databaseRevision: 52 },
+        }))).resolves.toBe(true)
+        expect(waitForPersistence).toHaveBeenCalledWith(60_000, 52)
+    })
+
+    it('queues a Lua chat button with its opaque community payload', async () => {
+        const waitForPersistence = vi.fn()
+            .mockResolvedValueOnce({ revision: 61 })
+            .mockResolvedValue({ revision: 62 })
+        mocks.create.mockResolvedValue(command('queued', { action: 'lua-button' }))
+        installRuntimeGenerationDelegation(waitForPersistence)
+
+        const pending = delegateRuntimeChatInteraction({
+            action: 'lua-button',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            data: 'community-button-payload',
+        })
+        await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledOnce())
+        expect(mocks.create).toHaveBeenCalledWith({
+            action: 'lua-button',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: {
+                databaseRevision: 61,
+                data: 'community-button-payload',
+            },
+        })
+
+        await expect(finishDelegate(pending, command('completed', {
+            action: 'lua-button',
+            finishedAt: 2,
+            result: { generated: false, databaseRevision: 62 },
+        }))).resolves.toBe(true)
+        expect(waitForPersistence).toHaveBeenCalledWith(60_000, 62)
+    })
+
     it('maps a cancelled resident command to the upstream false result', async () => {
         mocks.create.mockResolvedValue(command('queued'))
         installRuntimeGenerationDelegation(vi.fn(async () => ({ revision: 24 })))
@@ -225,6 +294,47 @@ describe('public low-level sendChat delegation', () => {
             finishedAt: 2,
             cancelRequestedAt: 2,
         }))).resolves.toBe(false)
+    })
+
+    it('lets Stop abort a pending create without consuming its draft payload', async () => {
+        mocks.create.mockImplementation((_input, signal?: AbortSignal) => (
+            new Promise((_resolve, reject) => {
+                const abort = () => reject(signal?.reason)
+                if(signal?.aborted){
+                    abort()
+                }
+                else{
+                    signal?.addEventListener('abort', abort, { once: true })
+                }
+            })
+        ))
+        const input = {
+            action: 'send' as const,
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: {
+                input: 'keep this pending draft',
+                files: ['asset://keep-this-file'],
+                databaseRevision: 7,
+            },
+        }
+        const controller = new AbortController()
+        const pending = queueRuntimeGeneration(input, controller.signal)
+        await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledOnce())
+        const { doingChat } = await import('../process/index.svelte')
+        expect(get(doingChat)).toBe(true)
+
+        controller.abort(new Error('generation cancelled by user'))
+
+        await expect(pending).rejects.toThrow('generation cancelled by user')
+        expect(mocks.create).toHaveBeenCalledWith(input, controller.signal)
+        expect(input.payload).toEqual({
+            input: 'keep this pending draft',
+            files: ['asset://keep-this-file'],
+            databaseRevision: 7,
+        })
+        expect(mocks.watchers).toHaveLength(0)
+        expect(get(doingChat)).toBe(false)
     })
 
     it('does not treat a running cancel request as terminal', async () => {

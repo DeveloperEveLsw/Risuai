@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
     executeCanonicalUnreroll: vi.fn(),
     executeCanonicalAuto: vi.fn(),
     executeCanonicalGenerate: vi.fn(),
+    executeCanonicalManualTrigger: vi.fn(),
+    executeCanonicalLuaButton: vi.fn(),
     setFence: vi.fn(),
     clearFence: vi.fn(),
     alertBridge: null as null | {
@@ -51,6 +53,8 @@ vi.mock('./canonicalGeneration.svelte', () => ({
     executeCanonicalUnreroll: mocks.executeCanonicalUnreroll,
     executeCanonicalAuto: mocks.executeCanonicalAuto,
     executeCanonicalGenerate: mocks.executeCanonicalGenerate,
+    executeCanonicalManualTrigger: mocks.executeCanonicalManualTrigger,
+    executeCanonicalLuaButton: mocks.executeCanonicalLuaButton,
 }))
 
 vi.mock('./executionContext', () => ({
@@ -184,6 +188,16 @@ describe('resident generation executor', () => {
             generated: true,
             previousLength: 1,
             currentLength: 2,
+        })
+        mocks.executeCanonicalManualTrigger.mockReset().mockResolvedValue({
+            generated: false,
+            previousLength: 1,
+            currentLength: 2,
+        })
+        mocks.executeCanonicalLuaButton.mockReset().mockResolvedValue({
+            generated: false,
+            previousLength: 2,
+            currentLength: 3,
         })
         mocks.setFence.mockReset()
         mocks.clearFence.mockReset()
@@ -429,6 +443,56 @@ describe('resident generation executor', () => {
             'command-1',
             expect.objectContaining({ fencingToken: 5 }),
             expect.objectContaining({ generated: false, databaseRevision: 11 }),
+        )
+    })
+
+    it('dispatches manual trigger identity through the fenced resident command', async () => {
+        const { client } = makeClient(command('manual-trigger', {
+            databaseRevision: 12,
+            manualName: 'community-action',
+            triggerId: 'trigger-7',
+        }))
+
+        start(client, vi.fn(async () => ({ revision: 12 })))
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(mocks.executeCanonicalManualTrigger).toHaveBeenCalledWith({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            manualName: 'community-action',
+            triggerId: 'trigger-7',
+        })
+        expect(client.progress).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ fencingToken: 4 }),
+            'execution_started',
+            { databaseRevision: 12 },
+        )
+    })
+
+    it('dispatches an opaque Lua button payload through the resident command', async () => {
+        const { client } = makeClient(command('lua-button', {
+            databaseRevision: 13,
+            data: 'community-button-payload',
+        }))
+
+        start(client, vi.fn(async () => ({ revision: 13 })))
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(mocks.executeCanonicalLuaButton).toHaveBeenCalledWith({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            data: 'community-button-payload',
+        })
+        expect(client.complete).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ fencingToken: 5 }),
+            expect.objectContaining({
+                generated: false,
+                previousLength: 2,
+                currentLength: 3,
+                databaseRevision: 13,
+            }),
         )
     })
 

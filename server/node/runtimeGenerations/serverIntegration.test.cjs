@@ -282,6 +282,33 @@ test('generate fallback commands retain normal create, list, get, and replay sem
     });
     assert.equal(unreroll.response.status, 201);
     assert.equal(unreroll.body.action, 'unreroll');
+
+    const manualTrigger = await createCommand(fixture, 'manual-trigger', {
+        action: 'manual-trigger',
+        payload: { manualName: 'community-action', triggerId: 'trigger-7' },
+    });
+    assert.equal(manualTrigger.response.status, 201);
+    assert.equal(manualTrigger.body.action, 'manual-trigger');
+    const loadedManualTrigger = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(manualTrigger.body.commandId)}`,
+    );
+    assert.deepEqual(loadedManualTrigger.body.payload, {
+        manualName: 'community-action',
+        triggerId: 'trigger-7',
+    });
+
+    const luaButton = await createCommand(fixture, 'lua-button', {
+        action: 'lua-button',
+        payload: { data: 'community-button-payload' },
+    });
+    assert.equal(luaButton.response.status, 201);
+    assert.equal(luaButton.body.action, 'lua-button');
+    const loadedLuaButton = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(luaButton.body.commandId)}`,
+    );
+    assert.deepEqual(loadedLuaButton.body.payload, { data: 'community-button-payload' });
 });
 
 test('duplicate creation, a single global claimant, fencing, heartbeat, and two observers compose', {
