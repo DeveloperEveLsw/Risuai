@@ -17,6 +17,7 @@ import { getInlayAsset } from "src/ts/process/files/inlays";
 import { getLLMCache, searchLLMCache } from "src/ts/translator/translator";
 import { hasher } from "src/ts/parser/parser.svelte";
 import localforage from "localforage";
+import { NodeJsonKeyValueStorage } from "src/ts/storage/nodeJsonKeyValueStorage";
 import { LLMFlags, LLMFormat, LLMProvider, LLMTokenizer, type LLMModel } from "src/ts/model/types";
 import { sendChat as processSendChat, doingChat } from "src/ts/process/index.svelte";
 import { getModelInfo } from "src/ts/model/modellist";
@@ -553,10 +554,52 @@ const unloadV3Plugin = async (pluginName: string) => {
 
 const permissionGivenPlugins: Set<string> = new Set();
 const permissionDeniedPlugins: Set<string> = new Set();
-const permissionForage = localforage.createInstance({
+const localPermissionForage = localforage.createInstance({
     name: 'plugin_permissions',
     storeName: 'plugin_permissions'
 });
+let nodePermissionStoragePromise: Promise<NodeJsonKeyValueStorage<boolean | number>> | null = null;
+
+async function getNodePermissionStorage() {
+    if (!isNodeServer) {
+        return null;
+    }
+    nodePermissionStoragePromise ??= import('src/ts/storage/nodeStorage')
+        .then(({ getSharedNodeStorage }) => new NodeJsonKeyValueStorage<boolean | number>(
+            getSharedNodeStorage(),
+            'plugin-permissions/',
+        ));
+    return await nodePermissionStoragePromise;
+}
+
+const permissionForage = {
+    async getItem<T extends boolean | number>(key: string): Promise<T | null> {
+        const nodeStorage = await getNodePermissionStorage();
+        if (!nodeStorage) {
+            return await localPermissionForage.getItem<T>(key);
+        }
+        const serverValue = await nodeStorage.getItem(key);
+        if (serverValue !== null) {
+            await localPermissionForage.removeItem(key);
+            return serverValue as T;
+        }
+        const legacyValue = await localPermissionForage.getItem<T>(key);
+        if (legacyValue !== null) {
+            await nodeStorage.setItem(key, legacyValue);
+            await localPermissionForage.removeItem(key);
+        }
+        return legacyValue;
+    },
+    async setItem<T extends boolean | number>(key: string, value: T): Promise<T> {
+        const nodeStorage = await getNodePermissionStorage();
+        if (nodeStorage) {
+            await nodeStorage.setItem(key, value);
+            await localPermissionForage.removeItem(key);
+            return value;
+        }
+        return await localPermissionForage.setItem(key, value);
+    },
+};
 
 type PluginV3ProviderOptions = PluginV2ProviderOptions & {
     model?: LLMModel
@@ -1401,7 +1444,7 @@ export async function executePluginV3(plugin:RisuPlugin){
         name: plugin.name,
         host
     });
-    host.run(iframe, plugin.script);
+    await host.run(iframe, plugin.script);
     console.log(`[RisuAI Plugin: ${plugin.name}] Loaded API V3 plugin.`);
 }
 

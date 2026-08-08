@@ -120,6 +120,10 @@ type EncodeBlockOption = {
 const risuSaveCacheForage = localforage.createInstance({
     name: 'risuSaveCache'
 });
+
+export async function clearRisuSaveClientCache() {
+    await risuSaveCacheForage.clear()
+}
 export class RisuSaveEncoder {
 
     private blocks: { [key: string]: Uint8Array } = {};
@@ -325,14 +329,14 @@ export class RisuSaveEncoder {
     }
 
     async encodeBlock(arg:EncodeBlockArg, option:EncodeBlockOption = { remote: 'none' }){
+        // Node multi-device saves use one self-contained blob so the server can
+        // commit it with a single revision compare-and-swap. Tauri can still
+        // prefer remote character blocks because it has one local writer.
         if(
             option.remote === 'force' ||
             (
                 option.remote === 'prefer' &&
-                (
-                    isTauri ||
-                    isNodeServer
-                )
+                isTauri
             ) &&
             !disableRemoteSaving()
         ){
@@ -366,11 +370,17 @@ export class RisuSaveEncoder {
         buf.set(nameBuf, 3);
         buf.set(new Uint8Array(lengthBuf), 3 + nameBuf.length);
         buf.set(databuf, 7 + nameBuf.length);
-        await risuSaveCacheForage.setItem(`risuSaveBlock_${arg.name}`, {
-            type: arg.type,
-            data: arg.data,
-            name: arg.name,
-        });
+        // A self-hosted Node client treats the server snapshot as the
+        // authoritative cache. Keeping another copy of every encoded block in
+        // the device IndexedDB defeats the server-resident storage mode and can
+        // leave a second device with stale encoder blocks.
+        if(cacheBlock && !isNodeServer){
+            await risuSaveCacheForage.setItem(`risuSaveBlock_${arg.name}`, {
+                type: arg.type,
+                data: arg.data,
+                name: arg.name,
+            });
+        }
         return buf;
     }
 

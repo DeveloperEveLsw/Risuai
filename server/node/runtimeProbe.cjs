@@ -82,6 +82,8 @@ async function main() {
                 let backendReachable = false
                 let backendStatus = 0
                 let backendError = ''
+                let executorReady = false
+                let executorAgeMs = null
                 const backendController = new AbortController()
                 const backendTimeout = setTimeout(() => backendController.abort(), 5000)
                 try {
@@ -92,6 +94,15 @@ async function main() {
                     backendReachable = response.ok
                     backendStatus = response.status
                     await response.arrayBuffer()
+                    const executorResponse = await fetch('/runtime-generations/executor/health', {
+                        cache: 'no-store',
+                        signal: backendController.signal
+                    })
+                    const executorHealth = await executorResponse.json()
+                    executorReady = executorResponse.ok && executorHealth?.ready === true
+                    executorAgeMs = Number.isFinite(executorHealth?.ageMs)
+                        ? executorHealth.ageMs
+                        : null
                 }
                 catch (error) {
                     backendError = error instanceof Error ? error.name : String(error)
@@ -109,6 +120,8 @@ async function main() {
                     backendReachable,
                     backendStatus,
                     backendError,
+                    executorReady,
+                    executorAgeMs,
                     inputCount: document.querySelectorAll('input, textarea').length,
                     buttonCount: document.querySelectorAll('button').length,
                     bodyText: (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 800)
@@ -119,7 +132,8 @@ async function main() {
                 summary.readyState === 'complete' &&
                 summary.nodeMode === true &&
                 summary.secureContext === true &&
-                summary.backendReachable === true
+                summary.backendReachable === true &&
+                summary.executorReady === true
             )) {
                 throw new Error('The resident RisuAI page failed its readiness checks')
             }

@@ -26,9 +26,71 @@ let cache={
 
 let bergamotTranslate: (text: string, from: string, to: string, html?: boolean) => Promise<string>|null = null
 
-export const LLMCacheStorage = localforage.createInstance({
+const persistentLLMCacheStorage = localforage.createInstance({
     name: "LLMTranslateCache"
 })
+
+interface LLMCacheLike {
+    getItem<T>(key: string): Promise<T | null>
+    setItem<T>(key: string, value: T): Promise<T>
+    iterate<T, U>(iterator: (value: T, key: string, iterationNumber: number) => U): Promise<U | undefined>
+    clear(): Promise<void>
+}
+
+class VolatileLLMCache implements LLMCacheLike {
+    private readonly values = new Map<string, unknown>()
+    private readonly maxEntries = 256
+
+    async getItem<T>(key: string) {
+        if (!this.values.has(key)) {
+            return null
+        }
+        const value = this.values.get(key) as T
+        // Refresh insertion order for a small in-memory LRU. Nothing is left
+        // in a PC/phone IndexedDB after the page closes.
+        this.values.delete(key)
+        this.values.set(key, value)
+        return value
+    }
+
+    async setItem<T>(key: string, value: T) {
+        this.values.delete(key)
+        this.values.set(key, value)
+        while (this.values.size > this.maxEntries) {
+            const oldest = this.values.keys().next().value
+            if (typeof oldest !== 'string') {
+                break
+            }
+            this.values.delete(oldest)
+        }
+        return value
+    }
+
+    async iterate<T, U>(iterator: (value: T, key: string, iterationNumber: number) => U) {
+        let iteration = 1
+        for (const [key, value] of this.values) {
+            const result = iterator(value as T, key, iteration++)
+            if (result !== undefined) {
+                return result
+            }
+        }
+        return undefined
+    }
+
+    async clear() {
+        this.values.clear()
+    }
+}
+
+export const LLMCacheStorage: LLMCacheLike = isNodeServer
+    ? new VolatileLLMCache()
+    : persistentLLMCacheStorage
+
+export async function clearNodeLegacyLLMCache() {
+    if (isNodeServer) {
+        await persistentLLMCacheStorage.clear()
+    }
+}
 
 let waitTrans = 0
 

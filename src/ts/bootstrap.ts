@@ -20,7 +20,11 @@ import { checkDriverInit } from "./drive/drive";
 import { characterURLImport } from "./characterCards";
 import { defaultJailbreak, defaultMainPrompt, oldJailbreak, oldMainPrompt } from "./storage/defaultPrompts";
 import { loadRisuAccountData } from "./drive/accounter";
-import { decodeRisuSave, encodeRisuSaveLegacy } from "./storage/risuSave";
+import {
+    clearRisuSaveClientCache,
+    decodeRisuSave,
+    encodeRisuSaveLegacy,
+} from "./storage/risuSave";
 import { updateAnimationSpeed } from "./gui/animation";
 import { updateColorScheme, updateTextThemeAndCSS } from "./gui/colorscheme";
 import { autoServerBackup } from "./kei/backup";
@@ -40,12 +44,19 @@ import {
     getUncleanables,
     getBasename,
     setUsingSw,
-    checkCharOrder
+    checkCharOrder,
+    initializeNodeDatabaseRuntime,
+    waitForNodeDatabasePersistence,
 } from "./globalApi.svelte";
-import { isTauri } from "./platform";
+import { isNodeServer, isTauri } from "./platform";
 import { registerModelDynamic } from "./model/modellist";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
+import { startResidentGenerationExecutor } from "./runtime/residentExecutor";
+import {
+    installRuntimeGenerationDelegation,
+    startRuntimeGenerationFollower,
+} from "./runtime/generationDelegation.svelte";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -193,12 +204,25 @@ export async function loadData() {
                     return
                 }
                 LoadingStatusState.text = "Checking Service Worker..."
-                if (navigator.serviceWorker) {
+                if (navigator.serviceWorker && !isNodeServer) {
                     setUsingSw(true)
                     await registerSw()
                 }
                 else {
                     setUsingSw(false)
+                    if (isNodeServer) {
+                        // Node self-hosting keeps assets in the authoritative
+                        // server store. Remove an older browser-side asset
+                        // cache so each device does not retain a second copy.
+                        const registrations = await navigator.serviceWorker?.getRegistrations?.() ?? []
+                        await Promise.all(registrations
+                            .filter((registration) => registration.active?.scriptURL.endsWith('/sw.js'))
+                            .map((registration) => registration.unregister()))
+                        await globalThis.caches?.delete('risuCache')
+                        await clearRisuSaveClientCache()
+                        await import('./translator/translator')
+                            .then(({ clearNodeLegacyLLMCache }) => clearNodeLegacyLLMCache())
+                    }
                 }
                 if (getDatabase().didFirstSetup) {
                     characterURLImport()
@@ -253,7 +277,21 @@ export async function loadData() {
             startObserveDom()
             assignIds()
             registerModelDynamic()
+            await initializeNodeDatabaseRuntime()
+            if (isNodeServer) {
+                // Older self-host builds left potentially large inlay media in
+                // each device's IndexedDB. Migrate it in the background; any
+                // referenced asset is also migrated lazily on first read.
+                void import('./process/files/inlays')
+                    .then(({ migrateNodeInlayAssets }) => migrateNodeInlayAssets())
+                    .catch((error) => console.error('[Node Inlay Migration]', error))
+            }
             saveDb()
+            installRuntimeGenerationDelegation(waitForNodeDatabasePersistence)
+            startResidentGenerationExecutor({
+                waitForPersistence: waitForNodeDatabasePersistence,
+            })
+            startRuntimeGenerationFollower()
             moduleUpdate()
             cleanChunks()
             alertTOS().then((a) => {

@@ -19,7 +19,15 @@
     import { stopTTS } from "src/ts/process/tts";
     import MainMenu from '../UI/MainMenu.svelte';
     import AssetInput from './AssetInput.svelte';
-    import { aiLawApplies, chatFoldedState, chatFoldedStateMessageIndex, downloadFile } from 'src/ts/globalApi.svelte';
+    import {
+        aiLawApplies,
+        chatFoldedState,
+        chatFoldedStateMessageIndex,
+        downloadFile,
+        getCleanNodeDatabaseHead,
+        runNodeDatabaseEphemeralMutation,
+        waitForNodeDatabasePersistence,
+    } from 'src/ts/globalApi.svelte';
     import { runTrigger } from 'src/ts/process/triggers';
     import { v4 } from 'uuid';
     import { PreUnreroll, Prereroll } from 'src/ts/process/prereroll';
@@ -32,6 +40,14 @@
     import Button from '../UI/GUI/Button.svelte';
     import PluginDefinedIcon from '../Others/PluginDefinedIcon.svelte';
     import { getAdditionalChatLoadPages, getInitialChatLoadPages } from 'src/ts/chatLoadPages';
+    import {
+        cancelActiveRuntimeGeneration,
+        queueRuntimeGeneration,
+        shouldDelegateGeneration,
+        shouldRestoreCancelledRuntimeDraft,
+        shouldRestoreRuntimeDraft,
+        waitForRuntimeGenerationTerminal,
+    } from 'src/ts/runtime/generationDelegation.svelte';
 
     const loadPlaygroundMenu = () => import('../Playground/PlaygroundMenu.svelte').then(m => m.default);
     
@@ -161,6 +177,203 @@
             }
         }
 
+        // When the shared canonical snapshot is clean, hand the raw upstream
+        // input to the resident before mutating the browser copy. This closes
+        // the 500 ms save/decode/CAS window in which a mobile tab could be
+        // frozen after showing a sent bubble but before the server knew about
+        // the request. The temporary bubble is UI-only; the resident runs the
+        // real trigger/script/input pipeline exactly once and its committed
+        // snapshot replaces it on every device.
+        if(shouldDelegateGeneration()){
+            const character = DBState.db.characters[selectedChar]
+            const chat = character?.chats?.[character.chatPage]
+            let canonicalHead = getCleanNodeDatabaseHead()
+            if(character && chat && !canonicalHead){
+                // Finish an unrelated settings/chat save before accepting the
+                // raw intent. We do not show a sent bubble until the server
+                // snapshot to which this command is bound is known.
+                $doingChat = true
+                try {
+                    await waitForNodeDatabasePersistence()
+                    canonicalHead = getCleanNodeDatabaseHead()
+                } catch (error) {
+                    $doingChat = false
+                    alertError(error)
+                    return
+                }
+                if(!canonicalHead){
+                    $doingChat = false
+                    alertError('The canonical server database is not ready for generation')
+                    return
+                }
+            }
+            if(character && chat && canonicalHead){
+                const originalInput = messageInput
+                const originalFiles = [...fileInput]
+                const optimisticId = v4()
+                let optimisticAdded = false
+                let commandAccepted = false
+                let restoreDraftAfterFailure = true
+                const intentAbort = new AbortController()
+                abortController = intentAbort
+                const commandPromise = queueRuntimeGeneration({
+                    action: continueResponse ? 'continue' : 'send',
+                    characterId: character.chaId,
+                    chatId: chat.id,
+                    payload: {
+                        input: originalInput,
+                        files: originalFiles,
+                        databaseRevision: canonicalHead.revision,
+                    },
+                }, intentAbort.signal)
+
+                try {
+                    runNodeDatabaseEphemeralMutation(() => {
+                        const liveCharacter = DBState.db.characters.find(
+                            (candidate) => candidate.chaId === character.chaId,
+                        )
+                        const liveChat = liveCharacter?.chats.find(
+                            (candidate) => candidate.id === chat.id,
+                        )
+                        if(!liveCharacter || !liveChat){
+                            return
+                        }
+                        const displayInput = originalInput + originalFiles
+                            .map((file) => `{{inlayed::${file}}}`)
+                            .join('')
+                        if(displayInput === ''){
+                            if(
+                                liveCharacter.type !== 'group'
+                                && (liveChat.message.length === 0 || liveChat.message.at(-1)?.role !== 'user')
+                                && DBState.db.useSayNothing
+                            ){
+                                liveChat.message.push({
+                                    role: 'user',
+                                    data: '*says nothing*',
+                                    name: $ConnectionOpenStore ? DBState.db.username : null,
+                                    __risuRuntimeOptimisticId: optimisticId,
+                                } as Message)
+                                optimisticAdded = true
+                            }
+                        }
+                        else{
+                            liveChat.message.push({
+                                role: 'user',
+                                data: displayInput,
+                                time: Date.now(),
+                                name: $ConnectionOpenStore ? DBState.db.username : null,
+                                __risuRuntimeOptimisticId: optimisticId,
+                            } as Message)
+                            optimisticAdded = true
+                        }
+                    })
+                } catch (error) {
+                    console.info('[Runtime Generation] Optimistic bubble was skipped:', error)
+                }
+
+                try {
+                    const command = await commandPromise
+                    commandAccepted = true
+                    if(messageInput === originalInput){
+                        messageInput = ''
+                        messageInputTranslate = ''
+                    }
+                    if(fileInput.length === originalFiles.length && fileInput.every(
+                        (file, index) => file === originalFiles[index],
+                    )){
+                        fileInput = []
+                    }
+                    rerolls = []
+                    await sleep(10)
+                    updateInputSizeAll()
+                    const terminal = await waitForRuntimeGenerationTerminal(command, intentAbort.signal)
+                    restoreDraftAfterFailure = shouldRestoreRuntimeDraft(terminal)
+                    const terminalRevision = terminal.result?.databaseRevision
+                    if(typeof terminalRevision === 'number'){
+                        await waitForNodeDatabasePersistence(60_000, terminalRevision)
+                    }
+                    if(terminal.state === 'completed'){
+                        const resultPreviousLength = terminal.result?.previousLength
+                        const currentMessages = DBState.db.characters
+                            .find((candidate) => candidate.chaId === character.chaId)
+                            ?.chats.find((candidate) => candidate.id === chat.id)?.message
+                        if(
+                            currentMessages
+                            && typeof resultPreviousLength === 'number'
+                            && resultPreviousLength < currentMessages.length
+                        ){
+                            rerolls.push(safeStructuredClone(currentMessages.slice(resultPreviousLength)))
+                            rerollid = rerolls.length - 1
+                        }
+                        lastCharId = $selectedCharID
+                        if(DBState.db.playMessage){
+                            const audio = new Audio(sendSound)
+                            audio.play().catch(() => {})
+                        }
+                        if(abortController === intentAbort){
+                            abortController = null
+                        }
+                        return
+                    }
+                    if(terminal.state !== 'cancelled'){
+                        throw new Error(
+                            terminal.error
+                                ? `Server generation ${terminal.state}: ${terminal.error}`
+                                : `Server generation ended as ${terminal.state}`,
+                        )
+                    }
+                    if(shouldRestoreCancelledRuntimeDraft(terminal)){
+                        if(messageInput === ''){
+                            messageInput = originalInput
+                            messageInputTranslate = ''
+                        }
+                        if(fileInput.length === 0){
+                            fileInput = [...originalFiles]
+                        }
+                    }
+                } catch (error) {
+                    if(commandAccepted){
+                        if(restoreDraftAfterFailure){
+                            if(messageInput === ''){
+                                messageInput = originalInput
+                                messageInputTranslate = ''
+                            }
+                            if(fileInput.length === 0){
+                                fileInput = [...originalFiles]
+                            }
+                        }
+                    }
+                    else{
+                        alertError(error)
+                    }
+                }
+
+                if(optimisticAdded){
+                    try {
+                        runNodeDatabaseEphemeralMutation(() => {
+                            const liveCharacter = DBState.db.characters.find(
+                                (candidate) => candidate.chaId === character.chaId,
+                            )
+                            const liveChat = liveCharacter?.chats.find(
+                                (candidate) => candidate.id === chat.id,
+                            )
+                            if(liveChat){
+                                liveChat.message = liveChat.message.filter((candidate) => (
+                                    (candidate as Message & { __risuRuntimeOptimisticId?: string })
+                                        .__risuRuntimeOptimisticId !== optimisticId
+                                ))
+                            }
+                        })
+                    } catch {}
+                }
+                if(abortController === intentAbort){
+                    abortController = null
+                }
+                $doingChat = false
+                return
+            }
+        }
+
         if(fileInput.length > 0){
             for(const file of fileInput){
                 messageInput += `{{inlayed::${file}}}`
@@ -223,6 +436,26 @@
             rerolls = []
             rerollid = -1
         }
+        if(shouldDelegateGeneration()){
+            const character = DBState.db.characters[$selectedCharID]
+            const chat = character?.chats?.[character.chatPage]
+            if(!character || !chat){
+                return
+            }
+            try {
+                const persisted = await waitForNodeDatabasePersistence()
+                await queueRuntimeGeneration({
+                    action: 'reroll',
+                    characterId: character.chaId,
+                    chatId: chat.id,
+                    payload: { databaseRevision: persisted?.revision ?? null },
+                })
+            } catch (error) {
+                $doingChat = false
+                alertError(error)
+            }
+            return
+        }
         const genId = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)?.generationInfo?.generationId
         if(genId){
             const r = Prereroll(genId)
@@ -278,6 +511,26 @@
             rerolls = []
             rerollid = -1
         }
+        if(shouldDelegateGeneration()){
+            const character = DBState.db.characters[$selectedCharID]
+            const chat = character?.chats?.[character.chatPage]
+            if(!character || !chat){
+                return
+            }
+            try {
+                const persisted = await waitForNodeDatabasePersistence()
+                await queueRuntimeGeneration({
+                    action: 'unreroll',
+                    characterId: character.chaId,
+                    chatId: chat.id,
+                    payload: { databaseRevision: persisted?.revision ?? null },
+                })
+            } catch (error) {
+                $doingChat = false
+                alertError(error)
+            }
+            return
+        }
         const genId = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)?.generationInfo?.generationId
         if(genId){
             const r = PreUnreroll(genId)
@@ -329,12 +582,54 @@
     }
 
     function abortChat(){
+        if(shouldDelegateGeneration()){
+            abortController?.abort('generation cancelled by user')
+            const character = DBState.db.characters[$selectedCharID]
+            const chat = character?.chats?.[character.chatPage]
+            void cancelActiveRuntimeGeneration({
+                characterId: character?.chaId,
+                chatId: chat?.id,
+            }).catch((error) => alertError(error))
+            return
+        }
         if(abortController){
             abortController.abort()
         }
     }
 
     async function runAutoMode() {
+        if(shouldDelegateGeneration()){
+            if(autoMode){
+                autoMode = false
+                const character = DBState.db.characters[$selectedCharID]
+                const chat = character?.chats?.[character.chatPage]
+                await cancelActiveRuntimeGeneration({
+                    characterId: character?.chaId,
+                    chatId: chat?.id,
+                })
+                return
+            }
+            const character = DBState.db.characters[$selectedCharID]
+            const chat = character?.chats?.[character.chatPage]
+            if(!character || !chat){
+                return
+            }
+            try {
+                const persisted = await waitForNodeDatabasePersistence()
+                await queueRuntimeGeneration({
+                    action: 'auto',
+                    characterId: character.chaId,
+                    chatId: chat.id,
+                    payload: { databaseRevision: persisted?.revision ?? null },
+                })
+                autoMode = true
+            } catch (error) {
+                autoMode = false
+                $doingChat = false
+                alertError(error)
+            }
+            return
+        }
         if(autoMode){
             autoMode = false
             return

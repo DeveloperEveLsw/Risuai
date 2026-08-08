@@ -5,7 +5,9 @@ type MsgType =
     | 'CALLBACK_RETURN'
     | 'RESPONSE'
     | 'RELEASE_INSTANCE'
-    | 'ABORT_SIGNAL';
+    | 'ABORT_SIGNAL'
+    | 'PLUGIN_READY'
+    | 'PLUGIN_ERROR';
 
 interface RpcMessage {
     type: MsgType;
@@ -766,7 +768,7 @@ export class SandboxHost {
         this.activeStreamCleanups.clear();
     }
 
-    public run(container: HTMLElement|HTMLIFrameElement, userCode: string) {
+    public async run(container: HTMLElement|HTMLIFrameElement, userCode: string) {
         if(container instanceof HTMLIFrameElement) {
             this.iframe = container;
         } else {
@@ -787,9 +789,24 @@ export class SandboxHost {
 
         this.iframe.setAttribute('csp', this.csp);
 
+        let resolveReady!: () => void;
+        let rejectReady!: (error: Error) => void;
+        const ready = new Promise<void>((resolve, reject) => {
+            resolveReady = resolve;
+            rejectReady = reject;
+        });
         const messageHandler = async (event: MessageEvent) => {
             if (event.source !== this.iframe.contentWindow) return;
             const data = event.data as RpcMessage;
+
+            if (data.type === 'PLUGIN_READY') {
+                resolveReady();
+                return;
+            }
+            if (data.type === 'PLUGIN_ERROR') {
+                rejectReady(new Error(data.error || 'Plugin initialization failed'));
+                return;
+            }
 
 
             if (data.type === 'CALLBACK_RETURN') {
@@ -909,9 +926,17 @@ export class SandboxHost {
             (async () => {
                 ${GUEST_BRIDGE_SCRIPT}
                     
-                (async () => {
-                    ${userCode}
-                })()
+                try {
+                    await (async () => {
+                        ${userCode}
+                    })();
+                    parent.postMessage({ type: 'PLUGIN_READY' }, '*');
+                } catch (error) {
+                    parent.postMessage({
+                        type: 'PLUGIN_ERROR',
+                        error: error?.message || String(error)
+                    }, '*');
+                }
             })();
         </script>
       </body>
@@ -919,6 +944,22 @@ export class SandboxHost {
     `;
 
         this.iframe.srcdoc = html;
+
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        const timeout = new Promise<void>((_resolve, reject) => {
+            timeoutId = setTimeout(
+                () => reject(new Error('Plugin initialization timed out after 60 seconds')),
+                60_000,
+            );
+        });
+        try {
+            await Promise.race([ready, timeout]);
+        }
+        finally {
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+            }
+        }
 
         return () => {
             this.terminate();

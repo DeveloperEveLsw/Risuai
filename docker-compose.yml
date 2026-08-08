@@ -9,14 +9,30 @@ services:
         VITE_RISU_LEGAL_CONFIGURED: "TRUE"
     image: risuai:server-resident
     restart: always
+    environment:
+      # Only the fixed resident Chromium container may claim the authoritative
+      # generation executor lease.
+      RISU_RUNTIME_EXECUTOR_IP: ${RISU_BROWSER_IPV4:-172.30.107.20}
+      # Initializes a fresh Node volume before it is reachable and lets the
+      # fixed resident enroll its device key without a hidden password dialog.
+      RISU_NODE_BOOTSTRAP_PASSWORD: ${RISU_RUNTIME_PASSWORD:?Set RISU_RUNTIME_PASSWORD in .env}
+      RISU_PROXY_STREAM_ACKNOWLEDGED_RETENTION_MS: ${RISU_PROXY_STREAM_ACKNOWLEDGED_RETENTION_MS:-604800000}
+      RISU_PROXY_STREAM_UNACKNOWLEDGED_RETENTION_MS: ${RISU_PROXY_STREAM_UNACKNOWLEDGED_RETENTION_MS:-1209600000}
+      RISU_PROXY_STREAM_MAX_TERMINAL_JOBS: ${RISU_PROXY_STREAM_MAX_TERMINAL_JOBS:-2000}
+      RISU_RUNTIME_GENERATION_RETENTION_MS: ${RISU_RUNTIME_GENERATION_RETENTION_MS:-2592000000}
+      RISU_RUNTIME_GENERATION_MAX_TERMINAL_COMMANDS: ${RISU_RUNTIME_GENERATION_MAX_TERMINAL_COMMANDS:-2000}
+      RISU_PROXY_STREAM_MAX_RESPONSE_BYTES: ${RISU_PROXY_STREAM_MAX_RESPONSE_BYTES:-268435456}
+      RISU_PROXY_STREAM_MAX_SPOOL_BYTES: ${RISU_PROXY_STREAM_MAX_SPOOL_BYTES:-2147483648}
+      RISU_SAVE_MAX_BYTES: ${RISU_SAVE_MAX_BYTES:-8589934592}
+      RISU_SAVE_MIN_FREE_BYTES: ${RISU_SAVE_MIN_FREE_BYTES:-1073741824}
     logging:
       driver: json-file
       options:
         max-size: 10m
         max-file: "3"
     ports:
-      # Keep the raw RisuAI web app private. The persistent browser below is
-      # the only supported interactive client.
+      # Cloudflare/reverse proxy publishes the unchanged upstream UI from this
+      # loopback listener. Do not expose the Node port directly to the LAN.
       - 127.0.0.1:6001:6001
     networks:
       default:
@@ -85,7 +101,7 @@ services:
       MAX_RES: 3840x2160
       RISU_RUNTIME_READINESS_URL: http://risuai:6001/logo_32.png
       CHROME_CLI: >-
-        --app=http://risuai:6001/
+        --app=http://risuai:6001/?risu-runtime=executor
         --unsafely-treat-insecure-origin-as-secure=http://risuai:6001
         --remote-debugging-port=9222
         --no-first-run
@@ -100,11 +116,10 @@ services:
     volumes:
       - risuai-runtime-profile:/config
       - ./server/runtime/wait-for-risuai.sh:/custom-cont-init.d/10-wait-for-risuai:ro
+      - ./server/runtime/browser-healthcheck.sh:/opt/risu/browser-healthcheck.sh:ro
     shm_size: 1gb
     healthcheck:
-      test:
-        - CMD-SHELL
-        - curl -fsS http://risuai:6001/logo_32.png >/dev/null && curl -fsS http://127.0.0.1:9222/json/version >/dev/null || exit 1
+      test: ["CMD", "bash", "/opt/risu/browser-healthcheck.sh"]
       interval: 10s
       timeout: 5s
       retries: 12

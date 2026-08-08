@@ -38,15 +38,151 @@ import { updateGuisize } from "./gui/guisize";
 import { updateLorebooks } from "./characters";
 import { initMobileGesture } from "./hotkey";
 import { fetch as TauriHTTPFetch } from '@tauri-apps/plugin-http';
-import { moduleUpdate } from "./process/modules";
+import { moduleUpdate, refreshModules } from "./process/modules";
 import type { AccountStorage } from "./storage/accountStorage";
 import { getColdStorageItem, makeColdData } from "./process/coldstorage.svelte";
-import { isTauri, isNodeServer } from "./platform";
+import { isNodeServer, isServerResidentExecutor, isTauri } from "./platform";
 import { isLocalNetworkUrl } from "./network/localNetwork";
-import { decodeProxyJobWsChunk, formatProxyStreamErrorMessage, parseProxyJobWsEvent } from "./network/proxyJobWs";
+import { fetchDurableProxyJob, isDurableOpenAIProxyInterceptor } from "./network/proxyJobClient";
 import { getNodeServerProxyAuth } from "./storage/nodeStorage";
+import {
+    NodeDatabaseRuntime,
+    getNodeDatabaseCommitKind,
+    type NodeDatabaseSaveAttempt,
+} from "./storage/nodeDatabaseRuntime";
+import {
+    NodeDatabaseConflictError,
+    NodeDatabaseHttpError,
+} from "./storage/nodeDatabaseSync";
+import { getActiveRuntimeExecutionFence } from "./runtime/executionContext";
 
 export const forageStorage = new AutoStorage()
+
+let nodeDatabaseRuntime: NodeDatabaseRuntime<Database> | null = null
+let nodePluginFingerprint = ''
+let nodePluginReloadPromise: Promise<void> = Promise.resolve()
+
+function getNodePluginFingerprint(database: Database) {
+    return JSON.stringify(database.plugins ?? [])
+}
+
+function queueNodePluginReload(database: Database) {
+    const nextFingerprint = getNodePluginFingerprint(database)
+    if (nextFingerprint === nodePluginFingerprint) {
+        return
+    }
+    nodePluginFingerprint = nextFingerprint
+    nodePluginReloadPromise = nodePluginReloadPromise
+        // A failed plugin must not permanently poison the reload queue. The
+        // failed generation still sees the rejection below, while a later DB
+        // revision can retry with the newly supplied plugin configuration.
+        .catch(() => {})
+        .then(() => loadPlugins())
+    void nodePluginReloadPromise.catch((error) => console.error('[Node Plugin Reload]', error))
+}
+
+export async function initializeNodeDatabaseRuntime() {
+    if (!isNodeServer || nodeDatabaseRuntime) {
+        return nodeDatabaseRuntime
+    }
+    const sync = forageStorage.getNodeDatabaseSync()
+    if (!sync) {
+        return null
+    }
+    nodePluginFingerprint = getNodePluginFingerprint(getDatabase())
+    nodeDatabaseRuntime = new NodeDatabaseRuntime<Database>({
+        sync,
+        decode: decodeRisuSave,
+        getDatabase: () => getDatabase(),
+        setDatabase,
+        getSelectedCharacterIndex: () => get(selectedCharID),
+        setSelectedCharacterIndex: (index) => selectedCharID.set(index),
+        onRemoteApplied: (database) => {
+            requiresFullEncoderReload.state = true
+            // getModules() intentionally caches by enabled IDs, which does not
+            // change when a module's lore/regex/trigger body is edited on the
+            // other device. A canonical snapshot replacement must invalidate
+            // that browser-memory cache before the resident builds a prompt.
+            refreshModules()
+            ReloadGUIPointer.set(Math.random())
+            queueNodePluginReload(database)
+        },
+        onError: (error) => console.error(error),
+    })
+    // Only the canonical resident persists bootstrap format/ID migrations.
+    // A phone opened during generation must begin as a clean follower; an
+    // unconditional startup write would block remote streaming snapshots and
+    // later conflict with the resident's newer revision.
+    if (isServerResidentExecutor) {
+        nodeDatabaseRuntime.markDirty()
+    }
+    await nodeDatabaseRuntime.start()
+    return nodeDatabaseRuntime
+}
+
+export async function waitForNodeDatabasePersistence(
+    timeoutMs = 60_000,
+    minimumRevision?: number,
+) {
+    if (!nodeDatabaseRuntime) {
+        return null
+    }
+    if (
+        minimumRevision !== undefined
+        && (!Number.isSafeInteger(minimumRevision) || minimumRevision < 0)
+    ) {
+        throw new TypeError('minimumRevision must be a non-negative safe integer')
+    }
+    if (minimumRevision !== undefined) {
+        nodeDatabaseRuntime.requestRevision(minimumRevision)
+    }
+    const deadline = Date.now() + timeoutMs
+    while (
+        nodeDatabaseRuntime.isDirty
+        || nodeDatabaseRuntime.isSaveInFlight
+        || saving.state
+        || (
+            minimumRevision !== undefined
+            && (nodeDatabaseRuntime.loadedSnapshotHead?.revision ?? -1) < minimumRevision
+        )
+    ) {
+        if (nodeDatabaseRuntime.persistenceError) {
+            throw nodeDatabaseRuntime.persistenceError
+        }
+        if (Date.now() >= deadline) {
+            throw new Error(`Timed out waiting ${timeoutMs}ms for the canonical database save`)
+        }
+        await sleep(50)
+    }
+    if (nodeDatabaseRuntime.persistenceError) {
+        throw nodeDatabaseRuntime.persistenceError
+    }
+    // Remote plugin enable/disable/update is part of the canonical database,
+    // but the executable provider/replacer/DOM hooks live in browser memory.
+    // Drain the current reload chain (including one queued while awaiting a
+    // previous reload) before the resident executor is allowed to generate.
+    while (true) {
+        const pendingReload = nodePluginReloadPromise
+        await pendingReload
+        if (pendingReload === nodePluginReloadPromise) {
+            break
+        }
+    }
+    return nodeDatabaseRuntime.loadedSnapshotHead
+}
+
+export function getCleanNodeDatabaseHead() {
+    return nodeDatabaseRuntime?.canApplyEphemeralMutation
+        ? nodeDatabaseRuntime.loadedSnapshotHead
+        : null
+}
+
+export function runNodeDatabaseEphemeralMutation<TResult>(operation: () => TResult) {
+    if (!nodeDatabaseRuntime) {
+        throw new Error('Node database runtime is not initialized')
+    }
+    return nodeDatabaseRuntime.runEphemeralMutation(operation)
+}
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -295,7 +431,7 @@ export async function saveDb() {
     let gotChannel = false
     const sessionID = v4()
     let channel: BroadcastChannel
-    if (window.BroadcastChannel) {
+    if (window.BroadcastChannel && !isNodeServer) {
         channel = new BroadcastChannel('risu-db')
     }
     if (channel) {
@@ -362,6 +498,9 @@ export async function saveDb() {
         }
 
         const unsubscribeDb = onDatabaseUpdate((info) => {
+            if (nodeDatabaseRuntime && !nodeDatabaseRuntime.recordDatabaseUpdate(info)) {
+                return
+            }
             if (info.path.length === 0) {
                 requiresFullEncoderReload.state = true
                 savetrys = 0
@@ -425,8 +564,12 @@ export async function saveDb() {
             }
             saveTimeoutExecute()
         })
-        // Persist bootstrap mutations emitted before the database listener existed.
-        saveTimeoutExecute()
+        // Persist pre-listener bootstrap migrations once from the canonical
+        // resident. Direct multi-device pages start clean and save only real
+        // user mutations observed by this listener.
+        if (!nodeDatabaseRuntime || isServerResidentExecutor) {
+            saveTimeoutExecute()
+        }
 
         return () => {
             unsubscribeSel()
@@ -435,7 +578,10 @@ export async function saveDb() {
     })
 
     try {
-        await encoder.init(getDatabase(), {
+        const initialDatabase = nodeDatabaseRuntime
+            ? nodeDatabaseRuntime.makeCanonicalSnapshot(getDatabase({ snapshot: true }))
+            : getDatabase()
+        await encoder.init(initialDatabase, {
             compression: forageStorage.isAccount
         })
     } catch (error) {
@@ -444,10 +590,30 @@ export async function saveDb() {
         console.error(error)
     }
 
-    let lastDbData = new Uint8Array(0)
+    let nodeRetryPayload: {
+        data: Uint8Array
+        kind: NodeDatabaseSaveAttempt['kind']
+        idempotencyKey: string
+    } | null = null
+    const sameBytes = (left: Uint8Array, right: Uint8Array) => {
+        if (left.byteLength !== right.byteLength) {
+            return false
+        }
+        for (let index = 0; index < left.byteLength; index += 1) {
+            if (left[index] !== right[index]) {
+                return false
+            }
+        }
+        return true
+    }
     await sleep(1000)
     while (true) {
         if (!changed) {
+            await sleep(500)
+            continue
+        }
+
+        if (nodeDatabaseRuntime?.persistenceError) {
             await sleep(500)
             continue
         }
@@ -463,8 +629,15 @@ export async function saveDb() {
         const pendingSave = cloneChangeTracker(changeTracker)
         changeTracker = createChangeTracker()
         const toSave = cloneChangeTracker(pendingSave)
+        let nodeSaveAttempt: NodeDatabaseSaveAttempt | null = null
+        let nodeCanonicalCommitted = false
+        let nodeDbData: Uint8Array | null = null
         try {
-            const db = getDatabase()
+            const db = nodeDatabaseRuntime
+                ? nodeDatabaseRuntime.makeCanonicalSnapshot(getDatabase({ snapshot: true }))
+                : getDatabase()
+            const nodeCommitKind = nodeDatabaseRuntime ? getNodeDatabaseCommitKind(db) : null
+            const nodeSaveEpoch = nodeDatabaseRuntime?.captureSaveEpoch()
 
             if (requiresFullEncoderReload.state) {
                 requiresFullEncoderReload.state = false
@@ -494,13 +667,45 @@ export async function saveDb() {
                 throw new Error('Database encoding failed')
             }
             const dbData = new Uint8Array(encoded)
+            nodeDbData = dbData
+            if (nodeDatabaseRuntime && nodeCommitKind) {
+                const retryKey = nodeRetryPayload
+                    && nodeRetryPayload.kind === nodeCommitKind
+                    && sameBytes(nodeRetryPayload.data, dbData)
+                    ? nodeRetryPayload.idempotencyKey
+                    : undefined
+                nodeSaveAttempt = nodeDatabaseRuntime.beginSave(
+                    nodeCommitKind,
+                    retryKey,
+                    nodeSaveEpoch,
+                )
+            }
             if (isTauri) {
                 await writeFile('database/database.bin', dbData, { baseDir: BaseDirectory.AppData });
                 await writeFile(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData, { baseDir: BaseDirectory.AppData });
             }
             else {
 
-                await forageStorage.setItem('database/database.bin', dbData)
+                const executionFence = getActiveRuntimeExecutionFence()
+                await forageStorage.setItem(
+                    'database/database.bin',
+                    dbData,
+                    nodeSaveAttempt ? {
+                        kind: nodeSaveAttempt.kind,
+                        idempotencyKey: nodeSaveAttempt.idempotencyKey,
+                        ...(executionFence ? {
+                            generationId: executionFence.commandId,
+                            executorId: executionFence.executorId,
+                            fencingToken: executionFence.fencingToken,
+                        } : {}),
+                    } : undefined,
+                )
+                if (nodeSaveAttempt) {
+                    nodeDatabaseRuntime?.finishSave(nodeSaveAttempt)
+                    nodeRetryPayload = null
+                    nodeSaveAttempt = null
+                    nodeCanonicalCommitted = true
+                }
                 if (!forageStorage.isAccount) {
                     await forageStorage.setItem(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData)
                 }
@@ -515,7 +720,83 @@ export async function saveDb() {
             await saveDbKei()
             await sleep(500)
         } catch (error) {
+            if (nodeCanonicalCommitted) {
+                // The authoritative CAS already succeeded. A best-effort
+                // backup/cleanup failure must not create another DB revision.
+                console.error(error)
+                nodeRetryPayload = null
+                saving.state = false
+                continue
+            }
             mergeChangeTrackers(changeTracker, pendingSave)
+            const nodeHttpErrorCode = error instanceof NodeDatabaseHttpError
+                && typeof error.body === 'object'
+                && error.body !== null
+                && typeof (error.body as { code?: unknown }).code === 'string'
+                ? (error.body as { code: string }).code
+                : null
+            if (
+                nodeSaveAttempt
+                && error instanceof NodeDatabaseHttpError
+                && error.status === 423
+                && nodeHttpErrorCode === 'GENERATION_WRITE_LEASE_ACTIVE'
+            ) {
+                nodeDatabaseRuntime?.failSave(nodeSaveAttempt)
+                if (nodeDbData) {
+                    nodeRetryPayload = {
+                        data: new Uint8Array(nodeDbData),
+                        kind: nodeSaveAttempt.kind,
+                        idempotencyKey: nodeSaveAttempt.idempotencyKey,
+                    }
+                }
+                nodeSaveAttempt = null
+                savetrys = 0
+                console.info('[Database Sync] Resident generation owns the write lease; retrying after it advances.')
+                await sleep(1000)
+                changed = true
+                saving.state = false
+                continue
+            }
+            if (
+                nodeSaveAttempt
+                && error instanceof NodeDatabaseHttpError
+                && error.status === 409
+                && nodeHttpErrorCode === 'STALE_EXECUTOR_FENCE'
+            ) {
+                nodeDatabaseRuntime?.failSaveTerminal(nodeSaveAttempt, error)
+                nodeRetryPayload = null
+                nodeSaveAttempt = null
+                changed = false
+                console.error('[Database Sync] Discarding output from a stale resident executor.', error)
+                saving.state = false
+                window.setTimeout(() => window.location.reload(), 1000)
+                continue
+            }
+            if (nodeSaveAttempt && error instanceof NodeDatabaseConflictError) {
+                nodeDatabaseRuntime?.failSaveWithConflict(nodeSaveAttempt, error)
+                nodeRetryPayload = null
+                nodeSaveAttempt = null
+                changed = false
+                alertError(
+                    `Database save conflict ${error.conflictId}: server revision `
+                    + `${error.currentRevision}. The stale local save was preserved on the server; `
+                    + `this device is reloading the canonical version.`,
+                )
+                nodeDatabaseRuntime?.recoverFromConflict(error)
+                saving.state = false
+                continue
+            }
+            if (nodeSaveAttempt) {
+                nodeDatabaseRuntime?.failSave(nodeSaveAttempt)
+                if (nodeDbData) {
+                    nodeRetryPayload = {
+                        data: new Uint8Array(nodeDbData),
+                        kind: nodeSaveAttempt.kind,
+                        idempotencyKey: nodeSaveAttempt.idempotencyKey,
+                    }
+                }
+                nodeSaveAttempt = null
+            }
             savetrys += 1
             if (savetrys > 4) {
                 alertError(error)
@@ -1567,176 +1848,35 @@ async function fetchViaProxyJobWs(url: string, arg: {
     chatId?: string,
     fetchLogIndex?: number | null
 }): Promise<Response> {
-    const auth = await getNodeServerProxyAuth();
-
-    const requestSignal = arg.signal;
     const baseUrl = getProxyStreamJobBaseUrl();
-
-    let jobId = '';
-    const createRes = await fetch(`${baseUrl}/proxy-stream-jobs`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'risu-auth': auth
-        },
-        body: JSON.stringify({
-            url,
-            method: arg.method,
-            headers: arg.headers ?? {},
-            bodyBase64: Buffer.from(arg.body).toString('base64'),
-            timeoutMs: arg.requestTimeoutMs,
-            heartbeatSec: defaultProxyJobHeartbeatSec
-        }),
-        signal: requestSignal
-    });
-
-    if (!createRes.ok) {
-        const errText = await createRes.text();
-        throw new Error(`Proxy stream job creation failed: ${createRes.status} ${errText}`);
-    }
-
-    const created = await createRes.json() as { jobId?: string };
-    if (!created.jobId) {
-        throw new Error('Proxy stream job creation returned no jobId');
-    }
-    jobId = created.jobId;
-
     const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${location.host}/proxy-stream-jobs/${encodeURIComponent(jobId)}/ws?risu-auth=${encodeURIComponent(auth)}`;
-
-    let headersReady = false;
-    let status = 200;
-    let responseHeaders: HeadersInit = { 'content-type': 'text/event-stream' };
-    let settled = false;
-    let resolveHeaders: () => void = () => {};
-    const waitHeaders = new Promise<void>((resolve) => {
-        resolveHeaders = resolve;
-    });
-    let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
-    const encoder = new TextEncoder();
-
-    const ws = new WebSocket(wsUrl);
-    const readable = new ReadableStream<Uint8Array>({
-        start(controller) {
-            streamController = controller;
-        },
-        cancel() {
-            try {
-                ws.close();
-            } catch {
-                // no-op
+    const responseDecoder = arg.fetchLogIndex == null ? null : new TextDecoder();
+    return await fetchDurableProxyJob({
+        baseUrl,
+        webSocketBaseUrl: `${wsProtocol}//${location.host}`,
+        getAuth: getNodeServerProxyAuth,
+        url,
+        method: arg.method,
+        body: arg.body,
+        headers: arg.headers,
+        signal: arg.signal,
+        requestTimeoutMs: arg.requestTimeoutMs,
+        heartbeatSec: defaultProxyJobHeartbeatSec,
+        chatId: arg.chatId,
+        onChunk: responseDecoder && arg.fetchLogIndex != null ? (bytes) => {
+            const entry = fetchLog[arg.fetchLogIndex!];
+            if (entry) {
+                const prefix = entry.response === 'Streamed Fetch' ? '' : entry.response;
+                entry.response = prefix + responseDecoder.decode(bytes, { stream: true });
             }
-        }
-    });
-    const pipedReadable = arg.fetchLogIndex != null ? pipeFetchLog(arg.fetchLogIndex, readable) : readable;
-
-    const ensureHeadersReady = () => {
-        if (!headersReady) {
-            headersReady = true;
-            resolveHeaders();
-        }
-    };
-
-    const closeAndEnd = () => {
-        if (settled) {
-            return;
-        }
-        settled = true;
-        if (streamController) {
-            try {
-                streamController.close();
-            } catch {
-                // no-op
+        } : undefined,
+        onTerminal: responseDecoder && arg.fetchLogIndex != null ? () => {
+            const entry = fetchLog[arg.fetchLogIndex!];
+            if (entry) {
+                const prefix = entry.response === 'Streamed Fetch' ? '' : entry.response;
+                entry.response = prefix + responseDecoder.decode();
             }
-        }
-        try {
-            ws.close();
-        } catch {
-            // no-op
-        }
-    };
-
-    ws.onmessage = (event) => {
-        const parsed = parseProxyJobWsEvent(typeof event.data === 'string' ? event.data : '');
-        if (!parsed || !streamController) {
-            return;
-        }
-        switch (parsed.type) {
-            case 'job_accepted':
-            case 'ping':
-                return;
-            case 'upstream_headers':
-                status = parsed.status;
-                responseHeaders = parsed.headers ?? {};
-                ensureHeadersReady();
-                return;
-            case 'chunk':
-                ensureHeadersReady();
-                streamController.enqueue(decodeProxyJobWsChunk(parsed.dataBase64));
-                return;
-            case 'error': {
-                status = parsed.status ?? 502;
-                responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
-                ensureHeadersReady();
-                const msg = formatProxyStreamErrorMessage(parsed.status, parsed.message);
-                streamController.enqueue(encoder.encode(msg));
-                closeAndEnd();
-                return;
-            }
-            case 'done':
-                ensureHeadersReady();
-                closeAndEnd();
-                return;
-        }
-    };
-
-    ws.onerror = () => {
-        if (!streamController) {
-            return;
-        }
-        status = 502;
-        responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
-        ensureHeadersReady();
-        streamController.enqueue(encoder.encode('Proxy WebSocket stream error'));
-        closeAndEnd();
-    };
-
-    ws.onclose = () => {
-        if (!headersReady) {
-            status = 502;
-            responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
-            ensureHeadersReady();
-        }
-        closeAndEnd();
-    };
-
-    const abortHandler = () => {
-        status = 499;
-        responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
-        ensureHeadersReady();
-        if (streamController && !settled) {
-            streamController.enqueue(encoder.encode('Aborted'));
-        }
-        void fetch(`${baseUrl}/proxy-stream-jobs/${encodeURIComponent(jobId)}`, {
-            method: 'DELETE',
-            headers: {
-                'risu-auth': auth
-            }
-        }).catch(() => {});
-        closeAndEnd();
-    };
-    if (requestSignal?.aborted) {
-        abortHandler();
-    }
-    else {
-        requestSignal?.addEventListener('abort', abortHandler, { once: true });
-    }
-
-    await waitHeaders;
-    requestSignal?.removeEventListener('abort', abortHandler);
-    return new Response(pipedReadable, {
-        status,
-        headers: new Headers(responseHeaders)
+        } : undefined,
     });
 }
 
@@ -1952,25 +2092,27 @@ export async function fetchNative(url: string, arg: {
     }
     else if (throughProxy) {
         const useProxyJobWs = isNodeServer
-            && arg.interceptor === 'openai_streaming'
+            && isDurableOpenAIProxyInterceptor(arg.interceptor)
             && arg.method === 'POST'
             && useLocalNetworkRoute;
         const nodeProxyAuth = isNodeServer ? await getNodeServerProxyAuth() : null;
 
         if (useProxyJobWs) {
-            try {
-                return await fetchViaProxyJobWs(url, {
-                    body: realBody,
-                    headers,
-                    method: arg.method,
-                    signal: requestSignal,
-                    requestTimeoutMs: arg.requestTimeoutMs,
-                    chatId: arg.chatId,
-                    fetchLogIndex
-                });
-            } catch (wsErr) {
-                console.warn('[ProxyJobWS] fallback to /proxy2 due to error:', wsErr);
-            }
+            // Once selected, the durable route owns this logical request. A
+            // fallback POST could create a second upstream generation when the
+            // job-creation response was merely lost in transit.
+            return await fetchViaProxyJobWs(url, {
+                body: realBody,
+                headers,
+                method: arg.method,
+                // Keep the caller's explicit abort connected for the entire
+                // response body. The server enforces requestTimeoutMs for the
+                // durable upstream job itself.
+                signal: arg.signal,
+                requestTimeoutMs: arg.requestTimeoutMs,
+                chatId: arg.chatId,
+                fetchLogIndex
+            });
         }
 
         const r = await fetch(getProxy2Url(), {

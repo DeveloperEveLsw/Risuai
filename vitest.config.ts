@@ -1,5 +1,5 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte"
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [
@@ -14,5 +14,6 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     setupFiles: ['vitest.setup.ts'],
+    exclude: [...configDefaults.exclude, 'server/node/**/*.test.cjs'],
   },
 })

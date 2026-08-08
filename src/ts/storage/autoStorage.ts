@@ -8,19 +8,31 @@ import { getDatabase, type Database } from "./database.svelte"
 import { AccountStorage } from "./accountStorage"
 import { decodeRisuSave, encodeRisuSaveLegacy } from "./risuSave";
 import { language } from "src/lang"
+import type { NodeDatabaseCommitOptions, NodeDatabaseSync } from "./nodeDatabaseSync"
 
 export class AutoStorage{
     isAccount:boolean = false
 
     realStorage:LocalForage|NodeStorage|OpfsStorage|AccountStorage
 
-    async setItem(key:string, value:Uint8Array):Promise<string|null> {
+    async setItem(key:string, value:Uint8Array, options?:NodeDatabaseCommitOptions):Promise<string|null> {
         await this.Init()
         if(this.isAccount){
             return await (this.realStorage as AccountStorage).setItem(key, value)
         }
-        await this.realStorage.setItem(key, value)
+        if(key === 'database/database.bin' && this.realStorage instanceof NodeStorage){
+            await this.realStorage.setItem(key, value, options)
+        }
+        else{
+            await this.realStorage.setItem(key, value)
+        }
         return null
+    }
+
+    getNodeDatabaseSync():NodeDatabaseSync|null {
+        return this.realStorage instanceof NodeStorage
+            ? this.realStorage.databaseSync
+            : null
     }
     async getItem(key:string):Promise<Buffer> {
         await this.Init()
@@ -38,6 +50,16 @@ export class AutoStorage{
     }
 
     async checkAccountSync(){
+        // A Node self-host is already the authoritative shared store. Account
+        // sync must never replace it with a browser/account-backed database,
+        // even when an older browser profile still has the accountst flag.
+        if(isNodeServer){
+            if(!(this.realStorage instanceof NodeStorage)){
+                this.realStorage = new NodeStorage()
+            }
+            this.isAccount = false
+            return false
+        }
         let db = getDatabase({ snapshot: true })
         if(this.isAccount){
             return true
@@ -164,14 +186,14 @@ export class AutoStorage{
 
     async Init(){
         if(!this.realStorage){
-            if(localStorage.getItem('accountst') === 'able'){
-                this.realStorage = new AccountStorage()
-                this.isAccount = true
-                return
-            }
             if(isNodeServer){
                 console.log("using node storage")
                 this.realStorage = new NodeStorage()
+                return
+            }
+            if(localStorage.getItem('accountst') === 'able'){
+                this.realStorage = new AccountStorage()
+                this.isAccount = true
                 return
             }
             else if(window.navigator?.storage?.getDirectory &&

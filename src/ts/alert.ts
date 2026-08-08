@@ -17,6 +17,154 @@ export interface alertData{
     defaultValue?: string
 }
 
+export interface RuntimeAlertBridge {
+    prompt: (data: alertData) => Promise<string>
+    notice: (data: alertData) => void | Promise<void>
+}
+
+export interface RuntimeAlertPromptEnvelope {
+    commandId: string
+    promptId: string
+    prompt: alertData
+}
+
+// Legacy V2.1 plugins receive these instead of native browser dialogs. Native
+// dialogs block the hidden resident Chromium main thread and cannot be handed
+// off to another device; the Promise form preserves blocking semantics for
+// plugins that await the result while using the same AlertComp bridge.
+export const runtimeAlertGlobals = {
+    alert: async (message?: unknown) => {
+        await alertNormalWait(String(message ?? ''))
+    },
+    confirm: async (message?: unknown) => {
+        return await alertConfirm(String(message ?? ''))
+    },
+    prompt: async (message?: unknown, defaultValue?: unknown) => {
+        return await alertInput(
+            String(message ?? ''),
+            undefined,
+            defaultValue === undefined ? '' : String(defaultValue),
+        )
+    },
+}
+
+let runtimeAlertBridge: RuntimeAlertBridge | null = null
+
+export function installRuntimeAlertBridge(bridge: RuntimeAlertBridge) {
+    const previous = runtimeAlertBridge
+    runtimeAlertBridge = bridge
+    return () => {
+        if (runtimeAlertBridge === bridge) {
+            runtimeAlertBridge = previous
+        }
+    }
+}
+
+async function presentBlockingAlert(data: alertData) {
+    if (runtimeAlertBridge) {
+        return await runtimeAlertBridge.prompt(data)
+    }
+    alertStoreImported.set(data)
+    await waitAlert()
+    return String(get(alertStoreImported).msg ?? '')
+}
+
+function relayRuntimeNotice(data: alertData) {
+    if (!runtimeAlertBridge) {
+        return false
+    }
+    void Promise.resolve(runtimeAlertBridge.notice(data)).catch((error) => {
+        console.error('[Runtime Alert Notice]', error)
+    })
+    return true
+}
+
+type DirectRuntimePromptState = {
+    commandId: string
+    promptId: string
+    prompt: alertData
+    presenting: boolean
+    dismissed: boolean
+    result: Promise<string | null>
+    resolve: (value: string | null) => void
+}
+
+const directRuntimePrompts = new Map<string, DirectRuntimePromptState>()
+let directRuntimeAlertQueue = Promise.resolve()
+
+export function presentRuntimeAlertPrompt(envelope: RuntimeAlertPromptEnvelope) {
+    const existing = directRuntimePrompts.get(envelope.promptId)
+    if (existing) {
+        return existing.result
+    }
+    let resolveResult!: (value: string | null) => void
+    const result = new Promise<string | null>((resolve) => {
+        resolveResult = resolve
+    })
+    const state: DirectRuntimePromptState = {
+        ...envelope,
+        presenting: false,
+        dismissed: false,
+        result,
+        resolve: resolveResult,
+    }
+    directRuntimePrompts.set(envelope.promptId, state)
+    const present = directRuntimeAlertQueue.then(async () => {
+        if (state.dismissed) {
+            state.resolve(null)
+            return
+        }
+        state.presenting = true
+        alertStoreImported.set({ ...state.prompt })
+        while (!state.dismissed && get(alertStoreImported).type !== 'none') {
+            await sleep(10)
+        }
+        state.presenting = false
+        if (state.dismissed) {
+            state.resolve(null)
+            return
+        }
+        const response = String(get(alertStoreImported).msg ?? '')
+        // Do not leave prompt answers (often API keys) sitting in the shared
+        // UI store after the response body has been constructed.
+        alertStoreImported.set({ type: 'none', msg: '' })
+        state.resolve(response)
+    })
+    directRuntimeAlertQueue = present.catch((error) => {
+        console.error('[Runtime Alert Prompt]', error)
+        state.resolve(null)
+    })
+    return result
+}
+
+export function dismissRuntimeAlertPrompt(promptId: string) {
+    const state = directRuntimePrompts.get(promptId)
+    if (!state) {
+        return
+    }
+    state.dismissed = true
+    if (state.presenting && get(alertStoreImported).type !== 'none') {
+        alertStoreImported.set({ type: 'none', msg: '' })
+    }
+    state.resolve(null)
+    directRuntimePrompts.delete(promptId)
+}
+
+export function dismissRuntimeAlertPromptsForCommand(commandId: string) {
+    for (const state of directRuntimePrompts.values()) {
+        if (state.commandId === commandId) {
+            dismissRuntimeAlertPrompt(state.promptId)
+        }
+    }
+}
+
+export function presentRuntimeAlertNotice(notice: alertData) {
+    directRuntimeAlertQueue = directRuntimeAlertQueue.then(() => {
+        alertStoreImported.set({ ...notice })
+    })
+    return directRuntimeAlertQueue
+}
+
 type AlertGenerationInfoStoreData = {
     genInfo: MessageGenerationInfo,
     idx: number
@@ -65,12 +213,15 @@ export function alertError(msg: string | Error) {
                     (!isTauri && !isNodeServer) ? language.errors.networkFetchWeb : language.errors.networkFetch
     }
 
-    alertStoreImported.set({
+    const notice: alertData = {
         'type': 'error',
         'msg': msg,
         'submsg': submsg,
         'stackTrace': stackTrace
-    })
+    }
+    if (!relayRuntimeNotice(notice)) {
+        alertStoreImported.set(notice)
+    }
 }
 
 export async function waitAlert(){
@@ -83,60 +234,50 @@ export async function waitAlert(){
 }
 
 export function alertNormal(msg:string){
-    alertStoreImported.set({
+    const notice: alertData = {
         'type': 'normal',
         'msg': msg
-    })
+    }
+    if (!relayRuntimeNotice(notice)) {
+        alertStoreImported.set(notice)
+    }
 }
 
 export async function alertNormalWait(msg:string){
-    alertStoreImported.set({
+    await presentBlockingAlert({
         'type': 'normal',
         'msg': msg
     })
-    await waitAlert()
 }
 
 export async function alertAddCharacter() {
-    alertStoreImported.set({
+    return await presentBlockingAlert({
         'type': 'addchar',
         'msg': language.addCharacter
     })
-    await waitAlert()
-
-    return get(alertStoreImported).msg
 }
 
 export async function alertChatOptions() {
-    alertStoreImported.set({
+    const response = await presentBlockingAlert({
         'type': 'chatOptions',
         'msg': language.chatOptions
     })
-    await waitAlert()
-
-    return parseInt(get(alertStoreImported).msg)
+    return parseInt(response)
 }
 
 export async function alertLogin(){
-    alertStoreImported.set({
+    return await presentBlockingAlert({
         'type': 'login',
         'msg': 'login'
     })
-    await waitAlert()
-
-    return get(alertStoreImported).msg
 }
 
 export async function alertSelect(msg:string[], display?:string){
     const message = display !== undefined ? `__DISPLAY__${display}||${msg.join('||')}` : msg.join('||')
-    alertStoreImported.set({
+    return await presentBlockingAlert({
         'type': 'select',
         'msg': message
     })
-
-    await waitAlert()
-
-    return get(alertStoreImported).msg
 }
 
 export async function alertErrorWait(msg:string){
@@ -148,10 +289,13 @@ export async function alertErrorWait(msg:string){
 }
 
 export function alertMd(msg:string){
-    alertStoreImported.set({
+    const notice: alertData = {
         'type': 'markdown',
         'msg': msg
-    })
+    }
+    if (!relayRuntimeNotice(notice)) {
+        alertStoreImported.set(notice)
+    }
 }
 
 export function doingAlert(){
@@ -182,51 +326,35 @@ export function alertClear(){
 }
 
 export async function alertSelectChar(){
-    alertStoreImported.set({
+    return await presentBlockingAlert({
         'type': 'selectChar',
         'msg': ''
     })
-
-    await waitAlert()
-
-    return get(alertStoreImported).msg
 }
 
 export async function alertConfirm(msg:string){
-
-    alertStoreImported.set({
+    const response = await presentBlockingAlert({
         'type': 'ask',
         'msg': msg
     })
-
-    await waitAlert()
-
-    return get(alertStoreImported).msg === 'yes'
+    return response === 'yes'
 }
 
 export async function alertPluginConfirm(msg:string){
-
-    alertStoreImported.set({
+    const response = await presentBlockingAlert({
         'type': 'pluginconfirm',
         'msg': msg
     })
-
-    await waitAlert()
-
-    return get(alertStoreImported).msg === 'yes'
+    return response === 'yes'
 }
 
 export async function alertCardExport(type:string = ''){
-
-    alertStoreImported.set({
+    const response = await presentBlockingAlert({
         'type': 'cardexport',
         'msg': '',
         'submsg': type
     })
-
-    await waitAlert()
-
-    return JSON.parse(get(alertStoreImported).msg) as {
+    return JSON.parse(response) as {
         type: string,
         type2: string,
     }
@@ -238,14 +366,12 @@ export async function alertTOS(){
         return true
     }
 
-    alertStoreImported.set({
+    const response = await presentBlockingAlert({
         'type': 'tos',
         'msg': 'tos'
     })
 
-    await waitAlert()
-
-    if(get(alertStoreImported).msg === 'yes'){
+    if(response === 'yes'){
         localStorage.setItem('tos4', 'true')
         return true
     }
@@ -259,34 +385,19 @@ export async function alertTOS(){
 }
 
 export async function alertInput(msg:string, datalist?:[string, string][], defaultValue?:string) {
-
-    alertStoreImported.set({
+    return await presentBlockingAlert({
         'type': 'input',
         'msg': msg,
         'datalist': datalist ?? [],
         'defaultValue': defaultValue ?? ''
     })
-
-    await waitAlert()
-
-    return get(alertStoreImported).msg
 }
 
 export async function alertModuleSelect(){
-
-    alertStoreImported.set({
+    return await presentBlockingAlert({
         'type': 'selectModule',
         'msg': ''
     })
-
-    while(true){
-        if (get(alertStoreImported).type === 'none'){
-            break
-        }
-        await sleep(20)
-    }
-
-    return get(alertStoreImported).msg
 }
 
 export function alertRequestData(info:AlertGenerationInfoStoreData){

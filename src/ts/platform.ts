@@ -18,6 +18,12 @@ const browserNavigator = navigator as BrowserNavigator
 
 export const isTauri: boolean = !!(window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
 export const isNodeServer: boolean = !!(globalThis as typeof globalThis & { __NODE__?: boolean }).__NODE__
+const isAttestedResident = (globalThis as typeof globalThis & {
+    __RISU_RUNTIME_EXECUTOR_ATTESTED__?: boolean
+}).__RISU_RUNTIME_EXECUTOR_ATTESTED__ === true
+export const isServerResidentExecutor: boolean = isNodeServer
+    && isAttestedResident
+    && new URLSearchParams(location.search).get('risu-runtime') === 'executor'
 export const isWeb: boolean = !isTauri && !isNodeServer && location.hostname === 'risuai.xyz'
 export const isMobile: boolean = /Android|iPhone|iPad|iPod|webOS/i.test(browserNavigator.userAgent);
 

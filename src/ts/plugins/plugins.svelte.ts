@@ -1,7 +1,7 @@
 import { get, writable } from "svelte/store";
 import { language } from "../../lang";
 import { getCurrentCharacter, getDatabase, setDatabase, setDatabaseLite } from "../storage/database.svelte";
-import { alertConfirm, alertError, alertPluginConfirm } from "../alert";
+import { alertConfirm, alertError, alertPluginConfirm, runtimeAlertGlobals } from "../alert";
 import { selectSingleFile, sleep } from "../util";
 import type { OpenAIChat } from "../process/index.svelte";
 import { fetchNative, globalFetch, readImage, saveAsset, toGetter } from "../globalApi.svelte";
@@ -62,6 +62,26 @@ const compareVersions = (v1: string, v2: string): 0|1|-1 => {
 }
 
 const updateCache = new Map<string, { version: string, updateURL: string } | undefined>();
+const V2_PLUGIN_LOAD_TIMEOUT_MS = 60_000
+
+async function waitForV2PluginInitialization(pluginName: string, initialization: unknown) {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    try {
+        await Promise.race([
+            Promise.resolve(initialization),
+            new Promise<never>((_resolve, reject) => {
+                timeoutId = setTimeout(() => reject(new Error(
+                    `Plugin "${pluginName}" did not initialize within ${V2_PLUGIN_LOAD_TIMEOUT_MS} ms`,
+                )), V2_PLUGIN_LOAD_TIMEOUT_MS)
+            }),
+        ])
+    }
+    finally {
+        if (timeoutId !== null) {
+            clearTimeout(timeoutId)
+        }
+    }
+}
 
 export const checkPluginUpdate = async (plugin: RisuPlugin) => {
     try {
@@ -642,9 +662,9 @@ export const getV2PluginAPIs = () => {
                 //@ts-expect-error spreading any[] into clearTimeout - first arg should be number | undefined
                 return globalThis.clearTimeout(...args);
             }
-            safeGlobal.alert = globalThis.alert;
-            safeGlobal.confirm = globalThis.confirm;
-            safeGlobal.prompt = globalThis.prompt;
+            safeGlobal.alert = runtimeAlertGlobals.alert;
+            safeGlobal.confirm = runtimeAlertGlobals.confirm;
+            safeGlobal.prompt = runtimeAlertGlobals.prompt;
             safeGlobal.innerWidth = window.innerWidth;
             safeGlobal.innerHeight = window.innerHeight;
             safeGlobal.getComputedStyle = window.getComputedStyle
@@ -861,7 +881,7 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
 
             const policy = policyFactory.createPolicy('plugin-policy', {
                 createScript: (_input) => {
-                    return `(async () => {
+                    return `return (async () => {
                         const risuFetch = globalThis.__pluginApis__.risuFetch
                         const nativeFetch = globalThis.__pluginApis__.nativeFetch
                         const getArg = globalThis.__pluginApis__.getArg
@@ -906,7 +926,10 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
             console.log('Loading V2.1 Plugin', plugin.name, data)
 
             try {
-                new Function(createRealScript(data))()
+                await waitForV2PluginInitialization(
+                    plugin.name,
+                    new Function(createRealScript(data))(),
+                )
             } catch (error) {
                 console.error(error)
             }

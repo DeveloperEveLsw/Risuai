@@ -96,14 +96,42 @@ export let requestTokenParts:{[key:string]:requestTokenPart[]} = {}
 export let previewFormated:OpenAIChat[] = []
 export let previewBody:string = ''
 
-export async function sendChat(chatProcessIndex = -1,arg:{
+export interface SendChatOptions {
     chatAdditonalTokens?:number,
     signal?:AbortSignal,
     continue?:boolean,
     usedContinueTokens?:number,
     preview?:boolean
     previewPrompt?:boolean
-} = {}):Promise<boolean> {
+}
+
+export type SendChatDelegate = (
+    chatProcessIndex: number,
+    options: SendChatOptions,
+) => Promise<boolean | null>
+
+let sendChatDelegate: SendChatDelegate | null = null
+
+/**
+ * Installs the Node multi-device boundary without making the upstream process
+ * engine import the server runtime. Returning null keeps the local upstream
+ * path (used for previews and by the resident executor itself).
+ */
+export function setSendChatDelegate(delegate: SendChatDelegate | null) {
+    sendChatDelegate = delegate
+}
+
+export async function sendChat(
+    chatProcessIndex = -1,
+    arg: SendChatOptions = {},
+):Promise<boolean> {
+
+    if(sendChatDelegate){
+        const delegated = await sendChatDelegate(chatProcessIndex, arg)
+        if(delegated !== null){
+            return delegated
+        }
+    }
 
     chatProcessStage.set(0)
     const abortSignal = arg.signal ?? (new AbortController()).signal

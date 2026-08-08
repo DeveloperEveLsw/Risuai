@@ -1,70 +1,107 @@
 # Server-resident RisuAI runtime
 
-This deployment runs the unmodified RisuAI browser application inside one
-persistent Chromium session on the server. Users attach to that session over
-the browser desktop at `https://SERVER:6002/` and may disconnect at any time.
-The RisuAI tab, its provider request, Lua VM, plugins, triggers, and output
-post-processing continue to run in the server container.
+## Entry points
 
-## Why the whole browser is resident
+This deployment has two views of the same upstream RisuAI build:
 
-Community content can depend on browser APIs, Lua callback ordering, plugin
-hooks, IndexedDB, Canvas, alerts, and undocumented combinations of them. A
-separate Node implementation of prompt building or output processing would
-inevitably drift from upstream. This deployment therefore uses the exact
-upstream bundle as its execution engine.
+- The normal public domain proxies host loopback port 6001. Each desktop or
+  mobile browser renders the upstream UI and uses the same-origin database,
+  generation, proxy-job, and WebSocket APIs.
+- `risuai-runtime` permanently opens
+  `http://risuai:6001/?risu-runtime=executor`. It owns the single global
+  generation lease and executes prompt assembly, Lua, plugins, provider calls,
+  post-processing, and saves after public browsers disconnect.
+- The full-runtime compatibility fallback exposes that Chromium desktop on
+  host port 6002 (`https://SERVER:6002/`). `/full` is only the mode name; no
+  literal `/full` route is installed on the public port. It is an
+  administrative/compatibility view, not the normal public UI.
+
+The public reverse proxy must preserve the same origin and WebSocket upgrades
+for `/api/sync/database/ws`, `/runtime-generations/*/ws`, and
+`/proxy-stream-jobs/*/ws`. Do not publish the Node application's port 6001
+directly to the LAN; Compose binds it to host loopback.
 
 ## Persistent state
 
-- `risuai-save` contains the upstream Node server's opaque RisuAI save and
-  assets. It remains the canonical application store.
-- `risuai-runtime-profile` contains Chromium's profile, the NodeStorage signing
-  key, plugin-local browser storage, and UI preferences.
-- The viewer browser only stores the remote-desktop site's ordinary cookies and
-  cache. It does not hold the RisuAI database.
+- `risuai-save` contains the canonical opaque RisuSave, assets, database
+  revision/conflict metadata, durable generation commands/events, raw proxy
+  jobs, the Node password, and trusted device public keys.
+- `risuai-runtime-profile` contains Chromium's profile, its Node authentication
+  key, resident-only browser/plugin storage, and UI preferences.
 
-Back up both Docker volumes together. Do not open the raw app from another
-browser and edit it concurrently: RisuAI's browser state is single-writer and a
-second page can overwrite newer state.
+Back up both volumes as one stopped-state set. A consistent example from the
+Compose directory is:
 
-## Start
+```bash
+backup_dir="$PWD/backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+docker compose stop
+trap 'docker compose start' EXIT
+docker run --rm -v risuai_risuai-save:/source:ro -v "$backup_dir":/backup alpine \
+  sh -c 'cd /source && tar -czf /backup/risuai-save.tgz .'
+docker run --rm -v risuai_risuai-runtime-profile:/source:ro -v "$backup_dir":/backup alpine \
+  sh -c 'cd /source && tar -czf /backup/risuai-runtime-profile.tgz .'
+tar -tzf "$backup_dir/risuai-save.tgz" >/dev/null
+tar -tzf "$backup_dir/risuai-runtime-profile.tgz" >/dev/null
+docker compose start
+trap - EXIT
+```
 
-1. Copy `.env.example` to `.env`, set a long random
-   `RISU_RUNTIME_PASSWORD`, and set `RISU_RUNTIME_BIND` to the server's LAN or
-   VPN address when remote access is required.
+Store a copy of `.env`, the deployed Git commit, and the application/browser
+image identifiers with the archives. Protect the archive because it contains
+provider credentials, chats, and authentication material.
+
+## Start and access
+
+1. Copy `.env.example` to `.env`. Set a long random
+   `RISU_RUNTIME_PASSWORD`. Bind port 6002 only to a trusted LAN/VPN address
+   when `/full` access is needed; the default is loopback.
 2. Run `docker compose up -d --build`.
-3. Open `https://SERVER:6002/`, accept the locally generated TLS certificate,
-   and sign in with `RISU_RUNTIME_USER` and `RISU_RUNTIME_PASSWORD`.
-4. On the first RisuAI launch, set its separate Node server password. The
-   browser profile and upstream trusted-key file preserve this login across
-   normal container recreation.
+3. Open the normal public domain. On a fresh volume the RisuAI Node password is
+   initialized, before listen, from `RISU_RUNTIME_PASSWORD`. Existing
+   `save/__password` values are never replaced. Each new desktop/mobile device
+   enters that Node password once so its public key can be trusted.
+4. If compatibility access is needed, open `https://SERVER:6002/` and sign in
+   with `RISU_RUNTIME_USER` and `RISU_RUNTIME_PASSWORD`. The fixed resident
+   enrolls its device key automatically through an executor-IP-only endpoint;
+   it does not receive a hidden first-launch password dialog. A V3 plugin whose
+   permission store is absent can still ask during plugin startup before the
+   command prompt bridge exists; resolve that startup permission from port
+   6002 if health does not become ready.
 
-Port 6001 is bound to host loopback only. The remote browser is the supported
-interactive entry point.
+The application and browser use fixed addresses configured by
+`RISU_APP_IPV4` and `RISU_BROWSER_IPV4` inside `RISU_RUNTIME_SUBNET`. The fixed
+browser address is also the executor allow-list. Change the subnet and both
+addresses together if the default overlaps a Docker, LAN, or VPN route.
 
-The browser container runs `server/runtime/wait-for-risuai.sh` before starting
-Chromium. This also covers Docker's host-reboot path, where restart policies do
-not guarantee the Compose `depends_on` startup order. If the app is unavailable,
-the browser waits instead of permanently opening Chromium's connection-error
-page. Readiness checks use a static asset so they do not continuously add root
-page access entries to the application log. Docker JSON logs for both services
-rotate at 10 MiB with three files retained per container.
+`server/runtime/wait-for-risuai.sh` delays Chromium until the app is ready,
+including after host reboot. Chromium's debugging endpoint is loopback-only
+inside the browser container. The internal HTTP app origin is treated as secure
+only in resident Chromium. Container JSON logs rotate at 10 MiB with three
+files each.
 
-The app and browser keep the private addresses configured by `RISU_APP_IPV4`
-and `RISU_BROWSER_IPV4` inside `RISU_RUNTIME_SUBNET`. Chromium can cache a Docker
-DNS answer beyond a container recreation, so the app's stable address is
-required for image updates that replace it while retaining the resident browser
-profile. Change the subnet and both addresses together if the default overlaps
-an existing Docker, LAN, or VPN route.
+## Health and recovery
 
-Chromium's debugging endpoint listens only on loopback inside its own container.
-It is used for health checks and deployment verification and is not published
-to the app container, host, or LAN. The internal `http://risuai:6001` origin is
-explicitly marked as a secure origin in the resident Chromium only; the raw app
-port remains bound to host loopback.
+Check both services first:
 
-For an administrative readiness check, run the application image as a one-off
-probe inside the browser container's network namespace:
+```sh
+docker compose ps
+docker compose logs --tail=200 risuai browser-runtime
+```
+
+The Chromium container becomes healthy only after its page is the
+`?risu-runtime=executor` target **and** that page has made an authenticated
+executor claim poll within the last ten seconds. A loaded logo or an open CDP
+port alone is not treated as readiness.
+
+After three consecutive readiness failures the health script sends TERM to the
+Chromium process. `RESTART_APP=true` asks the image supervisor to start a fresh
+Chromium process in the same persistent profile; Docker itself does not restart
+a container merely because it is unhealthy. Validate this image-specific
+supervisor behavior during every browser-image rollout by terminating Chromium
+once and observing a new process, executor claim polling, and healthy status.
+
+Verify the already-running resident page from its network namespace:
 
 ```sh
 docker run --rm \
@@ -74,31 +111,45 @@ docker run --rm \
   /app/server/node/runtimeProbe.cjs verify
 ```
 
-The probe container exits after the check and cannot make the debugging port
-reachable from outside the browser container. Verification performs a
-cache-bypassing fetch from inside the already-running RisuAI page, so it also
-detects a stale browser-side Docker DNS result after an app replacement.
+Closing a public page is safe. Restarting Chromium or expiring its lease marks
+the running generation `interrupted`; restarting Node also marks running proxy
+jobs interrupted. Neither is automatically reissued. Queued generation
+commands remain queued, and committed RisuSave revisions remain authoritative.
+After a process restart, inspect the public UI and retry only work explicitly
+reported as interrupted.
 
-## Runtime behavior and limits
+Retention is bounded in `risuai-save`: terminal proxy jobs default to 7 days
+after transport acknowledgement or 14 days without acknowledgement, with a
+2,000-job cap; terminal generation commands default to 30 days with a
+2,000-command cap. Proxy response spools are additionally limited to 256 MiB
+per job and 2 GiB in total. Age, count, and byte overrides are listed in
+`.env.example`.
 
-- Closing the viewer, changing local tabs, or shutting down the viewer device
-  does not stop a generation.
-- An upstream alert/input/select requested by content remains visible in the
-  resident session and waits until the user reconnects. It is not guessed or
-  skipped.
-- A Chromium crash, host reboot, or deliberate container restart can still
-  interrupt an in-flight JavaScript operation. Persisting jobs across process
-  crashes is a separate feature from surviving viewer disconnects.
-- Local file import/export and clipboard use the remote desktop's transfer
-  bridge. Microphone, WebGPU, and hardware-specific plugins remain constrained
-  by that bridge.
+Regular flat NodeStorage files are atomically replaced and subject to an 8 GiB
+default accounting cap plus a 1 GiB filesystem free-space reserve. The
+accounting includes database/auth files and flat assets, inlays, MCP payloads,
+V3 permissions, and backups; durable generation/proxy subdirectories have
+their own policies above. A rejected flat write returns HTTP 507 and must be
+treated as a storage-capacity failure, not retried indefinitely.
 
 ## Updating upstream
 
-Keep the fork's application code close to upstream `main`. Fast-forward or
-rebase this deployment commit onto the reviewed upstream revision, rebuild the
-`risuai` image, and then verify at least one Lua/trigger-heavy character before
-removing the prior image. Update `RISU_CHROMIUM_IMAGE` explicitly after
-reviewing a new browser image. The `depends_on.restart` relation makes an
-explicit Compose app update restart the browser service as well, preserving its
-profile but forcing the resident tab to load the newly built upstream bundle.
+1. Stop both services and back up both volumes, `.env`, the current Git commit,
+   and current image identifiers.
+2. Update the fork's upstream `main`, then rebase the custom runtime branch on
+   that reviewed commit. Resolve changes by preserving upstream UI markup and
+   keeping runtime integration at storage/generation boundaries.
+3. Run the server and browser test suites, Svelte checks, production build, and
+   `docker compose config` before deployment.
+4. Run `docker compose up -d --build`. The Compose dependency restart reloads
+   the resident page at `?risu-runtime=executor` so it cannot keep an older
+   cached bundle.
+5. Run the health probe and the multi-device acceptance checks in
+   `server/multidevice-runtime.md`. Keep the prior Git commit and images until a
+   Lua/plugin-heavy real character has passed.
+6. For a new Chromium image, terminate its Chromium process once and verify the
+   supervisor recreates it and the container returns healthy before accepting
+   the rollout.
+
+Update `RISU_CHROMIUM_IMAGE` only after reviewing and testing a new pinned
+browser image. Do not use an unattended floating browser tag.

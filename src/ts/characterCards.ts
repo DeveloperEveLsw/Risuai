@@ -19,6 +19,7 @@ import { exportModuleLegacy, readModule, type RisuModule } from "./process/modul
 import { readFile } from "@tauri-apps/plugin-fs"
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { AccountStorage } from "./storage/accountStorage"
+import { getNodeServerProxyAuth } from "./storage/nodeStorage"
 
 
 const EXTERNAL_HUB_URL = 'https://sv.risuai.xyz';
@@ -28,6 +29,15 @@ export const hubURL = isNodeServer
     : (window.location.hostname === 'nightly.risuai.xyz' || localStorage.getItem('hub') === 'nightly')
     ? NIGHTLY_HUB_URL 
     : EXTERNAL_HUB_URL;
+
+async function fetchHub(input: RequestInfo | URL, init: RequestInit = {}) {
+    if (!isNodeServer) {
+        return await fetch(input, init)
+    }
+    const headers = new Headers(init.headers)
+    headers.set('risu-auth', await getNodeServerProxyAuth())
+    return await fetch(input, { ...init, headers })
+}
 
 export async function importCharacter() {
     try {
@@ -393,7 +403,7 @@ export const getRealmInfo = async (realmPath:string) => {
     url.searchParams.delete('realm');
     window.history.pushState(null, '', url.toString());
 
-    const res = await fetch(`${hubURL}/hub/info/${realmPath}`)
+    const res = await fetchHub(`${hubURL}/hub/info/${realmPath}`)
     if(res.status !== 200){
         alertError(await res.text())
         return
@@ -1710,7 +1720,7 @@ export async function shareRisuHub2(char:character, arg:{
             return
         }
     
-        const fetchPromise = fetch(hubURL + '/hub/realm/upload', {
+        const fetchPromise = fetchHub(hubURL + '/hub/realm/upload', {
             method: "POST",
             body: writer.buf.buffer as any,
             headers: {
@@ -1778,7 +1788,7 @@ export async function getRisuHub(arg:{
         arg.search += ' __shared'
         const stringArg = `search==${arg.search}&&page==${arg.page}&&nsfw==${arg.nsfw}&&sort==${arg.sort}&&web==${(!isNodeServer && !isTauri) ? 'web' : 'other'}`
 
-        const da = await fetch(hubURL + '/realm/' + encodeURIComponent(stringArg) + "?cache=30", {
+        const da = await fetchHub(hubURL + '/realm/' + encodeURIComponent(stringArg) + "?cache=30", {
             headers: {
                 "x-risuai-info": appVer + ';' + (isNodeServer ? 'node' : (isTauri ? 'tauri' : 'web'))
             }
@@ -1870,7 +1880,7 @@ export async function downloadRisuHub(id:string, arg:{
 }
 
 export async function getHubResources(id:string) {
-    const res = await fetch(`${hubURL}/resource/${id}`)
+    const res = await fetchHub(`${hubURL}/resource/${id}`)
     if(res.status !== 200){
         throw (await res.text())
     }
