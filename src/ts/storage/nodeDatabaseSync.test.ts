@@ -127,6 +127,116 @@ describe('NodeDatabaseSync HTTP transport', () => {
         expect(sync.observedServerHead?.revision).toBe(5)
     })
 
+    it('uses X-Risu-ETag when a CDN weakens the standard representation ETag', async () => {
+        const strongReadEtag = `"risu-4-${sha0}"`
+        const strongCommitEtag = `"risu-5-${sha1}"`
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(new Response(Uint8Array.from([1, 2, 3]), {
+                status: 200,
+                headers: {
+                    ...responseHead(4, sha0, `W/${strongReadEtag}`),
+                    'X-Risu-ETag': strongReadEtag,
+                },
+            }))
+            .mockResolvedValueOnce(jsonResponse({
+                ok: true,
+                duplicate: true,
+                revision: 5,
+                sha256: sha1,
+                etag: strongCommitEtag,
+                currentRevision: 5,
+                currentSha256: sha1,
+                currentEtag: strongCommitEtag,
+            }, {
+                status: 200,
+                headers: {
+                    ...responseHead(5, sha1, `W/${strongCommitEtag}`),
+                    'X-Risu-ETag': strongCommitEtag,
+                },
+            }))
+        const sync = makeSync(fetchMock as unknown as typeof fetch)
+
+        await sync.read()
+        const committed = await sync.commit(Uint8Array.from([4, 5]))
+
+        const put = fetchMock.mock.calls[1][1] as RequestInit
+        expect((put.headers as Record<string, string>)['If-Match']).toBe(strongReadEtag)
+        expect(committed.duplicate).toBe(true)
+        expect(committed.etag).toBe(strongCommitEtag)
+        expect(sync.loadedSnapshotHead?.etag).toBe(strongCommitEtag)
+    })
+
+    it('falls back to a strong standard ETag from an older server', async () => {
+        const strongEtag = `"risu-2-${sha1}"`
+        const fetchMock = vi.fn().mockResolvedValueOnce(new Response(Uint8Array.from([1]), {
+            status: 200,
+            headers: responseHead(2, sha1, strongEtag),
+        }))
+        const sync = makeSync(fetchMock as unknown as typeof fetch)
+
+        await sync.read()
+
+        expect(sync.loadedSnapshotHead?.etag).toBe(strongEtag)
+    })
+
+    it.each([
+        {
+            name: 'a weak standard ETag without the canonical header',
+            headers: responseHead(2, sha1, `W/"risu-2-${sha1}"`),
+            label: 'ETag',
+        },
+        {
+            name: 'a weak canonical ETag even when the standard ETag is strong',
+            headers: {
+                ...responseHead(2, sha1),
+                'X-Risu-ETag': `W/"risu-2-${sha1}"`,
+            },
+            label: 'X-Risu-ETag',
+        },
+        {
+            name: 'a malformed canonical ETag even when the standard ETag is strong',
+            headers: {
+                ...responseHead(2, sha1),
+                'X-Risu-ETag': `risu-2-${sha1}`,
+            },
+            label: 'X-Risu-ETag',
+        },
+    ])('rejects $name', async ({ headers, label }) => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(new Response(Uint8Array.from([1]), {
+            status: 200,
+            headers,
+        }))
+        const sync = makeSync(fetchMock as unknown as typeof fetch)
+
+        await expect(sync.read()).rejects.toThrow(
+            new NodeDatabaseProtocolError(`${label} must be a strong ETag`),
+        )
+        expect(sync.loadedSnapshotHead).toBeNull()
+    })
+
+    it('rejects a weak ETag in a commit body even when the canonical header is strong', async () => {
+        const strongEtag = `"risu-3-${sha1}"`
+        const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({
+            ok: true,
+            duplicate: false,
+            revision: 3,
+            sha256: sha1,
+            etag: `W/${strongEtag}`,
+        }, {
+            status: 200,
+            headers: {
+                ...responseHead(3, sha1, `W/${strongEtag}`),
+                'X-Risu-ETag': strongEtag,
+            },
+        }))
+        const sync = makeSync(fetchMock as unknown as typeof fetch)
+
+        await expect(sync.commit(Uint8Array.from([1]))).rejects.toThrow(
+            new NodeDatabaseProtocolError('commit.etag must be a strong ETag'),
+        )
+        expect(sync.loadedSnapshotHead).toBeNull()
+    })
+
     it('does not promote a staged remote read to the CAS base until it is adopted', async () => {
         const fetchMock = vi.fn()
             .mockResolvedValueOnce(new Response(Uint8Array.from([1]), {

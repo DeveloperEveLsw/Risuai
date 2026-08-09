@@ -143,6 +143,17 @@ function requireString(value: unknown, label: string): string {
     return value
 }
 
+function requireStrongEtag(value: unknown, label: string): string {
+    const etag = requireString(value, label)
+    // Entity tags are opaque CAS tokens. Accept the RFC strong form only;
+    // notably, do not turn a proxy-generated weak validator back into a
+    // strong one by stripping its W/ prefix.
+    if (!/^"[\x21\x23-\x7e]*"$/.test(etag)) {
+        throw new NodeDatabaseProtocolError(`${label} must be a strong ETag`)
+    }
+    return etag
+}
+
 function requireRevision(value: unknown, label: string): number {
     if (!Number.isSafeInteger(value) || (value as number) < 0) {
         throw new NodeDatabaseProtocolError(`${label} must be a non-negative safe integer`)
@@ -166,10 +177,17 @@ function parseRevisionHeader(headers: Headers): number {
 }
 
 function parseHeadHeaders(headers: Headers): NodeDatabaseHead {
+    const canonicalEtag = headers.get('X-Risu-ETag')
     return {
         revision: parseRevisionHeader(headers),
         sha256: requireSha256(headers.get('X-Risu-Sha256'), 'X-Risu-Sha256'),
-        etag: requireString(headers.get('ETag'), 'ETag'),
+        // CDNs are allowed to weaken the representation ETag when they
+        // compress a response. X-Risu-ETag carries the unmodified CAS token.
+        // Older servers remain supported only when their standard ETag is
+        // already strong.
+        etag: canonicalEtag === null
+            ? requireStrongEtag(headers.get('ETag'), 'ETag')
+            : requireStrongEtag(canonicalEtag, 'X-Risu-ETag'),
     }
 }
 
@@ -177,7 +195,7 @@ function parseHeadRecord(value: Record<string, unknown>, label: string): NodeDat
     return {
         revision: requireRevision(value.revision, `${label}.revision`),
         sha256: requireSha256(value.sha256, `${label}.sha256`),
-        etag: requireString(value.etag, `${label}.etag`),
+        etag: requireStrongEtag(value.etag, `${label}.etag`),
     }
 }
 

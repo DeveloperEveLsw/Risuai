@@ -1934,9 +1934,10 @@ app.post('/api/set_password', async (req, res) => {
 
 function setDatabaseRevisionHeaders(res, value) {
     res.setHeader('ETag', value.etag);
+    res.setHeader('X-Risu-ETag', value.etag);
     res.setHeader('X-Risu-Revision', String(value.revision));
     res.setHeader('X-Risu-Sha256', value.sha256);
-    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Cache-Control', 'no-store, no-transform');
 }
 
 function parseDatabaseRevisionHeader(value) {

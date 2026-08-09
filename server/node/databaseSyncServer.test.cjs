@@ -188,6 +188,14 @@ function createMessageCollector(ws) {
     };
 }
 
+function assertDatabaseHeadHeaders(response, expected) {
+    assert.equal(response.headers.get('cache-control'), 'no-store, no-transform');
+    assert.equal(response.headers.get('x-risu-revision'), String(expected.revision));
+    assert.equal(response.headers.get('x-risu-sha256'), expected.sha256);
+    assert.equal(response.headers.get('etag'), expected.etag);
+    assert.equal(response.headers.get('x-risu-etag'), expected.etag);
+}
+
 async function expectTicketRejection(url) {
     await new Promise((resolve, reject) => {
         const ws = new WebSocket(url);
@@ -230,10 +238,15 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
         headers: authHeaders,
     });
     assert.equal(initialResponse.status, 200);
-    assert.equal(initialResponse.headers.get('cache-control'), 'no-store');
-    assert.equal(initialResponse.headers.get('x-risu-revision'), '0');
     const initialEtag = initialResponse.headers.get('etag');
     assert.match(initialEtag, /^"risu-0-[a-f0-9]{64}"$/);
+    const initialHead = {
+        revision: 0,
+        sha256: initialResponse.headers.get('x-risu-sha256'),
+        etag: initialEtag,
+    };
+    assert.match(initialHead.sha256, /^[a-f0-9]{64}$/);
+    assertDatabaseHeadHeaders(initialResponse, initialHead);
     assert.deepEqual(Buffer.from(await initialResponse.arrayBuffer()), initialData);
 
     const ticketResponse = await fetch(`${fixture.baseUrl}/api/sync/socket-ticket`, {
@@ -276,10 +289,10 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
         body: committedData,
     });
     assert.equal(commitResponse.status, 200);
-    assert.equal(commitResponse.headers.get('x-risu-revision'), '1');
     const committed = await commitResponse.json();
     assert.equal(committed.ok, true);
     assert.equal(committed.duplicate, false);
+    assertDatabaseHeadHeaders(commitResponse, committed);
     const committedEvent = await committedMessagePromise;
     assert.equal(committedEvent.revision, 1);
     assert.equal(committedEvent.clientId, 'desktop-browser');
@@ -300,6 +313,7 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
     assert.equal(secondResponse.status, 200);
     const second = await secondResponse.json();
     assert.equal(second.revision, 2);
+    assertDatabaseHeadHeaders(secondResponse, second);
 
     const duplicateResponse = await fetch(`${fixture.baseUrl}/api/sync/database`, {
         method: 'PUT',
@@ -312,9 +326,6 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
         body: committedData,
     });
     assert.equal(duplicateResponse.status, 200);
-    assert.equal(duplicateResponse.headers.get('x-risu-revision'), '2');
-    assert.equal(duplicateResponse.headers.get('etag'), second.etag);
-    assert.equal(duplicateResponse.headers.get('x-risu-sha256'), second.sha256);
     const duplicate = await duplicateResponse.json();
     assert.equal(duplicate.duplicate, true);
     assert.equal(duplicate.revision, 1, 'body retains the originally accepted commit');
@@ -323,6 +334,11 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
     assert.equal(duplicate.currentRevision, 2);
     assert.equal(duplicate.currentSha256, second.sha256);
     assert.equal(duplicate.currentEtag, second.etag);
+    assertDatabaseHeadHeaders(duplicateResponse, {
+        revision: duplicate.currentRevision,
+        sha256: duplicate.currentSha256,
+        etag: duplicate.currentEtag,
+    });
 
     const staleData = Buffer.from([7, 0, 7, 1, 9]);
     const staleResponse = await fetch(`${fixture.baseUrl}/api/sync/database`, {
@@ -336,10 +352,10 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
         body: staleData,
     });
     assert.equal(staleResponse.status, 409);
-    assert.equal(staleResponse.headers.get('x-risu-revision'), '2');
     const stale = await staleResponse.json();
     assert.equal(stale.reason, 'stale_base');
     assert.ok(stale.conflictId);
+    assertDatabaseHeadHeaders(staleResponse, stale);
 
     const conflictsResponse = await fetch(
         `${fixture.baseUrl}/api/sync/database/conflicts`,
@@ -360,7 +376,7 @@ test('database sync HTTP and WebSocket endpoints enforce CAS and preserve confli
     const finalResponse = await fetch(`${fixture.baseUrl}/api/sync/database`, {
         headers: authHeaders,
     });
-    assert.equal(finalResponse.headers.get('x-risu-revision'), '2');
+    assertDatabaseHeadHeaders(finalResponse, second);
     assert.deepEqual(Buffer.from(await finalResponse.arrayBuffer()), secondData);
     ws.close();
     await once(ws, 'close');
