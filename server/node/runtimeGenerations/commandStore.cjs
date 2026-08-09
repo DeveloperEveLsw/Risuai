@@ -39,6 +39,7 @@ const LIFECYCLE_EVENT_TYPES = new Set([
 ]);
 const UI_PROMPT_EVENT_TYPE = 'ui_prompt';
 const UI_PROMPT_RESPONSE_EVENT_TYPE = 'ui_prompt_response';
+const INPUT_COMMITTED_EVENT_TYPE = 'input_committed';
 const UI_PROMPT_EVENT_TYPES = new Set([
     UI_PROMPT_EVENT_TYPE,
     UI_PROMPT_RESPONSE_EVENT_TYPE,
@@ -494,51 +495,114 @@ class RuntimeGenerationStore {
                 };
             }
 
-            const id = this.idFactory();
-            assertSafeCommandId(id);
-            if (this.commands.has(id)) {
-                throw new RuntimeGenerationStoreError(
-                    `Generated duplicate command id: ${id}`,
-                    'DUPLICATE_COMMAND_ID',
-                    { commandId: id },
-                );
+            const command = await this.#createCommandLocked(input);
+            return { created: true, command: cloneJson(command) };
+        });
+    }
+
+    /** Linearize Stop against an ambiguous create by the idempotency key and
+     * full request hash. If cancellation wins before create, persist a terminal
+     * command immediately; a delayed create can then only reuse that record and
+     * can never become claimable. */
+    async cancelByRequest(input, details = {}) {
+        return await this.#exclusive(async () => {
+            this.#assertOpen();
+            assertNonEmptyString(input?.requestId, 'requestId');
+            assertNonEmptyString(input?.requestHash, 'requestHash');
+            assertNonEmptyString(input?.action, 'action', 128);
+            const normalizedDetails = cloneJsonObject(details, 'cancellation details', {});
+
+            const existing = this.requestIndex.get(input.requestId);
+            if (existing) {
+                if (existing.requestHash !== input.requestHash) {
+                    throw new IdempotencyConflictError(input.requestId, existing.commandId);
+                }
+                const command = this.#requireCommand(existing.commandId);
+                const previousLastSequence = command.lastSequence;
+                await this.#cancelCommandLocked(command, normalizedDetails, this.now());
+                return cloneJson({
+                    created: false,
+                    previousLastSequence,
+                    command,
+                });
             }
 
-            const timestamp = this.now();
-            const command = {
-                schemaVersion: COMMAND_SCHEMA_VERSION,
-                id,
-                requestId: input.requestId,
-                requestHash: input.requestHash,
-                action: input.action,
-                characterId: normalizeOptionalId(input.characterId, 'characterId'),
-                chatId: normalizeOptionalId(input.chatId, 'chatId'),
-                payload: cloneJsonObject(input.payload, 'payload', {}),
-                state: 'queued',
-                attempt: 0,
-                executorId: null,
-                fencingToken: null,
-                leaseExpiresAt: null,
-                result: null,
-                error: null,
-                createdAt: timestamp,
-                updatedAt: timestamp,
-                startedAt: null,
-                finishedAt: null,
-                interruptedAt: null,
-                cancelRequestedAt: null,
-                lastSequence: 0,
-            };
-
-            const paths = this.#commandPaths(id);
-            await this.#ensureSecureDirectory(paths.directory, { mustNotExist: true });
-            await this.#ensureSecureEventFile(paths.events);
-            await this.#writeCommandMetadataAtomic(paths, command);
-            this.commands.set(id, command);
-            this.requestIndex.set(command.requestId, {
-                commandId: id,
-                requestHash: command.requestHash,
+            const command = await this.#createCommandLocked(input, {
+                cancelled: true,
+                cancellationDetails: normalizedDetails,
             });
+            return cloneJson({
+                created: true,
+                previousLastSequence: 0,
+                command,
+            });
+        });
+    }
+
+    async #createCommandLocked(input, options = {}) {
+        const id = this.idFactory();
+        assertSafeCommandId(id);
+        if (this.commands.has(id)) {
+            throw new RuntimeGenerationStoreError(
+                `Generated duplicate command id: ${id}`,
+                'DUPLICATE_COMMAND_ID',
+                { commandId: id },
+            );
+        }
+
+        const timestamp = this.now();
+        const initiallyCancelled = options.cancelled === true;
+        const command = {
+            schemaVersion: COMMAND_SCHEMA_VERSION,
+            id,
+            requestId: input.requestId,
+            requestHash: input.requestHash,
+            action: input.action,
+            characterId: normalizeOptionalId(input.characterId, 'characterId'),
+            chatId: normalizeOptionalId(input.chatId, 'chatId'),
+            payload: cloneJsonObject(input.payload, 'payload', {}),
+            state: initiallyCancelled ? 'cancelled' : 'queued',
+            attempt: 0,
+            executorId: null,
+            fencingToken: null,
+            leaseExpiresAt: null,
+            result: null,
+            error: null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            startedAt: null,
+            finishedAt: initiallyCancelled ? timestamp : null,
+            interruptedAt: null,
+            cancelRequestedAt: initiallyCancelled ? timestamp : null,
+            lastSequence: 0,
+        };
+
+        const paths = this.#commandPaths(id);
+        await this.#ensureSecureDirectory(paths.directory, { mustNotExist: true });
+        await this.#ensureSecureEventFile(paths.events);
+        // For cancel-before-create, terminal metadata reaches disk before its
+        // event. A crash at any following point therefore cannot resurrect a
+        // queued command. The synthetic record intentionally starts with one
+        // cancelled event instead of a transient created/queued event.
+        await this.#writeCommandMetadataAtomic(paths, command);
+        this.commands.set(id, command);
+        this.requestIndex.set(command.requestId, {
+            commandId: id,
+            requestHash: command.requestHash,
+        });
+        if (initiallyCancelled) {
+            await this.#appendEventLocked(command, 'cancelled', {
+                ...cloneJsonObject(
+                    options.cancellationDetails,
+                    'cancellation details',
+                    {},
+                ),
+                state: 'cancelled',
+                previousState: 'unadmitted',
+                result: null,
+            }, timestamp);
+        }
+        else {
             await this.#appendEventLocked(command, 'created', {
                 state: 'queued',
                 requestId: command.requestId,
@@ -547,9 +611,8 @@ class RuntimeGenerationStore {
                 characterId: command.characterId,
                 chatId: command.chatId,
             }, timestamp);
-
-            return { created: true, command: cloneJson(command) };
-        });
+        }
+        return command;
     }
 
     async get(commandId) {
@@ -896,7 +959,9 @@ class RuntimeGenerationStore {
             this.#assertOpen();
             const credential = normalizeLeaseCredential(credentialInput);
             assertNonEmptyString(type, 'event.type', 128);
-            if (LIFECYCLE_EVENT_TYPES.has(type) || UI_PROMPT_EVENT_TYPES.has(type)) {
+            if (LIFECYCLE_EVENT_TYPES.has(type)
+                || UI_PROMPT_EVENT_TYPES.has(type)
+                || type === INPUT_COMMITTED_EVENT_TYPE) {
                 throw new TypeError(`Event type ${type} is reserved for runtime protocol operations`);
             }
             const normalizedPayload = cloneJsonObject(payload, 'event payload', {});
@@ -906,6 +971,71 @@ class RuntimeGenerationStore {
                 throw new InvalidCommandStateError(command.id, command.state, 'append progress to');
             }
             return cloneJson(await this.#appendEventLocked(command, type, normalizedPayload, timestamp));
+        });
+    }
+
+    /** Persist the canonical user-message barrier exactly once. Unlike normal
+     * progress this fact may be recorded after cancel_requested: the resident
+     * already committed the input, and followers still need that durable fact
+     * to avoid restoring or displaying a duplicate optimistic draft. */
+    async recordInputCommitted(commandId, credentialInput, payload) {
+        return await this.#exclusive(async () => {
+            this.#assertOpen();
+            const credential = normalizeLeaseCredential(credentialInput);
+            const normalizedPayload = cloneJsonObject(payload, 'input committed payload');
+            if (!Number.isSafeInteger(normalizedPayload.databaseRevision)
+                || normalizedPayload.databaseRevision < 0) {
+                throw new TypeError('databaseRevision must be a non-negative safe integer');
+            }
+            if (!Number.isSafeInteger(normalizedPayload.messageIndex)
+                || normalizedPayload.messageIndex < 0) {
+                throw new TypeError('messageIndex must be a non-negative safe integer');
+            }
+            assertNonEmptyString(normalizedPayload.messageId, 'messageId', 512);
+            if (Object.keys(normalizedPayload).some((key) => (
+                !['databaseRevision', 'messageIndex', 'messageId'].includes(key)
+            ))) {
+                throw new TypeError('input committed payload contains unsupported fields');
+            }
+
+            const timestamp = this.now();
+            const { command } = this.#requireCurrentLease(commandId, credential, timestamp);
+            if (command.action !== 'send' && command.action !== 'continue') {
+                throw new TypeError('input_committed is only valid for send or continue commands');
+            }
+            if (normalizedPayload.messageId !== command.requestId) {
+                throw new TypeError('input_committed messageId must equal the command requestId');
+            }
+            const baseRevision = command.payload?.databaseRevision;
+            if (Number.isSafeInteger(baseRevision)
+                && normalizedPayload.databaseRevision <= baseRevision) {
+                throw new TypeError('input_committed must advance the command database revision');
+            }
+            const events = await this.#readEvents(this.#commandPaths(command.id), {
+                repairTrailingRecord: false,
+            });
+            if (!events.some((event) => event.type === 'execution_started')) {
+                throw new InvalidCommandStateError(command.id, command.state, 'commit input before execution starts for');
+            }
+            const existing = events.find((event) => event.type === INPUT_COMMITTED_EVENT_TYPE);
+            if (existing) {
+                if (canonicalJsonStringify(existing.payload)
+                    !== canonicalJsonStringify(normalizedPayload)) {
+                    throw new RuntimeGenerationStoreError(
+                        `Canonical input for command ${commandId} conflicts with its existing marker`,
+                        'INPUT_COMMIT_CONFLICT',
+                        { commandId, statusCode: 409 },
+                    );
+                }
+                return { created: false, record: cloneJson(existing) };
+            }
+            const record = await this.#appendEventLocked(
+                command,
+                INPUT_COMMITTED_EVENT_TYPE,
+                normalizedPayload,
+                timestamp,
+            );
+            return { created: true, record: cloneJson(record) };
         });
     }
 
@@ -1075,41 +1205,45 @@ class RuntimeGenerationStore {
         return await this.#exclusive(async () => {
             this.#assertOpen();
             const normalizedDetails = cloneJsonObject(details, 'cancellation details', {});
-            const timestamp = this.now();
             const command = this.#requireCommand(commandId);
-            if (command.state === 'cancelled' || TERMINAL_COMMAND_STATES.has(command.state)) {
-                return cloneJson(command);
-            }
-            if (command.state !== 'queued' && command.state !== 'running') {
-                throw new InvalidCommandStateError(command.id, command.state, 'cancel');
-            }
-
-            if (command.state === 'running') {
-                if (command.cancelRequestedAt !== null) {
-                    return cloneJson(command);
-                }
-                command.cancelRequestedAt = timestamp;
-                await this.#appendEventLocked(command, 'cancel_requested', {
-                    ...normalizedDetails,
-                    state: 'running',
-                }, timestamp);
-                return cloneJson(command);
-            }
-
-            command.state = 'cancelled';
-            command.cancelRequestedAt = timestamp;
-            command.finishedAt = timestamp;
-            command.executorId = null;
-            command.fencingToken = null;
-            command.leaseExpiresAt = null;
-            await this.#appendEventLocked(command, 'cancelled', {
-                ...normalizedDetails,
-                state: 'cancelled',
-                previousState: 'queued',
-                result: null,
-            }, timestamp);
+            await this.#cancelCommandLocked(command, normalizedDetails, this.now());
             return cloneJson(command);
         });
+    }
+
+    async #cancelCommandLocked(command, normalizedDetails, timestamp) {
+        if (command.state === 'cancelled' || TERMINAL_COMMAND_STATES.has(command.state)) {
+            return command;
+        }
+        if (command.state !== 'queued' && command.state !== 'running') {
+            throw new InvalidCommandStateError(command.id, command.state, 'cancel');
+        }
+
+        if (command.state === 'running') {
+            if (command.cancelRequestedAt !== null) {
+                return command;
+            }
+            command.cancelRequestedAt = timestamp;
+            await this.#appendEventLocked(command, 'cancel_requested', {
+                ...normalizedDetails,
+                state: 'running',
+            }, timestamp);
+            return command;
+        }
+
+        command.state = 'cancelled';
+        command.cancelRequestedAt = timestamp;
+        command.finishedAt = timestamp;
+        command.executorId = null;
+        command.fencingToken = null;
+        command.leaseExpiresAt = null;
+        await this.#appendEventLocked(command, 'cancelled', {
+            ...normalizedDetails,
+            state: 'cancelled',
+            previousState: 'queued',
+            result: null,
+        }, timestamp);
+        return command;
     }
 
     async completeCancellation(commandId, credentialInput, result = {}) {
@@ -1171,9 +1305,22 @@ class RuntimeGenerationStore {
         const previousState = command.state;
         const executorId = command.executorId;
         const fencingToken = command.fencingToken;
+        const events = await this.#readEvents(this.#commandPaths(command.id), {
+            repairTrailingRecord: false,
+        });
+        const inputCommit = events.find((event) => event.type === INPUT_COMMITTED_EVENT_TYPE);
+        const result = inputCommit
+            ? {
+                databaseRevision: inputCommit.payload.databaseRevision,
+                canonicalMutationPersisted: true,
+                messageIndex: inputCommit.payload.messageIndex,
+                messageId: inputCommit.payload.messageId,
+            }
+            : null;
         command.state = 'interrupted';
         command.interruptedAt = timestamp;
         command.finishedAt = timestamp;
+        command.result = result;
         command.executorId = null;
         command.fencingToken = null;
         command.leaseExpiresAt = null;
@@ -1182,6 +1329,7 @@ class RuntimeGenerationStore {
             state: 'interrupted',
             previousState,
             reason,
+            result,
             executorId,
             fencingToken,
         }, timestamp);
@@ -1366,6 +1514,9 @@ class RuntimeGenerationStore {
         }
         if (event.type === 'interrupted') {
             command.interruptedAt = event.timestamp;
+            command.result = event.payload.result === null
+                ? null
+                : cloneJson(event.payload.result ?? null);
         }
     }
 

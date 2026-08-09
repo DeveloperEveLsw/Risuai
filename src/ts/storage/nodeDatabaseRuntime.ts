@@ -12,6 +12,19 @@ import type {
 interface RuntimeChat {
     id?: string
     isStreaming?: boolean
+    message?: RuntimeMessage[]
+}
+
+interface RuntimeMessage {
+    role?: string
+    data?: string
+    __risuRuntimeOptimisticId?: string
+}
+
+function isRuntimeOptimisticMessage(message: RuntimeMessage): boolean {
+    return message !== null
+        && typeof message === 'object'
+        && Object.prototype.hasOwnProperty.call(message, '__risuRuntimeOptimisticId')
 }
 
 interface RuntimeCharacter {
@@ -311,6 +324,16 @@ export class NodeDatabaseRuntime<TDatabase extends RuntimeDatabase> {
      */
     makeCanonicalSnapshot(database: TDatabase): TDatabase {
         for (const character of database.characters ?? []) {
+            for (const chat of character?.chats ?? []) {
+                if (!chat?.message?.some(isRuntimeOptimisticMessage)) {
+                    continue
+                }
+                // The caller supplies a detached database snapshot. Replace the
+                // snapshot array rather than touching the live browser database,
+                // and discard the whole presentation-only message rather than
+                // merely stripping its marker and persisting a duplicate.
+                chat.message = chat.message.filter((message) => !isRuntimeOptimisticMessage(message))
+            }
             const characterId = character?.chaId
             if (!characterId) {
                 continue

@@ -39,6 +39,36 @@ export interface RuntimeGenerationEvent {
     payload: Record<string, unknown>
 }
 
+export interface RuntimeCanonicalInputCommit {
+    databaseRevision: number
+    messageIndex: number
+    messageId: string
+}
+
+export function canonicalInputCommitFromEvent(
+    event: RuntimeGenerationEvent,
+): RuntimeCanonicalInputCommit | null {
+    if (event.eventType !== 'input_committed') {
+        return null
+    }
+    const { databaseRevision, messageIndex, messageId } = event.payload
+    if (
+        !Number.isSafeInteger(databaseRevision)
+        || (databaseRevision as number) < 0
+        || !Number.isSafeInteger(messageIndex)
+        || (messageIndex as number) < 0
+        || typeof messageId !== 'string'
+        || messageId.length === 0
+    ) {
+        throw new Error('Malformed input_committed runtime generation event')
+    }
+    return {
+        databaseRevision: databaseRevision as number,
+        messageIndex: messageIndex as number,
+        messageId,
+    }
+}
+
 export interface RuntimeGenerationSnapshot extends RuntimeGenerationCommand {
     type: 'generation_snapshot'
     clientId: string
@@ -125,6 +155,51 @@ const terminalStates = new Set<RuntimeGenerationState>([
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function sortJsonValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(sortJsonValue)
+    }
+    if (isRecord(value)) {
+        return Object.fromEntries(
+            Object.keys(value)
+                .sort()
+                .map((key) => [key, sortJsonValue(value[key])]),
+        )
+    }
+    return value
+}
+
+function canonicalJson(value: unknown) {
+    return JSON.stringify(sortJsonValue(JSON.parse(JSON.stringify(value))))
+}
+
+function jsonEquivalent(left: unknown, right: unknown) {
+    return canonicalJson(left) === canonicalJson(right)
+}
+
+function withExpectedRuntimeGenerationPayload(
+    command: RuntimeGenerationCommand,
+    input: RuntimeGenerationCreateInput,
+    requestId: string,
+    payload: Record<string, unknown>,
+    requireResponsePayload = false,
+) {
+    if (
+        command.requestId !== requestId
+        || command.action !== input.action
+        || command.characterId !== input.characterId
+        || command.chatId !== input.chatId
+        || (requireResponsePayload && command.payload === undefined)
+        || (command.payload !== undefined && !jsonEquivalent(command.payload, payload))
+    ) {
+        throw new Error(`requestId ${requestId} resolved to a different runtime generation request`)
+    }
+    return {
+        ...command,
+        payload,
+    }
 }
 
 function asCommand(value: unknown): RuntimeGenerationCommand {
@@ -238,6 +313,16 @@ class RuntimeGenerationTransportError extends Error {
     }
 }
 
+function isRetryableRuntimeAdmissionHttpError(error: unknown) {
+    return error instanceof RuntimeGenerationHttpError
+        && (
+            error.status === 408
+            || error.status === 425
+            || error.status === 429
+            || error.status >= 500
+        )
+}
+
 export class RuntimeGenerationClient {
     private readonly getAuth: () => Promise<string>
     private readonly fetchImpl: typeof fetch
@@ -261,6 +346,7 @@ export class RuntimeGenerationClient {
     ): Promise<RuntimeGenerationCommand> {
         const requestId = input.requestId ?? this.cryptoImpl.randomUUID()
         const prepared = prepareRuntimeGenerationCreate(input, requestId)
+        const serializedPayload = (JSON.parse(prepared.body) as { payload: Record<string, unknown> }).payload
         // Fetch keepalive has a browser-wide 64 KiB request-body quota. It is
         // valuable for ordinary sends that may be followed immediately by a
         // navigation, but forcing it on a long prompt makes fetch throw before
@@ -273,30 +359,62 @@ export class RuntimeGenerationClient {
             headers: { 'Idempotency-Key': requestId },
             body: prepared.body,
         }
-        while (true) {
-            try {
-                return asCommand(await this.request('/runtime-generations', init))
-            }
-            catch (error) {
-                if (signal?.aborted) {
-                    throw runtimeAbortError(signal)
+        try {
+            while (true) {
+                try {
+                    if (signal?.aborted) {
+                        throw runtimeAbortError(signal)
+                    }
+                    const command = asCommand(await this.request('/runtime-generations', init))
+                    // POST intentionally omits payload from its public response.
+                    // Preserve the exact serialized envelope locally so crash
+                    // fallback and cross-device overlay observation retain the
+                    // command's canonical base revision.
+                    return withExpectedRuntimeGenerationPayload(
+                        command,
+                        input,
+                        requestId,
+                        serializedPayload,
+                    )
                 }
-                if (!(error instanceof RuntimeGenerationTransportError)) {
-                    throw error
+                catch (error) {
+                    if (signal?.aborted) {
+                        throw runtimeAbortError(signal)
+                    }
+                    if (
+                        !(error instanceof RuntimeGenerationTransportError)
+                        && !isRetryableRuntimeAdmissionHttpError(error)
+                    ) {
+                        throw error
+                    }
+                    await retryDelay(this.reconnectDelayMs, signal)
                 }
-                await retryDelay(this.reconnectDelayMs, signal)
             }
+        }
+        catch (error) {
+            if (!signal?.aborted) {
+                throw error
+            }
+
+            // Fetch abort cannot prove that the origin rejected POST. Stop is
+            // linearized by the same full idempotency envelope: the server
+            // either cancels the command that won create, or durably records a
+            // terminal cancellation that a delayed create can only reuse.
+            return await this.cancelByRequest({ ...input, requestId })
         }
     }
 
-    async get(commandId: string): Promise<RuntimeGenerationCommand> {
-        return asCommand(await this.request(`/runtime-generations/${encodeURIComponent(commandId)}`))
+    async get(commandId: string, signal?: AbortSignal): Promise<RuntimeGenerationCommand> {
+        return asCommand(await this.request(
+            `/runtime-generations/${encodeURIComponent(commandId)}`,
+            signal ? { signal } : {},
+        ))
     }
 
     async list(query: Partial<Pick<RuntimeGenerationCommand, 'state' | 'requestId' | 'action' | 'characterId' | 'chatId'>> & {
         updatedAfter?: number
         limit?: number
-    } = {}) {
+    } = {}, signal?: AbortSignal) {
         const url = new URL('/runtime-generations', 'http://runtime.invalid')
         for (const [key, value] of Object.entries(query)) {
             if (typeof value === 'string') {
@@ -306,11 +424,56 @@ export class RuntimeGenerationClient {
                 url.searchParams.set(key, String(value))
             }
         }
-        const body = await this.request(`${url.pathname}${url.search}`)
+        const body = await this.request(
+            `${url.pathname}${url.search}`,
+            signal ? { signal } : {},
+        )
         if (!isRecord(body) || !Array.isArray(body.commands)) {
             throw new Error('Malformed runtime generation list response')
         }
         return body.commands.map(asCommand)
+    }
+
+    async cancelByRequest(
+        input: RuntimeGenerationCreateInput & { requestId: string },
+    ): Promise<RuntimeGenerationCommand> {
+        const prepared = prepareRuntimeGenerationCreate(input, input.requestId)
+        const serializedPayload = (JSON.parse(prepared.body) as { payload: Record<string, unknown> }).payload
+        const init: RequestInit = {
+            method: 'DELETE',
+            ...(prepared.keepaliveSafe ? { keepalive: true } : {}),
+            headers: { 'Idempotency-Key': input.requestId },
+            body: prepared.body,
+        }
+        const path = `/runtime-generations/by-request/${encodeURIComponent(input.requestId)}`
+        while (true) {
+            try {
+                const body = await this.request(path, init)
+                if (
+                    !isRecord(body)
+                    || body.success !== true
+                    || typeof body.created !== 'boolean'
+                ) {
+                    throw new Error('Malformed runtime generation request cancellation response')
+                }
+                return withExpectedRuntimeGenerationPayload(
+                    asCommand(body.command),
+                    input,
+                    input.requestId,
+                    serializedPayload,
+                    true,
+                )
+            }
+            catch (error) {
+                if (
+                    !(error instanceof RuntimeGenerationTransportError)
+                    && !isRetryableRuntimeAdmissionHttpError(error)
+                ) {
+                    throw error
+                }
+                await retryDelay(this.reconnectDelayMs)
+            }
+        }
     }
 
     async cancel(commandId: string): Promise<RuntimeGenerationCommand> {
@@ -451,13 +614,20 @@ export class RuntimeGenerationClient {
                 return await this.executorTerminalRequest(commandId, 'progress', lease, body, signal)
             }
             catch (error) {
-                // UI prompt IDs make issuance idempotent in the durable store;
-                // retrying an ambiguous response avoids failing generation
-                // after observers have already seen the committed prompt.
+                // UI prompt IDs and the command-scoped input commit make these
+                // writes idempotent in the durable store. Retrying an ambiguous
+                // response avoids failing generation after observers have
+                // already seen the committed protocol event.
                 if (signal?.aborted) {
                     throw runtimeAbortError(signal)
                 }
-                if (eventType !== 'ui_prompt' || !(error instanceof RuntimeGenerationTransportError)) {
+                if (
+                    (
+                        eventType !== 'ui_prompt'
+                        && eventType !== 'input_committed'
+                    )
+                    || !(error instanceof RuntimeGenerationTransportError)
+                ) {
                     throw error
                 }
                 await retryDelay(this.reconnectDelayMs, signal)

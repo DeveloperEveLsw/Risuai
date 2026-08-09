@@ -6,6 +6,7 @@
     import { createSimpleCharacter, DBState, selectedCharID, ReloadChatPointer } from 'src/ts/stores.svelte';
     import { chatFoldedStateMessageIndex } from 'src/ts/globalApi.svelte';
     import { get } from 'svelte/store';
+    import type { RuntimeChatPresentationOverlay } from 'src/ts/runtime/chatPresentationOverlay.svelte';
     
     const getCurrentChatRoomId = () => {
         const charId = get(selectedCharID);
@@ -24,6 +25,7 @@
         userIcon,
         loadPages,
         userIconPortrait,
+        presentationOverlays = [],
         hasNewUnreadMessage = $bindable(false)
     }:{
         messages: Message[]
@@ -34,6 +36,7 @@
         userIcon: string
         loadPages: number
         userIconPortrait?: boolean
+        presentationOverlays?: readonly RuntimeChatPresentationOverlay[]
         hasNewUnreadMessage?: boolean
     } = $props();
 
@@ -72,8 +75,29 @@
         const charImage = getCharImage(currentCharacter.image, 'css')
         const userImage = getCharImage(userIcon, 'css')
         const simpleChar = createSimpleCharacter(currentCharacter);
-        let loadStart = messages.length - 1
-        let loadEnd = messages.length - loadPages
+        const displayEntries = [
+            ...messages.map((message, canonicalIndex) => ({
+                message,
+                canonicalIndex,
+                overlay: null as RuntimeChatPresentationOverlay | null,
+            })),
+            ...[...presentationOverlays]
+                .sort((left, right) => (
+                    left.createdAt - right.createdAt
+                    || left.requestId.localeCompare(right.requestId)
+                ))
+                .map((overlay) => ({
+                message: {
+                    role: 'user',
+                    data: overlay.displayText,
+                    time: overlay.createdAt,
+                } as Message,
+                canonicalIndex: -1,
+                overlay,
+            })),
+        ]
+        let loadStart = displayEntries.length - 1
+        let loadEnd = displayEntries.length - loadPages
         const currentChat = currentCharacter.chats?.[currentCharacter.chatPage]
         const configuredPerformanceMode = DBState.db.streamingDisplayOptimizationMode ?? 'off';
         const performanceMode = currentChat?.isStreaming
@@ -92,30 +116,43 @@
 
         for(let i=loadStart ; i >= loadEnd; i--){
             if(i < 0) break; // Prevent out of bounds
-            const message = messages[i];
+            const entry = displayEntries[i];
+            const message = entry.message;
+            const canonicalIndex = entry.canonicalIndex;
+            const readOnlyPresentation = entry.overlay !== null;
             const messageLargePortrait = message.role === 'user' ? (userIconPortrait ?? false) : ((currentCharacter as character).largePortrait ?? false);
-            const reloadPointer = reloadPointerMap[i] ?? 0;
-            const activeStreamingMessage = i === activeStreamingIndex && message.role === 'char';
+            const reloadPointer = canonicalIndex >= 0 ? (reloadPointerMap[canonicalIndex] ?? 0) : 0;
+            const activeStreamingMessage = canonicalIndex === activeStreamingIndex && message.role === 'char';
             const hashMessageData = activeStreamingMessage ? '' : message.data;
-            let hashd = hashMessageData + (message.chatId ?? '') + i.toString() + messageLargePortrait.toString() + message.disabled?.toString() + reloadPointer.toString();
+            let hashd = hashMessageData + (message.chatId ?? '')
+                + (entry.overlay?.requestId ?? canonicalIndex.toString())
+                + messageLargePortrait.toString() + message.disabled?.toString()
+                + reloadPointer.toString();
             const currentHash = hashCode(hashd);
             currentHashes.add(currentHash);
             if(!hashes.has(currentHash)){
                 const b = document.createElement('div');
                 b.setAttribute('x-hashed', currentHash.toString());
                 b.classList.add('chat-message-container');
+                if(readOnlyPresentation){
+                    b.classList.add('runtime-chat-presentation-overlay', 'opacity-75');
+                    b.setAttribute('data-runtime-request-id', entry.overlay!.requestId);
+                }
                 const inst = mount(Chat, {
                     target: b,
                     props: {
                         message: message.data,
                         isLastMemory: false,
-                        idx: i,
+                        idx: canonicalIndex,
                         totalLength: messages.length,
                         img: message.role === 'user' ? userImage : charImage,
                         onReroll: onReroll,
                         unReroll: unReroll,
                         rerollIcon: 'dynamic',
-                        character: simpleChar,
+                        // Pending input must not run display triggers against a
+                        // live character object. The canonical replacement will
+                        // use the normal character pipeline after adoption.
+                        character: readOnlyPresentation ? null : simpleChar,
                         largePortrait: message.role === 'user' ? (userIconPortrait ?? false) : ((currentCharacter as character).largePortrait ?? false),
                         messageGenerationInfo: message.generationInfo,
                         role: message.role,
@@ -125,6 +162,7 @@
                         isOptimizedStreamingMessage: activeStreamingMessage,
                         streamingOptimizationMode: performanceMode,
                         rawStreamingText: message.data,
+                        readOnlyPresentation,
                     },
 
                 })
@@ -207,8 +245,11 @@
         const isSameChat = currentChatRoomId === previousChatRoomId;
         
         // Only auto-scroll if it's the same chat and new messages were added
-        if(isSameChat && messages.length > previousLength){
-            const lastMsg = messages[messages.length - 1];
+        const displayLength = messages.length + presentationOverlays.length;
+        if(isSameChat && displayLength > previousLength){
+            const lastMsg = presentationOverlays.at(-1)
+                ? { role: 'user' }
+                : messages[messages.length - 1];
             if(lastMsg && lastMsg.role === 'char' && DBState.db.autoScrollToNewMessage){
                 if(wasAtBottom || DBState.db.alwaysScrollToNewMessage){
                     const element = chatBody.firstElementChild;
@@ -222,7 +263,7 @@
                 }
             }
         }
-        previousLength = messages.length;
+        previousLength = displayLength;
         previousChatRoomId = currentChatRoomId;
     })
 

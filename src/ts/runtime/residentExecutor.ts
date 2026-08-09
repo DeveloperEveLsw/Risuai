@@ -10,6 +10,7 @@ import {
     executeCanonicalReroll,
     executeCanonicalSend,
     executeCanonicalUnreroll,
+    type CanonicalInputMessageReference,
     type CanonicalGenerationResult,
 } from './canonicalGeneration.svelte'
 import {
@@ -98,7 +99,11 @@ function optionalFiniteNumber(payload: Record<string, unknown>, key: string) {
     return value as number | undefined
 }
 
-async function executeCommand(command: RuntimeGenerationCommand, signal: AbortSignal) {
+async function executeCommand(
+    command: RuntimeGenerationCommand,
+    signal: AbortSignal,
+    onInputAppended?: (reference: CanonicalInputMessageReference) => Promise<void>,
+) {
     const payload = command.payload ?? {}
     const target = {
         characterId: command.characterId,
@@ -118,6 +123,8 @@ async function executeCommand(command: RuntimeGenerationCommand, signal: AbortSi
                 files: normalizeFiles(payload),
                 continueResponse: command.action === 'continue',
                 signal,
+                canonicalInputMessageId: command.requestId,
+                onInputAppended,
             })
         }
         case 'reroll':
@@ -211,6 +218,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
 
     const runClaimed = async (command: RuntimeGenerationCommand, initialLease: RuntimeExecutorLease) => {
         const commandAbort = new AbortController()
+        const protocolAbort = new AbortController()
         let cleanupRunResources = () => {}
         const abortFromRoot = () => {
             commandAbort.abort(rootAbort.signal.reason)
@@ -221,6 +229,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
         let fenceRejected = false
         let cancelRequested = command.cancelRequestedAt !== null
         let executionStarted = false
+        let canonicalInputPersisted = false
         let stoppedHeartbeat = false
         const heartbeatAbort = new AbortController()
         let lastStage = get(chatProcessStage)
@@ -231,6 +240,11 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
         }>()
         let uninstallAlertBridge = () => {}
         let runtimeAlertsCleaned = false
+        commandAbort.signal.addEventListener('abort', () => {
+            if (commandAbort.signal.reason !== 'cancel_requested') {
+                protocolAbort.abort(commandAbort.signal.reason)
+            }
+        })
         const rejectPendingPrompts = (reason: unknown) => {
             if (runtimeAlertsCleaned) {
                 return
@@ -354,6 +368,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
             resourcesCleaned = true
             stoppedHeartbeat = true
             heartbeatAbort.abort('command resources cleaned')
+            protocolAbort.abort('command resources cleaned')
             rejectPendingPrompts(commandAbort.signal.reason)
             unsubscribeStage()
             stopWatching()
@@ -432,6 +447,38 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
         })()
 
         const requestedRevision = command.payload?.databaseRevision
+        const persistCanonicalInput = async (reference: CanonicalInputMessageReference) => {
+            const minimumRevision = typeof requestedRevision === 'number'
+                ? requestedRevision + 1
+                : undefined
+            if (minimumRevision !== undefined && !Number.isSafeInteger(minimumRevision)) {
+                throw new Error('Canonical input revision exceeds the safe integer range')
+            }
+            const persisted = await options.waitForPersistence(60_000, minimumRevision)
+            if (!persisted) {
+                throw new Error('Canonical input did not reach durable database storage')
+            }
+            if (
+                typeof requestedRevision === 'number'
+                && persisted.revision <= requestedRevision
+            ) {
+                throw new Error(
+                    `Canonical input revision ${persisted.revision} did not advance command base `
+                    + `${requestedRevision}`,
+                )
+            }
+            canonicalInputPersisted = true
+            if (fenceRejected || rootAbort.signal.aborted) {
+                throw new Error('Canonical input persistence lost its active executor fence')
+            }
+            lease = await client.heartbeat(command.commandId, lease, leaseDurationMs)
+            setActiveRuntimeExecutionFence(command.commandId, lease)
+            await client.progress(command.commandId, lease, 'input_committed', {
+                databaseRevision: persisted.revision,
+                messageIndex: reference.messageIndex,
+                messageId: reference.messageId,
+            }, protocolAbort.signal)
+        }
         const waitForMutationPersistence = async () => {
             const persisted = await options.waitForPersistence()
             if (fenceRejected || rootAbort.signal.aborted) {
@@ -439,18 +486,24 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
             }
             return persisted
         }
+        const canonicalMutationWasPersisted = (persisted: { revision: number } | null) => {
+            if (command.action === 'send' || command.action === 'continue') {
+                return canonicalInputPersisted
+            }
+            return executionStarted
+                && !!persisted
+                && typeof requestedRevision === 'number'
+                && persisted.revision > requestedRevision
+        }
         const completeCancellationAfterPersistence = async (persisted: { revision: number } | null) => {
             if (!persisted || fenceRejected || rootAbort.signal.aborted) {
                 return
             }
             lease = await client.heartbeat(command.commandId, lease, leaseDurationMs)
             setActiveRuntimeExecutionFence(command.commandId, lease)
-            const canonicalMutationPersisted = executionStarted
-                && typeof requestedRevision === 'number'
-                && persisted.revision > requestedRevision
             await client.completeCancellation(command.commandId, lease, {
                 databaseRevision: persisted.revision,
-                canonicalMutationPersisted,
+                canonicalMutationPersisted: canonicalMutationWasPersisted(persisted),
             })
         }
         const finishCancellation = async () => {
@@ -499,7 +552,11 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
                 databaseRevision: requestedRevision ?? null,
             })
             executionStarted = true
-            const result: CanonicalGenerationResult = await executeCommand(command, commandAbort.signal)
+            const result: CanonicalGenerationResult = await executeCommand(
+                command,
+                commandAbort.signal,
+                persistCanonicalInput,
+            )
             if (cancelRequested) {
                 await finishCancellation()
                 return
@@ -520,6 +577,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
             await client.complete(command.commandId, lease, {
                 ...result,
                 databaseRevision: persisted?.revision ?? null,
+                canonicalMutationPersisted: canonicalMutationWasPersisted(persisted),
             })
         }
         catch (error) {
@@ -567,9 +625,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
                     {
                         stage: lastStage,
                         databaseRevision: persisted.revision,
-                        canonicalMutationPersisted: executionStarted
-                            && typeof requestedRevision === 'number'
-                            && persisted.revision > requestedRevision,
+                        canonicalMutationPersisted: canonicalMutationWasPersisted(persisted),
                     },
                 )
             }

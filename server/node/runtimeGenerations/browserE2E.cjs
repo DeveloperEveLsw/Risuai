@@ -144,7 +144,17 @@ function createSeedDatabase(providerPort) {
             chaId: CHARACTER_ID,
             sdData: [],
             customscript: [],
-            triggerscript: [],
+            // The production regression was caused by display preprocessing
+            // assigning lowLevelAccess=false to every live character trigger.
+            // Keep this trigger permission intentionally undefined so an open
+            // follower would create a stale CAS save if rendering ever mutates
+            // the canonical database again.
+            triggerscript: [{
+                comment: 'Display immutability regression sentinel',
+                type: 'manual',
+                conditions: [],
+                effect: [],
+            }],
             utilityBot: false,
             exampleMessage: '',
             creatorNotes: '',
@@ -920,6 +930,16 @@ async function listCommands(baseUrl) {
     return (await response.json()).commands;
 }
 
+async function listDatabaseConflicts(baseUrl) {
+    const response = await fetch(`${baseUrl}/api/sync/database/conflicts`, {
+        headers: { 'risu-auth': PASSWORD_HASH },
+    });
+    assert.equal(response.status, 200, 'database conflict list must be authenticated');
+    const body = await response.json();
+    assert.ok(Array.isArray(body.conflicts), 'database conflict list must contain an array');
+    return body.conflicts;
+}
+
 async function waitForNewCommand(baseUrl, knownCommandIds) {
     return eventually(async () => {
         const commands = await listCommands(baseUrl);
@@ -980,6 +1000,20 @@ function getFixtureMessages(database) {
     const chat = character.chats.find((candidate) => candidate.id === CHAT_ID);
     assert.ok(chat, 'canonical DB must retain the E2E chat');
     return chat.message;
+}
+
+function assertDisplayTriggerStayedImmutable(database, label) {
+    const character = database.characters.find((candidate) => candidate.chaId === CHARACTER_ID);
+    assert.ok(character, `${label} must retain the E2E character`);
+    const sentinel = character.triggerscript.find(
+        (trigger) => trigger.comment === 'Display immutability regression sentinel',
+    );
+    assert.ok(sentinel, `${label} must retain the display immutability sentinel`);
+    assert.equal(
+        Object.prototype.hasOwnProperty.call(sentinel, 'lowLevelAccess'),
+        false,
+        `${label} rendering must not normalize lowLevelAccess into the canonical database`,
+    );
 }
 
 function assertDirectClientStorage(metrics, label) {
@@ -1060,6 +1094,11 @@ async function runScenario() {
         // follower writes settle before measuring generation behavior so a
         // fixture-only CAS race cannot masquerade as a hand-off failure.
         const settledRevision = await waitForStableCanonicalRevision(server.baseUrl);
+        const settledSnapshot = await loadCanonicalDatabase(server.baseUrl);
+        assertDisplayTriggerStayedImmutable(settledSnapshot.database, 'initial follower render');
+        const initialConflictIds = new Set(
+            (await listDatabaseConflicts(server.baseUrl)).map((conflict) => conflict.conflictId),
+        );
         const desktopStorageBeforeClose = await desktop.storageMetrics();
         assert.ok(desktopStorageBeforeClose.usageBytes === null
             || Number.isSafeInteger(desktopStorageBeforeClose.usageBytes));
@@ -1117,6 +1156,10 @@ async function runScenario() {
         const beforeCancelIds = new Set((await listCommands(server.baseUrl)).map((command) => command.commandId));
         await phone.setInput('textarea.text-input-area', CANCEL_INPUT);
         await phone.clickSelector('.button-icon-send');
+        await phone.waitFor(
+            `document.querySelector('.runtime-chat-presentation') !== null`,
+            { timeoutMs: 2_000, intervalMs: 25 },
+        );
         await eventually(() => mockProvider.requests.length === 2, { timeoutMs: 15_000 });
         assert.match(mockProvider.requests[1].lastUserContent, new RegExp(CANCEL_INPUT));
         const cancelCommand = await waitForNewCommand(server.baseUrl, beforeCancelIds);
@@ -1132,12 +1175,21 @@ async function runScenario() {
         assert.equal(cancelledTerminal.state, 'cancelled');
         await eventually(() => mockProvider.requests[1].aborted, { timeoutMs: 10_000 });
         await phone.waitFor(`document.querySelector('.button-icon-send') !== null
-            && document.querySelector('button[aria-labelledby="cancel"]') === null`, {
+            && document.querySelector('button[aria-labelledby="cancel"]') === null
+            && document.querySelector('.runtime-chat-presentation') === null`, {
             timeoutMs: 15_000,
         });
 
         const finalSnapshot = await loadCanonicalDatabase(server.baseUrl);
+        assertDisplayTriggerStayedImmutable(finalSnapshot.database, 'completed/cancelled chat render');
         const finalMessages = getFixtureMessages(finalSnapshot.database);
+        assert.equal(
+            finalMessages.some((message) => (
+                Object.prototype.hasOwnProperty.call(message, '__risuRuntimeOptimisticId')
+            )),
+            false,
+            'presentation-only messages must never enter the canonical database',
+        );
         assert.equal(finalMessages.filter((message) => message.role === 'user' && message.data === NORMAL_INPUT).length, 1);
         assert.equal(finalMessages.filter((message) => message.role === 'user' && message.data === CANCEL_INPUT).length, 1);
         assert.ok(
@@ -1150,6 +1202,12 @@ async function runScenario() {
             .filter(Boolean);
         assert.equal(new Set(generationIds).size, generationIds.length, 'canonical generation IDs must be unique');
         assert.equal(mockProvider.requests.length, 2, 'each user send must reach the mock provider exactly once');
+        const finalConflicts = await listDatabaseConflicts(server.baseUrl);
+        assert.deepEqual(
+            finalConflicts.filter((conflict) => !initialConflictIds.has(conflict.conflictId)),
+            [],
+            'presentation rendering must not produce a stale canonical database save',
+        );
 
         const allCommands = await listCommands(server.baseUrl);
         const scenarioCommands = allCommands.filter((command) => !initialIds.has(command.commandId));

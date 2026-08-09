@@ -60,6 +60,7 @@
         isOptimizedStreamingMessage?: boolean;
         streamingOptimizationMode?: StreamingDisplayOptimizationMode;
         rawStreamingText?: string;
+        readOnlyPresentation?: boolean;
     }
 
     let {
@@ -85,6 +86,7 @@
         isOptimizedStreamingMessage = false,
         streamingOptimizationMode = 'off',
         rawStreamingText = message,
+        readOnlyPresentation = false,
     }: Props = $props();
 
     let msgDisplay = $state('')
@@ -143,6 +145,12 @@
     }
 
     function getCbsCondition(){
+        if(readOnlyPresentation){
+            return {
+                firstmsg: false,
+                chatRole: role ?? 'user',
+            }
+        }
         try{
             const cbsConditions:CbsConditions = {
                 firstmsg: firstMessage ?? false,
@@ -233,6 +241,11 @@
     }
 
     async function handleButtonTriggerWithin(event: UIEvent) {
+        if(readOnlyPresentation){
+            event.preventDefault()
+            event.stopPropagation()
+            return
+        }
         const currentChar = getCurrentCharacter()
         if(!currentChar || currentChar.type === 'group'){
             return
@@ -305,9 +318,9 @@
     }
 
     let isBookmarked = $derived(
-        DBState.db.characters[selIdState.selId]
+        !readOnlyPresentation && (DBState.db.characters[selIdState.selId]
             ?.chats[DBState.db.characters[selIdState.selId].chatPage]
-            ?.bookmarks?.includes(DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx]?.chatId) ?? false
+            ?.bookmarks?.includes(DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx]?.chatId) ?? false)
     );
 
     async function toggleBookmark() {
@@ -452,7 +465,7 @@
             {language.noMessage}
         </div>
     {:else}
-        {@const chatReloadPointer = $ReloadGUIPointer + ($ReloadChatPointer[idx] ?? 0)}
+        {@const chatReloadPointer = readOnlyPresentation ? 0 : $ReloadGUIPointer + ($ReloadChatPointer[idx] ?? 0)}
         {@const totalLengthPointer = (idx > totalLength - 6) ? totalLength : 0}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -460,7 +473,7 @@
             class:prose-invert={$ColorSchemeTypeStore}
             bind:this={bodyRoot}
             onclick={() => {
-            if(DBState.db.clickToEdit && idx > -1 && !isOptimizedStreamingMessage){
+            if(!readOnlyPresentation && DBState.db.clickToEdit && idx > -1 && !isOptimizedStreamingMessage){
                 editMode = true
             }
         }}
@@ -485,7 +498,7 @@
                     {renderRawStreaming}
                     {rawStreamingText} />
             {/key}
-            {#if idx >= 0 && !editMode && !isOptimizedStreamingMessage && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
+            {#if !readOnlyPresentation && idx >= 0 && !editMode && !isOptimizedStreamingMessage && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
                 <PartialEditController
                     messageData={message}
                     chatIndex={idx}
@@ -501,7 +514,9 @@
 
 {#snippet iconButtons(options:{applyTextColors?:boolean} = {})}
     <div class="grow flex items-center justify-end" class:text-textcolor2={options?.applyTextColors !== false}>
-        {#if isComment}
+        {#if readOnlyPresentation}
+            <span class="text-xs opacity-60" aria-label="Pending message">…</span>
+        {:else if isComment}
             <button
                 class="flex items-center hover:text-blue-500 transition-colors button-icon-remove"
                 onclick={async (e) => {
@@ -1094,8 +1109,9 @@
 <div class="w-full border-t-2 border-dashed border-blue-500"></div>
 {/if}
 <div class="flex max-w-full justify-center risu-chat"
-     data-chat-index={idx}
-     data-chat-id={DBState.db.characters?.[selIdState.selId]?.chats?.[DBState.db.characters?.[selIdState.selId]?.chatPage]?.message?.[idx]?.chatId ?? ''}
+     class:runtime-chat-presentation={readOnlyPresentation}
+     data-chat-index={readOnlyPresentation ? undefined : idx}
+     data-chat-id={readOnlyPresentation ? undefined : (DBState.db.characters?.[selIdState.selId]?.chats?.[DBState.db.characters?.[selIdState.selId]?.chatPage]?.message?.[idx]?.chatId ?? '')}
      style={isLastMemory ? `border-top:${DBState.db.memoryLimitThickness}px solid rgba(98, 114, 164, 0.7);` : ''}
      onclickcapture={handleButtonTriggerWithin}>
     <div class="text-textcolor mt-1 ml-4 mr-4 mb-1 p-2 bg-transparent grow border-t-gray-900 border-opacity/30 border-transparent flexium items-start max-w-full" >

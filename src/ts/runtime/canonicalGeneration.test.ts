@@ -95,6 +95,9 @@ describe('canonical resident generation boundary', () => {
     })
 
     it('selects the command target by stable IDs and runs the existing input pipeline', async () => {
+        const onInputAppended = vi.fn(async () => {
+            expect(mocks.sendChat).not.toHaveBeenCalled()
+        })
         mocks.sendChat.mockImplementation(async () => {
             const character = mocks.dbState.db.characters[0]
             character.chats[1].message.push({ role: 'char', data: 'response' })
@@ -106,6 +109,8 @@ describe('canonical resident generation boundary', () => {
             chatId: 'chat-b',
             input: 'hello',
             files: ['assets/file.png'],
+            canonicalInputMessageId: 'request-1',
+            onInputAppended,
         })
 
         expect(get(selectedCharID)).toBe(0)
@@ -120,24 +125,36 @@ describe('canonical resident generation boundary', () => {
             continue: undefined,
         })
         expect(mocks.dbState.db.characters[0].chats[1].message).toEqual([
-            expect.objectContaining({ role: 'user', data: 'edited:hello{{inlayed::assets/file.png}}' }),
+            expect.objectContaining({
+                role: 'user',
+                data: 'edited:hello{{inlayed::assets/file.png}}',
+                chatId: 'request-1',
+            }),
             { role: 'char', data: 'response' },
         ])
+        expect(onInputAppended).toHaveBeenCalledWith({
+            messageIndex: 0,
+            messageId: mocks.dbState.db.characters[0].chats[1].message[0].chatId,
+        })
+        expect(mocks.dbState.db.characters[0].chats[1].message[0]).not.toHaveProperty('commandId')
         expect(result).toMatchObject({ generated: true, previousLength: 1, currentLength: 2 })
     })
 
     it('executes slash commands before generation without calling the provider path', async () => {
         mocks.processMultiCommand.mockResolvedValue(true)
+        const onInputAppended = vi.fn()
 
         const result = await executeCanonicalSend({
             characterId: 'character-a',
             chatId: 'chat-a',
             input: '/command',
+            onInputAppended,
         })
 
         expect(result.commandProcessed).toBe(true)
         expect(mocks.processScript).not.toHaveBeenCalled()
         expect(mocks.sendChat).not.toHaveBeenCalled()
+        expect(onInputAppended).not.toHaveBeenCalled()
     })
 
     it('preserves say-nothing behavior for an empty character input', async () => {

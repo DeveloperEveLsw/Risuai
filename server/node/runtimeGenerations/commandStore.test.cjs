@@ -160,6 +160,119 @@ describe('RuntimeGenerationStore command persistence and idempotency', () => {
             ['created', 'cancelled'],
         );
     });
+
+    test('materializes cancel-before-create as one unclaimable idempotent command', async () => {
+        const { store } = await makeFixture();
+        const input = commandInput('cancel-before-create');
+
+        const cancellation = await store.cancelByRequest(input, { reason: 'stop_during_create' });
+        assert.equal(cancellation.created, true);
+        assert.equal(cancellation.previousLastSequence, 0);
+        assert.equal(cancellation.command.state, 'cancelled');
+        assert.equal(cancellation.command.attempt, 0);
+        assert.equal(cancellation.command.cancelRequestedAt, cancellation.command.createdAt);
+        assert.equal(cancellation.command.finishedAt, cancellation.command.createdAt);
+        assert.equal(await store.claimNext({ executorId: 'resident' }), null);
+
+        const replay = await store.replay(cancellation.command.id);
+        assert.deepEqual(replay.events.map((event) => event.type), ['cancelled']);
+        assert.equal(replay.events[0].payload.previousState, 'unadmitted');
+
+        const delayedCreate = await store.create(input);
+        assert.equal(delayedCreate.created, false);
+        assert.equal(delayedCreate.command.id, cancellation.command.id);
+        assert.equal(delayedCreate.command.state, 'cancelled');
+        assert.equal(delayedCreate.command.lastSequence, cancellation.command.lastSequence);
+    });
+
+    test('linearizes create, request cancellation, and claim in store lock order', async () => {
+        const { store } = await makeFixture();
+        const cancelFirstInput = commandInput('cancel-wins-race');
+        const [cancelFirst, delayedCreate, claimAfterCancellation] = await Promise.all([
+            store.cancelByRequest(cancelFirstInput, { reason: 'stop' }),
+            store.create(cancelFirstInput),
+            store.claimNext({ executorId: 'resident-after-cancel' }),
+        ]);
+        assert.equal(cancelFirst.command.state, 'cancelled');
+        assert.equal(delayedCreate.command.id, cancelFirst.command.id);
+        assert.equal(delayedCreate.command.state, 'cancelled');
+        assert.equal(claimAfterCancellation, null);
+
+        const createFirstInput = commandInput('create-wins-race');
+        const [created, cancelled, claimAfterCreateCancellation] = await Promise.all([
+            store.create(createFirstInput),
+            store.cancelByRequest(createFirstInput, { reason: 'stop' }),
+            store.claimNext({ executorId: 'resident-after-create' }),
+        ]);
+        assert.equal(created.command.state, 'queued');
+        assert.equal(cancelled.created, false);
+        assert.equal(cancelled.command.id, created.command.id);
+        assert.equal(cancelled.command.state, 'cancelled');
+        assert.equal(claimAfterCreateCancellation, null);
+    });
+
+    test('rejects payload collisions without cancelling the indexed request', async () => {
+        const { store } = await makeFixture();
+        const input = commandInput('cancel-collision');
+        const cancellation = await store.cancelByRequest(input);
+        const conflicting = commandInput('different-payload', { requestId: input.requestId });
+
+        await assert.rejects(
+            store.cancelByRequest(conflicting),
+            (error) => error instanceof IdempotencyConflictError,
+        );
+        await assert.rejects(
+            store.create(conflicting),
+            (error) => error instanceof IdempotencyConflictError,
+        );
+        const preserved = await store.get(cancellation.command.id);
+        assert.equal(preserved.state, 'cancelled');
+        assert.deepEqual(preserved.payload, input.payload);
+        assert.equal(preserved.lastSequence, cancellation.command.lastSequence);
+    });
+
+    test('restores cancel-before-create fencing across restart', async () => {
+        const { clock, rootDir, store } = await makeFixture();
+        const input = commandInput('cancel-restart');
+        const cancellation = await store.cancelByRequest(input, { reason: 'stop' });
+
+        const reopened = new RuntimeGenerationStore({
+            rootDir,
+            now: clock.now,
+            idFactory: () => 'must-not-create-another-command',
+        });
+        await reopened.open();
+
+        const delayedCreate = await reopened.create(input);
+        assert.equal(delayedCreate.created, false);
+        assert.equal(delayedCreate.command.id, cancellation.command.id);
+        assert.equal(delayedCreate.command.state, 'cancelled');
+        assert.equal(await reopened.claimNext({ executorId: 'resident-after-restart' }), null);
+        assert.deepEqual(
+            (await reopened.replay(cancellation.command.id)).events.map((event) => event.type),
+            ['cancelled'],
+        );
+    });
+
+    test('uses the fenced cancel-request protocol when create was already claimed', async () => {
+        const { store } = await makeFixture();
+        const input = commandInput('cancel-running-by-request');
+        const created = await store.create(input);
+        await store.claimNext({ executorId: 'resident-running' });
+
+        const cancellation = await store.cancelByRequest(input, { reason: 'stop' });
+        assert.equal(cancellation.created, false);
+        assert.equal(cancellation.command.id, created.command.id);
+        assert.equal(cancellation.command.state, 'running');
+        assert.equal(cancellation.command.cancelRequestedAt !== null, true);
+        assert.deepEqual(
+            (await store.replay(created.command.id)).events.map((event) => event.type),
+            ['created', 'running', 'cancel_requested'],
+        );
+
+        const repeated = await store.cancelByRequest(input, { reason: 'duplicate-stop' });
+        assert.equal(repeated.command.lastSequence, cancellation.command.lastSequence);
+    });
 });
 
 describe('RuntimeGenerationStore terminal command retention', () => {
@@ -591,6 +704,126 @@ describe('RuntimeGenerationStore global executor fencing', () => {
 });
 
 describe('RuntimeGenerationStore event replay and restart recovery', () => {
+    test('records one durable canonical input marker across cancel and ambiguous retries', async () => {
+        const { store } = await makeFixture();
+        const { command } = await store.create(commandInput('input-committed', {
+            payload: { input: 'hello', databaseRevision: 7 },
+        }));
+        const claim = await store.claimNext({ executorId: 'resident' });
+        const marker = {
+            databaseRevision: 8,
+            messageIndex: 3,
+            messageId: 'request-input-committed',
+        };
+
+        await assert.rejects(
+            store.appendProgress(command.id, claim.lease, 'input_committed', marker),
+            /reserved/,
+        );
+        await assert.rejects(
+            store.recordInputCommitted(command.id, claim.lease, marker),
+            { code: 'INVALID_COMMAND_STATE' },
+        );
+        await store.appendProgress(command.id, claim.lease, 'execution_started', {
+            databaseRevision: 7,
+        });
+        await assert.rejects(
+            store.recordInputCommitted(command.id, claim.lease, {
+                ...marker,
+                databaseRevision: 7,
+            }),
+            /must advance/,
+        );
+        await assert.rejects(
+            store.recordInputCommitted(command.id, claim.lease, {
+                ...marker,
+                messageIndex: -1,
+            }),
+            /messageIndex/,
+        );
+
+        const cancelRequested = await store.cancel(command.id, { reason: 'input-race' });
+        assert.equal(cancelRequested.state, 'running');
+        assert.notEqual(cancelRequested.cancelRequestedAt, null);
+        const first = await store.recordInputCommitted(command.id, claim.lease, marker);
+        const duplicate = await store.recordInputCommitted(command.id, claim.lease, marker);
+        assert.equal(first.created, true);
+        assert.equal(duplicate.created, false);
+        assert.equal(duplicate.record.sequence, first.record.sequence);
+        await assert.rejects(
+            store.recordInputCommitted(command.id, claim.lease, {
+                ...marker,
+                messageIndex: marker.messageIndex + 1,
+            }),
+            { code: 'INPUT_COMMIT_CONFLICT', statusCode: 409 },
+        );
+        assert.deepEqual(
+            (await store.replay(command.id)).events.map((event) => event.type),
+            ['created', 'running', 'execution_started', 'cancel_requested', 'input_committed'],
+        );
+        await store.completeCancellation(command.id, claim.lease, {
+            databaseRevision: 8,
+            canonicalMutationPersisted: true,
+        });
+
+        const unsupported = await store.create(commandInput('input-committed-reroll', {
+            action: 'reroll',
+            payload: { databaseRevision: 8 },
+        }));
+        const unsupportedClaim = await store.claimNext({ executorId: 'resident' });
+        await store.appendProgress(
+            unsupported.command.id,
+            unsupportedClaim.lease,
+            'execution_started',
+            { databaseRevision: 8 },
+        );
+        await assert.rejects(
+            store.recordInputCommitted(unsupported.command.id, unsupportedClaim.lease, {
+                ...marker,
+                databaseRevision: 9,
+            }),
+            /only valid for send or continue/,
+        );
+    });
+
+    test('promotes a durable input marker into interrupted results and restores it on restart', async () => {
+        const clock = createClock();
+        const { rootDir, store } = await makeFixture({ clock });
+        const { command } = await store.create(commandInput('interrupted-input', {
+            payload: { input: 'hello', databaseRevision: 20 },
+        }));
+        const claim = await store.claimNext({ executorId: 'resident', leaseDurationMs: 100 });
+        await store.appendProgress(command.id, claim.lease, 'execution_started', {
+            databaseRevision: 20,
+        });
+        await store.recordInputCommitted(command.id, claim.lease, {
+            databaseRevision: 21,
+            messageIndex: 4,
+            messageId: 'request-interrupted-input',
+        });
+
+        clock.advance(100);
+        const interrupted = await store.expireLease();
+        assert.equal(interrupted.state, 'interrupted');
+        assert.deepEqual(interrupted.result, {
+            databaseRevision: 21,
+            canonicalMutationPersisted: true,
+            messageIndex: 4,
+            messageId: 'request-interrupted-input',
+        });
+        const interruptedEvent = (await store.replay(command.id)).events.at(-1);
+        assert.equal(interruptedEvent.type, 'interrupted');
+        assert.deepEqual(interruptedEvent.payload.result, interrupted.result);
+
+        const reopened = new RuntimeGenerationStore({
+            rootDir,
+            now: clock.now,
+            idFactory: () => 'unused-command-id',
+        });
+        await reopened.open();
+        assert.deepEqual((await reopened.get(command.id)).result, interrupted.result);
+    });
+
     test('durably fences UI prompts and commits exactly one observer response', async () => {
         const { store } = await makeFixture();
         const { command } = await store.create(commandInput('ui-prompt'));

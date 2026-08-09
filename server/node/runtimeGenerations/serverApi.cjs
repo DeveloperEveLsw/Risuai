@@ -349,6 +349,50 @@ function createRuntimeGenerationServer(options) {
         return true;
     }
 
+    function runtimeGenerationRequest(req, pathRequestId = '') {
+        const bodyRequestId = typeof req.body?.requestId === 'string' ? req.body.requestId : '';
+        const bodyIdempotencyKey = typeof req.body?.idempotencyKey === 'string'
+            ? req.body.idempotencyKey
+            : '';
+        const headerIdempotencyKey = normalizeHeader(req.headers['idempotency-key']);
+        const suppliedKeys = [
+            pathRequestId,
+            bodyRequestId,
+            bodyIdempotencyKey,
+            headerIdempotencyKey,
+        ].filter(Boolean);
+        if (suppliedKeys.length === 0) {
+            throw new TypeError('requestId or Idempotency-Key is required');
+        }
+        if (new Set(suppliedKeys).size > 1) {
+            throw new TypeError('requestId and idempotencyKey values must match');
+        }
+        const requestId = assertNonEmptyString(suppliedKeys[0], 'requestId');
+        const action = assertNonEmptyString(req.body?.action, 'action', 32);
+        if (!RUNTIME_GENERATION_ACTION_SET.has(action)) {
+            throw new TypeError(`action must be one of: ${RUNTIME_GENERATION_ACTIONS.join(', ')}`);
+        }
+        const characterId = assertNonEmptyString(req.body?.characterId, 'characterId');
+        const chatId = assertNonEmptyString(req.body?.chatId, 'chatId');
+        const payload = req.body?.payload === undefined ? {} : assertJsonObject(req.body.payload, 'payload');
+        assertSerializedLimit(payload, 'payload', maxRequestPayloadBytes);
+        const requestEnvelope = {
+            schemaVersion: 1,
+            action,
+            characterId,
+            chatId,
+            payload,
+        };
+        return {
+            requestId,
+            requestHash: hashRuntimeGenerationRequest(requestEnvelope),
+            action,
+            characterId,
+            chatId,
+            payload,
+        };
+    }
+
     function sendRouteError(error, res, next) {
         const statusCode = Number(error?.statusCode);
         if (Number.isSafeInteger(statusCode) && statusCode >= 400 && statusCode <= 599) {
@@ -574,42 +618,8 @@ function createRuntimeGenerationServer(options) {
                 return;
             }
             try {
-                const bodyRequestId = typeof req.body?.requestId === 'string' ? req.body.requestId : '';
-                const bodyIdempotencyKey = typeof req.body?.idempotencyKey === 'string'
-                    ? req.body.idempotencyKey
-                    : '';
-                const headerIdempotencyKey = normalizeHeader(req.headers['idempotency-key']);
-                const suppliedKeys = [bodyRequestId, bodyIdempotencyKey, headerIdempotencyKey].filter(Boolean);
-                if (suppliedKeys.length === 0) {
-                    throw new TypeError('requestId or Idempotency-Key is required');
-                }
-                if (new Set(suppliedKeys).size > 1) {
-                    throw new TypeError('requestId and idempotencyKey values must match');
-                }
-                const requestId = assertNonEmptyString(suppliedKeys[0], 'requestId');
-                const action = assertNonEmptyString(req.body?.action, 'action', 32);
-                if (!RUNTIME_GENERATION_ACTION_SET.has(action)) {
-                    throw new TypeError(`action must be one of: ${RUNTIME_GENERATION_ACTIONS.join(', ')}`);
-                }
-                const characterId = assertNonEmptyString(req.body?.characterId, 'characterId');
-                const chatId = assertNonEmptyString(req.body?.chatId, 'chatId');
-                const payload = req.body?.payload === undefined ? {} : assertJsonObject(req.body.payload, 'payload');
-                assertSerializedLimit(payload, 'payload', maxRequestPayloadBytes);
-                const requestEnvelope = {
-                    schemaVersion: 1,
-                    action,
-                    characterId,
-                    chatId,
-                    payload,
-                };
-                const created = await store.create({
-                    requestId,
-                    requestHash: hashRuntimeGenerationRequest(requestEnvelope),
-                    action,
-                    characterId,
-                    chatId,
-                    payload,
-                });
+                const request = runtimeGenerationRequest(req);
+                const created = await store.create(request);
                 const responseBody = {
                     ...publicCommand(created.command),
                     reused: !created.created,
@@ -731,6 +741,22 @@ function createRuntimeGenerationServer(options) {
                     ? {}
                     : assertJsonObject(req.body.payload, 'payload');
                 assertSerializedLimit(payload, 'payload', maxProgressPayloadBytes);
+                if (eventType === 'input_committed') {
+                    const committed = await store.recordInputCommitted(
+                        req.params.commandId,
+                        credentials,
+                        payload,
+                    );
+                    if (committed.created) {
+                        broadcastRecord(req.params.commandId, committed.record);
+                    }
+                    res.send({
+                        success: true,
+                        reused: !committed.created,
+                        event: wireGenerationEvent(req.params.commandId, committed.record),
+                    });
+                    return;
+                }
                 if (eventType === 'ui_prompt') {
                     const promptId = assertPromptId(payload.promptId);
                     const prompt = normalizeUiPrompt(payload.prompt);
@@ -927,6 +953,33 @@ function createRuntimeGenerationServer(options) {
                 clearUiPromptResponses(command.id);
                 await broadcastRecordsAfter(command.id, before.lastSequence);
                 res.send({ success: true, command: publicCommand(command) });
+            }
+            catch (error) {
+                sendRouteError(error, res, next);
+            }
+        });
+
+        registerRoute(app, 'delete', '/runtime-generations/by-request/:requestId', async (req, res, next) => {
+            if (!await requireObserverAuth(req, res)) {
+                return;
+            }
+            try {
+                const request = runtimeGenerationRequest(req, req.params.requestId);
+                const cancellation = await store.cancelByRequest(request, {
+                    reason: 'user_cancel_by_request',
+                });
+                const command = cancellation.command;
+                if (command.state === 'cancelled') {
+                    clearUiPromptResponses(command.id);
+                }
+                if (command.lastSequence > cancellation.previousLastSequence) {
+                    await broadcastRecordsAfter(command.id, cancellation.previousLastSequence);
+                }
+                res.send({
+                    success: true,
+                    created: cancellation.created,
+                    command: publicCommand(command, { includePayload: true }),
+                });
             }
             catch (error) {
                 sendRouteError(error, res, next);

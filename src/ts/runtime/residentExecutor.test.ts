@@ -212,7 +212,12 @@ describe('resident generation executor', () => {
 
     it('adopts the requested database revision before execution and completes only after persistence', async () => {
         const requestedRevision = deferred<{ revision: number } | null>()
+        const inputPersistence = deferred<{ revision: number } | null>()
         const persistedResult = deferred<{ revision: number } | null>()
+        mocks.executeCanonicalSend.mockImplementation(async (input) => {
+            await input.onInputAppended({ messageIndex: 2, messageId: 'request-1' })
+            return { generated: true, previousLength: 1, currentLength: 2 }
+        })
         let persistenceCall = 0
         const waitForPersistence = vi.fn(() => {
             persistenceCall += 1
@@ -221,6 +226,9 @@ describe('resident generation executor', () => {
             }
             if (persistenceCall === 2) {
                 return requestedRevision.promise
+            }
+            if (persistenceCall === 3) {
+                return inputPersistence.promise
             }
             return persistedResult.promise
         })
@@ -250,7 +258,22 @@ describe('resident generation executor', () => {
         )
         expect(client.complete).not.toHaveBeenCalled()
 
-        persistedResult.resolve({ revision: 8 })
+        await vi.waitFor(() => expect(waitForPersistence).toHaveBeenNthCalledWith(3, 60_000, 8))
+        inputPersistence.resolve({ revision: 8 })
+        await vi.waitFor(() => expect(client.progress).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ fencingToken: 5 }),
+            'input_committed',
+            {
+                databaseRevision: 8,
+                messageIndex: 2,
+                messageId: 'request-1',
+            },
+            expect.any(AbortSignal),
+        ))
+        expect(client.complete).not.toHaveBeenCalled()
+
+        persistedResult.resolve({ revision: 9 })
         await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
 
         expect(client.heartbeat).toHaveBeenCalledWith(
@@ -265,7 +288,8 @@ describe('resident generation executor', () => {
                 generated: true,
                 previousLength: 1,
                 currentLength: 2,
-                databaseRevision: 8,
+                databaseRevision: 9,
+                canonicalMutationPersisted: true,
             },
         )
         expect(mocks.setFence).toHaveBeenLastCalledWith(
@@ -277,7 +301,10 @@ describe('resident generation executor', () => {
     it('keeps the fence until cancellation persistence completes, then records cancelled', async () => {
         const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
         const cancellationPersistence = deferred<{ revision: number } | null>()
-        mocks.executeCanonicalSend.mockReturnValue(execution.promise)
+        mocks.executeCanonicalSend.mockImplementation(async (input) => {
+            await input.onInputAppended({ messageIndex: 0, messageId: 'request-1' })
+            return await execution.promise
+        })
         let persistenceCall = 0
         const waitForPersistence = vi.fn(() => {
             persistenceCall += 1
@@ -356,7 +383,10 @@ describe('resident generation executor', () => {
 
     it('waits for the user-message mutation to persist before reporting execution failure', async () => {
         const failurePersistence = deferred<{ revision: number } | null>()
-        mocks.executeCanonicalSend.mockRejectedValue(new Error('provider failed'))
+        mocks.executeCanonicalSend.mockImplementation(async (input) => {
+            await input.onInputAppended({ messageIndex: 0, messageId: 'request-1' })
+            throw new Error('provider failed')
+        })
         let persistenceCall = 0
         const waitForPersistence = vi.fn(() => {
             persistenceCall += 1
@@ -387,6 +417,39 @@ describe('resident generation executor', () => {
         )
         expect(client.heartbeat.mock.invocationCallOrder[0]).toBeLessThan(
             client.fail.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('does not claim an unrelated revision when send fails before appending canonical input', async () => {
+        mocks.executeCanonicalSend.mockRejectedValue(new Error('input trigger failed'))
+        const waitForPersistence = vi.fn()
+            .mockResolvedValueOnce({ revision: 7 })
+            .mockResolvedValueOnce({ revision: 7 })
+            .mockResolvedValueOnce({ revision: 8 })
+        const { client } = makeClient(command('send', {
+            input: 'restore this draft',
+            databaseRevision: 7,
+        }))
+
+        start(client, waitForPersistence)
+        await vi.waitFor(() => expect(client.fail).toHaveBeenCalledOnce())
+
+        expect(client.progress).not.toHaveBeenCalledWith(
+            'command-1',
+            expect.anything(),
+            'input_committed',
+            expect.anything(),
+            expect.anything(),
+        )
+        expect(client.fail).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ fencingToken: 5 }),
+            'input trigger failed',
+            {
+                stage: 0,
+                databaseRevision: 8,
+                canonicalMutationPersisted: false,
+            },
         )
     })
 

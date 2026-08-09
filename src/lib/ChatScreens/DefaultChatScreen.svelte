@@ -25,7 +25,6 @@
         chatFoldedStateMessageIndex,
         downloadFile,
         getCleanNodeDatabaseHead,
-        runNodeDatabaseEphemeralMutation,
         waitForNodeDatabasePersistence,
     } from 'src/ts/globalApi.svelte';
     import { runTrigger } from 'src/ts/process/triggers';
@@ -52,6 +51,16 @@
         isRuntimeGenerationKeepaliveSafe,
         type RuntimeGenerationCreateInput,
     } from 'src/ts/runtime/generationClient';
+    import {
+        bindRuntimeChatPresentationCommand,
+        createRuntimeChatPresentationOverlay,
+        getRuntimeChatPresentationOverlay,
+        removeRuntimeChatPresentationOverlay,
+        resolveRuntimeChatPresentationText,
+        reserveRuntimeChatPresentationRequest,
+        settleRuntimeChatOverlay,
+        visibleRuntimeChatPresentationOverlays,
+    } from 'src/ts/runtime/chatPresentationOverlay.svelte';
 
     const loadPlaygroundMenu = () => import('../Playground/PlaygroundMenu.svelte').then(m => m.default);
     
@@ -78,6 +87,12 @@
     let { openModuleList = $bindable(false), openChatList = $bindable(false), customStyle = '' }: Props = $props();
     let currentCharacter = $derived(DBState.db.characters[$selectedCharID])
     let currentChat = $derived(currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [])
+    let currentPresentationOverlays = $derived(
+        $visibleRuntimeChatPresentationOverlays.filter((overlay) => (
+            overlay.characterId === currentCharacter?.chaId
+            && overlay.chatId === currentCharacter?.chats[currentCharacter.chatPage]?.id
+        )),
+    )
 
     function scrollToBottom() {
         chatsInstance?.scrollToLatestMessage();
@@ -214,14 +229,50 @@
             if(character && chat && canonicalHead){
                 const originalInput = messageInput
                 const originalFiles = [...fileInput]
-                const optimisticId = v4()
-                let optimisticAdded = false
                 let commandAccepted = false
                 let restoreDraftAfterFailure = true
+                let terminalRevisionAdopted = false
+                let retainOverlayForFollower = false
                 const intentAbort = new AbortController()
                 abortController = intentAbort
+                const requestId = v4()
+                reserveRuntimeChatPresentationRequest(requestId)
+                let overlayIdentifier = requestId
+                const presentationText = resolveRuntimeChatPresentationText({
+                    input: originalInput,
+                    files: originalFiles,
+                    useSayNothing: DBState.db.useSayNothing,
+                    isGroup: character.type === 'group',
+                    lastRole: chat.message.at(-1)?.role,
+                    continueResponse,
+                })
+                let presentationCreated = false
+                const createPresentationOverlay = () => {
+                    if(presentationCreated || presentationText === ''){
+                        return
+                    }
+                    // queueRuntimeGeneration observes the accepted command
+                    // before resolving. On a large (post-ACK) request that
+                    // observer may already have reconstructed this exact
+                    // request, so treat it as the same overlay rather than a
+                    // duplicate submission.
+                    if(getRuntimeChatPresentationOverlay(requestId)){
+                        presentationCreated = true
+                        return
+                    }
+                    presentationCreated = true
+                    createRuntimeChatPresentationOverlay({
+                        requestId,
+                        characterId: character.chaId,
+                        chatId: chat.id,
+                        input: originalInput,
+                        files: originalFiles,
+                        displayText: presentationText,
+                        baseRevision: canonicalHead.revision,
+                    })
+                }
                 const runtimeInput: RuntimeGenerationCreateInput = {
-                    requestId: v4(),
+                    requestId,
                     action: continueResponse ? 'continue' : 'send',
                     characterId: character.chaId,
                     chatId: chat.id,
@@ -232,71 +283,19 @@
                     },
                 }
                 const keepaliveSafe = isRuntimeGenerationKeepaliveSafe(runtimeInput)
-                const commandPromise = queueRuntimeGeneration(runtimeInput, intentAbort.signal)
-
-                const addOptimisticBubble = () => {
-                    if(optimisticAdded){
-                        return
-                    }
-                    try {
-                        runNodeDatabaseEphemeralMutation(() => {
-                            const liveCharacter = DBState.db.characters.find(
-                                (candidate) => candidate.chaId === character.chaId,
-                            )
-                            const liveChat = liveCharacter?.chats.find(
-                                (candidate) => candidate.id === chat.id,
-                            )
-                            if(!liveCharacter || !liveChat){
-                                return
-                            }
-                            const displayInput = originalInput + originalFiles
-                                .map((file) => `{{inlayed::${file}}}`)
-                                .join('')
-                            if(displayInput === ''){
-                                if(
-                                    liveCharacter.type !== 'group'
-                                    && (liveChat.message.length === 0 || liveChat.message.at(-1)?.role !== 'user')
-                                    && DBState.db.useSayNothing
-                                ){
-                                    liveChat.message.push({
-                                        role: 'user',
-                                        data: '*says nothing*',
-                                        name: $ConnectionOpenStore ? DBState.db.username : null,
-                                        __risuRuntimeOptimisticId: optimisticId,
-                                    } as Message)
-                                    optimisticAdded = true
-                                }
-                            }
-                            else{
-                                liveChat.message.push({
-                                    role: 'user',
-                                    data: displayInput,
-                                    time: Date.now(),
-                                    name: $ConnectionOpenStore ? DBState.db.username : null,
-                                    __risuRuntimeOptimisticId: optimisticId,
-                                } as Message)
-                                optimisticAdded = true
-                            }
-                        })
-                    } catch (error) {
-                        console.info('[Runtime Generation] Optimistic bubble was skipped:', error)
-                    }
-                }
-
-                // A keepalive-safe command is eligible for browser continuation
-                // during navigation. A larger command remains a cancellable
-                // pending upload, so it is not shown as sent until the server
-                // durably accepts it.
                 if(keepaliveSafe){
-                    addOptimisticBubble()
+                    createPresentationOverlay()
                 }
+                const commandPromise = queueRuntimeGeneration(runtimeInput, intentAbort.signal)
 
                 try {
                     const command = await commandPromise
                     commandAccepted = true
+                    overlayIdentifier = command.commandId
                     if(!keepaliveSafe){
-                        addOptimisticBubble()
+                        createPresentationOverlay()
                     }
+                    bindRuntimeChatPresentationCommand(requestId, command)
                     if(messageInput === originalInput){
                         messageInput = ''
                         messageInputTranslate = ''
@@ -310,12 +309,25 @@
                     await sleep(10)
                     updateInputSizeAll()
                     const terminal = await waitForRuntimeGenerationTerminal(command, intentAbort.signal)
-                    restoreDraftAfterFailure = shouldRestoreRuntimeDraft(terminal)
+                    restoreDraftAfterFailure = terminal.state === 'completed'
+                        ? false
+                        : shouldRestoreRuntimeDraft(terminal)
                     const terminalRevision = terminal.result?.databaseRevision
+                    settleRuntimeChatOverlay(command.commandId, {
+                        state: terminal.state,
+                        terminalRevision: typeof terminalRevision === 'number'
+                            ? terminalRevision
+                            : null,
+                        canonicalMutationPersisted:
+                            terminal.result?.canonicalMutationPersisted === true
+                            || terminal.state === 'completed',
+                    })
                     if(typeof terminalRevision === 'number'){
                         await waitForNodeDatabasePersistence(60_000, terminalRevision)
+                        terminalRevisionAdopted = true
                     }
                     if(terminal.state === 'completed'){
+                        removeRuntimeChatPresentationOverlay(command.commandId)
                         const resultPreviousLength = terminal.result?.previousLength
                         const currentMessages = DBState.db.characters
                             .find((candidate) => candidate.chaId === character.chaId)
@@ -355,6 +367,17 @@
                         }
                     }
                 } catch (error) {
+                    // If the resident already persisted this input but the
+                    // direct client temporarily failed its revision barrier,
+                    // leave presentation ownership with the global follower.
+                    // It retries adoption and removes the overlay only after
+                    // the canonical snapshot is actually visible here.
+                    retainOverlayForFollower = commandAccepted
+                        && !restoreDraftAfterFailure
+                        && !terminalRevisionAdopted
+                    if(!retainOverlayForFollower){
+                        removeRuntimeChatPresentationOverlay(overlayIdentifier)
+                    }
                     if(commandAccepted){
                         if(restoreDraftAfterFailure){
                             if(messageInput === ''){
@@ -372,24 +395,8 @@
                         }
                     }
                 }
-
-                if(optimisticAdded){
-                    try {
-                        runNodeDatabaseEphemeralMutation(() => {
-                            const liveCharacter = DBState.db.characters.find(
-                                (candidate) => candidate.chaId === character.chaId,
-                            )
-                            const liveChat = liveCharacter?.chats.find(
-                                (candidate) => candidate.id === chat.id,
-                            )
-                            if(liveChat){
-                                liveChat.message = liveChat.message.filter((candidate) => (
-                                    (candidate as Message & { __risuRuntimeOptimisticId?: string })
-                                        .__risuRuntimeOptimisticId !== optimisticId
-                                ))
-                            }
-                        })
-                    } catch {}
+                if(!retainOverlayForFollower){
+                    removeRuntimeChatPresentationOverlay(overlayIdentifier)
                 }
                 if(abortController === intentAbort){
                     abortController = null
@@ -608,7 +615,13 @@
 
     function abortChat(){
         if(shouldDelegateGeneration()){
-            abortController?.abort('generation cancelled by user')
+            if(abortController){
+                // The local signal is bound to this exact request. Falling
+                // through would also cancel an older remote command in the
+                // same chat because the global fallback prefers running work.
+                abortController.abort('generation cancelled by user')
+                return
+            }
             const character = DBState.db.characters[$selectedCharID]
             const chat = character?.chats?.[character.chatPage]
             void cancelActiveRuntimeGeneration({
@@ -1139,6 +1152,7 @@
             <Chats
                 bind:this={chatsInstance}
                 messages={currentChat}
+                presentationOverlays={currentPresentationOverlays}
                 loadPages={loadPages}
                 onReroll={reroll}
                 unReroll={unReroll}

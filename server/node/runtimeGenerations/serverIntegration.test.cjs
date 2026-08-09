@@ -140,6 +140,29 @@ async function createCommand(fixture, suffix, overrides = {}) {
     });
 }
 
+async function cancelCommandByRequest(fixture, suffix, overrides = {}) {
+    const requestId = overrides.requestId ?? `request-${suffix}`;
+    return await requestJson(
+        fixture,
+        `/runtime-generations/by-request/${encodeURIComponent(requestId)}`,
+        {
+            method: 'DELETE',
+            headers: { 'Idempotency-Key': requestId },
+            body: {
+                requestId,
+                action: 'send',
+                characterId: 'character-1',
+                chatId: 'chat-1',
+                payload: {
+                    message: `message-${suffix}`,
+                    settings: { stream: true, temperature: 0.7 },
+                },
+                ...overrides,
+            },
+        },
+    );
+}
+
 async function claimNext(fixture, executorId, leaseDurationMs = 5_000) {
     return await requestJson(fixture, '/runtime-generations/executor/claim-next', {
         body: { executorId, leaseDurationMs },
@@ -309,6 +332,52 @@ test('generate fallback commands retain normal create, list, get, and replay sem
         `/runtime-generations/${encodeURIComponent(luaButton.body.commandId)}`,
     );
     assert.deepEqual(loadedLuaButton.body.payload, { data: 'community-button-payload' });
+});
+
+test('cancel-by-request durably linearizes Stop before create and rejects payload collisions', {
+    timeout: 20_000,
+}, async () => {
+    const directoryFixture = await createFixtureDirectory();
+    const fixture = await startServerFixture(directoryFixture);
+
+    const cancellation = await cancelCommandByRequest(fixture, 'ambiguous-create');
+    assert.equal(cancellation.response.status, 200);
+    assert.equal(cancellation.body.created, true);
+    assert.equal(cancellation.body.command.state, 'cancelled');
+    assert.deepEqual(cancellation.body.command.payload, {
+        message: 'message-ambiguous-create',
+        settings: { stream: true, temperature: 0.7 },
+    });
+
+    const delayedCreate = await createCommand(fixture, 'ambiguous-create');
+    assert.equal(delayedCreate.response.status, 200);
+    assert.equal(delayedCreate.body.reused, true);
+    assert.equal(delayedCreate.body.commandId, cancellation.body.command.commandId);
+    assert.equal(delayedCreate.body.state, 'cancelled');
+    assert.deepEqual((await claimNext(fixture, 'resident-after-stop')).body, { claimed: false });
+
+    const replay = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(delayedCreate.body.commandId)}/events?afterSequence=0`,
+    );
+    assert.deepEqual(replay.body.events.map((event) => event.eventType), ['cancelled']);
+    assert.equal(replay.body.events[0].payload.previousState, 'unadmitted');
+
+    const conflict = await cancelCommandByRequest(fixture, 'ambiguous-create', {
+        payload: { message: 'different payload' },
+    });
+    assert.equal(conflict.response.status, 409);
+    assert.equal(conflict.body.code, 'IDEMPOTENCY_CONFLICT');
+    assert.equal(conflict.body.existingCommandId, delayedCreate.body.commandId);
+
+    await stopChild(fixture.child);
+    const restarted = await startServerFixture(directoryFixture);
+    const afterRestart = await createCommand(restarted, 'ambiguous-create');
+    assert.equal(afterRestart.response.status, 200);
+    assert.equal(afterRestart.body.reused, true);
+    assert.equal(afterRestart.body.commandId, delayedCreate.body.commandId);
+    assert.equal(afterRestart.body.state, 'cancelled');
+    assert.deepEqual((await claimNext(restarted, 'resident-after-restart')).body, { claimed: false });
 });
 
 test('duplicate creation, a single global claimant, fencing, heartbeat, and two observers compose', {
@@ -584,6 +653,124 @@ test('claim-next expires a lease, broadcasts interruption, advances the fence, a
     await secondObserver.waitFor((message) => message.eventType === 'cancelled');
     await closeSocket(observer.ws);
     await closeSocket(secondObserver.ws);
+});
+
+test('input_committed is validated, replayable, idempotent, and survives cancel_requested', {
+    timeout: 20_000,
+}, async () => {
+    const fixture = await startServerFixture();
+    const created = await createCommand(fixture, 'input-committed', {
+        payload: { input: 'hello', databaseRevision: 12 },
+    });
+    const commandId = created.body.commandId;
+    const observer = await openCommandSocket(fixture, commandId, 'input-observer');
+    const claim = await claimNext(fixture, 'resident-input');
+    const credentials = claim.body.lease;
+
+    const executionStarted = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/progress`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                eventType: 'execution_started',
+                payload: { databaseRevision: 12 },
+            },
+        },
+    );
+    assert.equal(executionStarted.response.status, 200);
+    const cancelRequested = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}`,
+        { method: 'DELETE' },
+    );
+    assert.equal(cancelRequested.body.command.state, 'running');
+
+    const marker = {
+        databaseRevision: 13,
+        messageIndex: 4,
+        messageId: 'request-input-committed',
+    };
+    const committed = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/progress`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                eventType: 'input_committed',
+                payload: marker,
+            },
+        },
+    );
+    assert.equal(committed.response.status, 200);
+    assert.equal(committed.body.reused, false);
+    assert.deepEqual(committed.body.event.payload, marker);
+
+    const duplicate = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/progress`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                eventType: 'input_committed',
+                payload: marker,
+            },
+        },
+    );
+    assert.equal(duplicate.response.status, 200);
+    assert.equal(duplicate.body.reused, true);
+    assert.equal(duplicate.body.event.sequence, committed.body.event.sequence);
+
+    const conflicting = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/progress`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                eventType: 'input_committed',
+                payload: { ...marker, messageIndex: marker.messageIndex + 1 },
+            },
+        },
+    );
+    assert.equal(conflicting.response.status, 409);
+    assert.equal(conflicting.body.code, 'INPUT_COMMIT_CONFLICT');
+    const malformed = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/progress`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                eventType: 'input_committed',
+                payload: { ...marker, messageIndex: -1 },
+            },
+        },
+    );
+    assert.equal(malformed.response.status, 400);
+
+    const observed = await observer.waitFor((message) => message.eventType === 'input_committed');
+    assert.deepEqual(observed.payload, marker);
+    assert.deepEqual(
+        generationEvents(observer).map((event) => event.eventType),
+        ['created', 'running', 'execution_started', 'cancel_requested', 'input_committed'],
+    );
+    const cancelled = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/cancel-complete`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                result: { databaseRevision: 13, canonicalMutationPersisted: true },
+            },
+        },
+    );
+    assert.equal(cancelled.response.status, 200);
+    await closeSocket(observer.ws);
 });
 
 test('resident UI prompts are validated, replayable, and accept only the first device response', {

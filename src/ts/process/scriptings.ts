@@ -12,7 +12,7 @@ import { writeInlayImage, getInlayAsset } from "./files/inlays";
 import type { OpenAIChat, MultiModal } from "./index.svelte";
 import { requestChatData, type StreamResponseChunk } from "./request/request";
 import { v4 } from "uuid";
-import { getModuleLorebooks, getModuleTriggers } from "./modules";
+import { getModuleLorebooks, getModuleTriggers, withTriggerLowLevelAccess } from "./modules";
 import { Mutex } from "../mutex";
 import { tokenize } from "../tokenizer";
 import { fetchNative, readImage } from "../globalApi.svelte";
@@ -1424,10 +1424,11 @@ export async function runLuaEditTrigger<T extends string|OpenAIChat[]>(char:char
     try {
         let data = content
 
-        const triggers = char.type === 'group' ? (getModuleTriggers()) : (char.triggerscript.map((v) => {
-            v.lowLevelAccess = false
-            return v
-        }).concat(getModuleTriggers()))
+        const triggers = char.type === 'group'
+            ? getModuleTriggers()
+            : char.triggerscript
+                .map((trigger) => withTriggerLowLevelAccess(trigger, false))
+                .concat(getModuleTriggers())
     
         for(let trigger of triggers){
             if(trigger?.effect?.[0]?.type === 'triggerlua'){

@@ -10,6 +10,7 @@ import { runLuaButtonTrigger } from '../process/scriptings'
 import { runTrigger } from '../process/triggers'
 import { safeStructuredClone } from '../polyfill'
 import { sleep } from '../util'
+import { v4 } from 'uuid'
 
 export type CanonicalGenerationAction =
     | 'send'
@@ -31,6 +32,13 @@ export interface CanonicalSendInput extends CanonicalGenerationTarget {
     files?: string[]
     continueResponse?: boolean
     signal?: AbortSignal
+    canonicalInputMessageId?: string
+    onInputAppended?: (reference: CanonicalInputMessageReference) => Promise<void> | void
+}
+
+export interface CanonicalInputMessageReference {
+    messageIndex: number
+    messageId: string
 }
 
 export interface CanonicalGenerationResult {
@@ -173,15 +181,28 @@ export async function executeCanonicalSend(input: CanonicalSendInput): Promise<C
     }
 
     let messages = target.character.chats[target.chatIndex].message
+    let inputReference: CanonicalInputMessageReference | null = null
+    const appendInputMessage = (message: Message) => {
+        // chatId is the existing upstream per-message identity. Assigning it
+        // before the proxy append and persistence gives observers a stable
+        // canonical reference without adding a runtime command identifier to
+        // the database schema.
+        message.chatId ??= input.canonicalInputMessageId ?? v4()
+        inputReference = {
+            messageIndex: messages.length,
+            messageId: message.chatId,
+        }
+        messages.push(message)
+    }
     if (messageInput === '') {
         if (target.character.type !== 'group') {
             const lastMessage = messages.at(-1)
             if ((!lastMessage || lastMessage.role !== 'user') && DBState.db.useSayNothing) {
-                messages.push({
-                    role: 'user',
-                    data: '*says nothing*',
-                    name: get(ConnectionOpenStore) ? DBState.db.username : null,
-                })
+            appendInputMessage({
+                role: 'user',
+                data: '*says nothing*',
+                name: get(ConnectionOpenStore) ? DBState.db.username : null,
+            })
             }
         }
     }
@@ -192,7 +213,7 @@ export async function executeCanonicalSend(input: CanonicalSendInput): Promise<C
         if (triggerResult) {
             messages = triggerResult.chat.message
         }
-        messages.push({
+        appendInputMessage({
             role: 'user',
             data: await processScript(target.character, messageInput, 'editinput'),
             time: Date.now(),
@@ -200,7 +221,7 @@ export async function executeCanonicalSend(input: CanonicalSendInput): Promise<C
         })
     }
     else {
-        messages.push({
+        appendInputMessage({
             role: 'user',
             data: messageInput,
             time: Date.now(),
@@ -210,6 +231,9 @@ export async function executeCanonicalSend(input: CanonicalSendInput): Promise<C
 
     target.character.chats[target.chatIndex].message = messages
     await sleep(10)
+    if (inputReference) {
+        await input.onInputAppended?.(inputReference)
+    }
     return await runGenerationOnly(target, {
         continue: input.continueResponse,
         signal: input.signal,

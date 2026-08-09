@@ -5,11 +5,13 @@ vi.mock('../storage/nodeStorage', () => ({
 }))
 
 import {
+    canonicalInputCommitFromEvent,
     isRuntimeGenerationKeepaliveSafe,
     RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES,
     RuntimeGenerationClient,
     RuntimeGenerationHttpError,
     type RuntimeGenerationCreateInput,
+    type RuntimeGenerationEvent,
 } from './generationClient'
 
 function command(overrides: Record<string, unknown> = {}) {
@@ -135,6 +137,7 @@ describe('RuntimeGenerationClient', () => {
         })
 
         expect(created.commandId).toBe('command-1')
+        expect(created.payload).toEqual({ input: 'hello' })
         expect(fetchImpl).toHaveBeenCalledOnce()
         const [path, init] = fetchImpl.mock.calls[0]
         if (!init) {
@@ -177,7 +180,7 @@ describe('RuntimeGenerationClient', () => {
     })
 
     it('parses executor claims and carries the fencing lease', async () => {
-        const fetchImpl = vi.fn(async () => jsonResponse({
+        const fetchImpl = vi.fn(async (_path: RequestInfo | URL, _init?: RequestInit) => jsonResponse({
             claimed: true,
             command: command({ state: 'running', fencingToken: 7 }),
             lease: { executorId: 'resident-1', fencingToken: 7, expiresAt: 20_000 },
@@ -275,6 +278,7 @@ describe('RuntimeGenerationClient', () => {
         })
 
         expect(created.reused).toBe(true)
+        expect(created.payload).toEqual({ input: 'once' })
         expect(fetchImpl).toHaveBeenCalledTimes(2)
         expect(getAuth).toHaveBeenCalledTimes(2)
         expect(fetchImpl.mock.calls[0][1]?.body).toBe(fetchImpl.mock.calls[1][1]?.body)
@@ -288,27 +292,266 @@ describe('RuntimeGenerationClient', () => {
         })
     })
 
-    it('lets Stop abort an offline create retry before a command is observed', async () => {
-        const fetchImpl = vi.fn().mockRejectedValue(new TypeError('server offline'))
+    it('linearizes pre-admission Stop with one keepalive cancel-by-request envelope', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000012'
+        const controller = new AbortController()
+        const input: RuntimeGenerationCreateInput & { requestId: string } = {
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'keep this draft' },
+        }
+        const cancelled = command({
+            requestId,
+            state: 'cancelled',
+            finishedAt: 2,
+            cancelRequestedAt: 2,
+            payload: input.payload,
+        })
+        const fetchImpl = vi.fn(async (_path: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.method === 'POST') {
+                throw new TypeError('server is offline before admission')
+            }
+            return jsonResponse({ success: true, created: true, command: cancelled })
+        })
         const client = new RuntimeGenerationClient({
             fetchImpl: fetchImpl as typeof fetch,
             getAuth: async () => 'auth',
             reconnectDelayMs: 60_000,
             location: { protocol: 'https:', host: 'risu.example' },
         })
+        const pending = client.create(input, controller.signal)
+        await vi.waitFor(() => {
+            expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST'))
+                .toHaveLength(1)
+        })
+        controller.abort(new Error('generation cancelled by user'))
+
+        await expect(pending).resolves.toEqual(cancelled)
+        expect(input.payload).toEqual({ input: 'keep this draft' })
+        const createCalls = fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST')
+        const cancellationCalls = fetchImpl.mock.calls.filter(([, init]) => init?.method === 'DELETE')
+        expect(createCalls).toHaveLength(1)
+        expect(cancellationCalls).toHaveLength(1)
+        expect(cancellationCalls[0][0]).toBe(
+            `/runtime-generations/by-request/${requestId}`,
+        )
+        expect(cancellationCalls[0][1]).toMatchObject({
+            method: 'DELETE',
+            keepalive: true,
+        })
+        expect(cancellationCalls[0][1]?.body).toBe(createCalls[0][1]?.body)
+    })
+
+    it('cancels response loss after durable create without another POST', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000013'
         const controller = new AbortController()
-        const pending = client.create({
+        const durable = command({
+            requestId,
+            state: 'cancelled',
+            finishedAt: 2,
+            cancelRequestedAt: 2,
+            payload: {
+                nested: { first: 1, second: 2 },
+                input: 'once',
+            },
+        })
+        const fetchImpl = vi.fn(async (path: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.method === 'POST') {
+                controller.abort(new Error('generation cancelled by user'))
+                throw new TypeError('response lost after server commit')
+            }
+            expect(path).toBe(`/runtime-generations/by-request/${requestId}`)
+            return jsonResponse({ success: true, created: false, command: durable })
+        })
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.create({
+            requestId,
             action: 'send',
             characterId: 'character-1',
             chatId: 'chat-1',
-            payload: { input: 'keep this draft' },
-        }, controller.signal)
-        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce())
+            payload: {
+                input: 'once',
+                nested: { second: 2, first: 1 },
+            },
+        }, controller.signal)).resolves.toEqual(durable)
 
-        controller.abort(new Error('generation cancelled by user'))
+        expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+        expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+    })
 
-        await expect(pending).rejects.toThrow('generation cancelled by user')
-        expect(fetchImpl).toHaveBeenCalledOnce()
+    it('retries an ambiguous 502 create response with the identical idempotent body', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000014'
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({ error: 'gateway lost origin response' }, 502))
+            .mockResolvedValueOnce(jsonResponse(command({ requestId, reused: true })))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            reconnectDelayMs: 0,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.create({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'retry once' },
+        })).resolves.toMatchObject({ requestId, reused: true })
+
+        expect(fetchImpl).toHaveBeenCalledTimes(2)
+        expect(fetchImpl.mock.calls[0][1]?.method).toBe('POST')
+        expect(fetchImpl.mock.calls[1][1]?.method).toBe('POST')
+        expect(fetchImpl.mock.calls[0][1]?.body).toBe(fetchImpl.mock.calls[1][1]?.body)
+    })
+
+    it('turns an aborted ambiguous 502 into durable request cancellation', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000016'
+        const controller = new AbortController()
+        const cancelled = command({
+            requestId,
+            state: 'cancelled',
+            finishedAt: 2,
+            cancelRequestedAt: 2,
+            payload: { input: 'ambiguous gateway' },
+        })
+        const fetchImpl = vi.fn(async (_path: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.method === 'POST') {
+                controller.abort(new Error('generation cancelled by user'))
+                return jsonResponse({ error: 'gateway timeout' }, 504)
+            }
+            return jsonResponse({ success: true, created: false, command: cancelled })
+        })
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.create({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'ambiguous gateway' },
+        }, controller.signal)).resolves.toEqual(cancelled)
+        expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+        expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
+    })
+
+    it('retries an ambiguous cancel-by-request response with the same full envelope', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000015'
+        const payload = { input: 'cancel exactly once' }
+        const cancelled = command({
+            requestId,
+            state: 'cancelled',
+            finishedAt: 2,
+            cancelRequestedAt: 2,
+            payload,
+        })
+        const fetchImpl = vi.fn()
+            .mockRejectedValueOnce(new TypeError('cancel response lost'))
+            .mockResolvedValueOnce(jsonResponse({
+                success: true,
+                created: false,
+                command: cancelled,
+            }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            reconnectDelayMs: 0,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.cancelByRequest({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload,
+        })).resolves.toEqual(cancelled)
+
+        expect(fetchImpl).toHaveBeenCalledTimes(2)
+        expect(fetchImpl.mock.calls[0][1]?.method).toBe('DELETE')
+        expect(fetchImpl.mock.calls[1][1]?.method).toBe('DELETE')
+        expect(fetchImpl.mock.calls[0][1]?.body).toBe(fetchImpl.mock.calls[1][1]?.body)
+        expect(fetchImpl.mock.calls[0][1]?.keepalive).toBe(true)
+    })
+
+    it('omits keepalive for a cancel envelope above the browser quota', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000017'
+        const payload = { input: '가'.repeat(30_000) }
+        const cancelled = command({
+            requestId,
+            state: 'cancelled',
+            finishedAt: 2,
+            cancelRequestedAt: 2,
+            payload,
+        })
+        const fetchImpl = vi.fn(async (_path: RequestInfo | URL, _init?: RequestInit) => jsonResponse({
+            success: true,
+            created: true,
+            command: cancelled,
+        }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await client.cancelByRequest({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload,
+        })
+
+        const init = fetchImpl.mock.calls[0][1]
+        expect(init?.method).toBe('DELETE')
+        expect(init?.keepalive).toBeUndefined()
+        expect(new TextEncoder().encode(init?.body as string).byteLength).toBeGreaterThan(64 * 1024)
+    })
+
+    it('does not cancel a colliding requestId after an aborted create', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000018'
+        const controller = new AbortController()
+        const fetchImpl = vi.fn(async (_path: RequestInfo | URL, init?: RequestInit) => {
+            if (init?.method === 'POST') {
+                controller.abort(new Error('generation cancelled by user'))
+                throw new TypeError('create response lost')
+            }
+            return jsonResponse({
+                error: 'requestId is already associated with a different request',
+                code: 'IDEMPOTENCY_CONFLICT',
+                existingCommandId: 'other-command',
+            }, 409)
+        })
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        const error = await client.create({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'original request' },
+        }, controller.signal).catch((caught) => caught)
+
+        expect(error).toBeInstanceOf(RuntimeGenerationHttpError)
+        expect(error).toMatchObject({ status: 409 })
+        expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+        expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
     })
 
     it('retries an ambiguous UI prompt response and returns the durable winning event', async () => {
@@ -401,6 +644,58 @@ describe('RuntimeGenerationClient', () => {
         })
     })
 
+    it('retries an ambiguous canonical input marker with the identical durable payload', async () => {
+        const fetchImpl = vi.fn()
+            .mockRejectedValueOnce(new TypeError('input marker response lost'))
+            .mockResolvedValueOnce(jsonResponse({ success: true, reused: true }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            reconnectDelayMs: 0,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+        const payload = {
+            databaseRevision: 13,
+            messageIndex: 2,
+            messageId: 'request-1',
+        }
+
+        await client.progress(
+            'command-1',
+            { executorId: 'resident-1', fencingToken: 7, expiresAt: 20_000 },
+            'input_committed',
+            payload,
+        )
+
+        expect(fetchImpl).toHaveBeenCalledTimes(2)
+        expect(fetchImpl.mock.calls[0][1]?.body).toBe(fetchImpl.mock.calls[1][1]?.body)
+        expect(JSON.parse(fetchImpl.mock.calls[0][1]?.body as string)).toMatchObject({
+            eventType: 'input_committed',
+            payload,
+        })
+    })
+
+    it('validates canonical input event revisions and stable message references', () => {
+        const event: RuntimeGenerationEvent = {
+            type: 'generation_event',
+            commandId: 'command-1',
+            sequence: 3,
+            eventType: 'input_committed',
+            timestamp: 123,
+            payload: {
+                databaseRevision: 13,
+                messageIndex: 2,
+                messageId: 'request-1',
+            },
+        }
+        expect(canonicalInputCommitFromEvent(event)).toEqual(event.payload)
+        expect(canonicalInputCommitFromEvent({ ...event, eventType: 'chat_stage' })).toBeNull()
+        expect(() => canonicalInputCommitFromEvent({
+            ...event,
+            payload: { ...event.payload, messageIndex: -1 },
+        })).toThrow('Malformed input_committed')
+    })
+
     it('stops UI prompt transport retries as soon as the resident command aborts', async () => {
         const fetchImpl = vi.fn().mockRejectedValue(new TypeError('offline'))
         const client = new RuntimeGenerationClient({
@@ -423,6 +718,81 @@ describe('RuntimeGenerationClient', () => {
 
         await expect(pending).rejects.toThrow('command cancelled')
         expect(fetchImpl).toHaveBeenCalledOnce()
+    })
+
+    it('replays input_committed before terminating an initially interrupted watch', async () => {
+        const terminal = command({
+            state: 'interrupted',
+            finishedAt: 5,
+            interruptedAt: 5,
+            lastSequence: 4,
+            result: {
+                databaseRevision: 13,
+                canonicalMutationPersisted: true,
+                messageIndex: 2,
+                messageId: 'request-1',
+            },
+        })
+        const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+            if (String(input).endsWith('/socket-ticket')) {
+                return jsonResponse({
+                    ticket: 'ticket-1',
+                    path: '/runtime-generations/command-1/ws',
+                })
+            }
+            return jsonResponse(terminal)
+        })
+        const socket = new FakeWebSocket()
+        const observed: string[] = []
+        const onTerminal = vi.fn(() => observed.push('terminal'))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            webSocketFactory: () => socket,
+            reconnectDelayMs: 0,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        client.watch('command-1', {
+            onSnapshot: () => observed.push('snapshot'),
+            onEvent: (event) => observed.push(event.eventType),
+            onTerminal,
+        })
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce())
+        socket.message({
+            ...terminal,
+            type: 'generation_snapshot',
+            clientId: 'phone',
+        })
+        expect(onTerminal).not.toHaveBeenCalled()
+        for (const [sequence, eventType, payload] of [
+            [1, 'created', {}],
+            [2, 'running', {}],
+            [3, 'input_committed', {
+                databaseRevision: 13,
+                messageIndex: 2,
+                messageId: 'request-1',
+            }],
+            [4, 'interrupted', { result: terminal.result }],
+        ] as const) {
+            socket.message({
+                type: 'generation_event',
+                commandId: 'command-1',
+                sequence,
+                eventType,
+                timestamp: sequence,
+                payload,
+            })
+        }
+        await vi.waitFor(() => expect(onTerminal).toHaveBeenCalledOnce())
+        expect(observed).toEqual([
+            'snapshot',
+            'created',
+            'running',
+            'input_committed',
+            'interrupted',
+            'terminal',
+        ])
     })
 
     it('keeps watching and retries the terminal GET with fresh auth after a transient failure', async () => {

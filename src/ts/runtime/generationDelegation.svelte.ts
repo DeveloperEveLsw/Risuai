@@ -16,18 +16,33 @@ import {
 } from '../process/index.svelte'
 import { DBState, selectedCharID } from '../stores.svelte'
 import {
+    canonicalInputCommitFromEvent,
     RuntimeGenerationClient,
+    type RuntimeCanonicalInputCommit,
     type RuntimeGenerationCommand,
     type RuntimeGenerationCreateInput,
 } from './generationClient'
+import {
+    ensureRuntimeChatPresentationOverlay,
+    markRuntimeChatOverlayCanonical,
+    removeRuntimeChatPresentationOverlay,
+    resolveRuntimeChatPresentationText,
+    settleRuntimeChatOverlay,
+} from './chatPresentationOverlay.svelte'
 
 const runtimeClient = new RuntimeGenerationClient()
-const observedCommands = new Map<string, {
+interface ObservedRuntimeCommand {
     command: RuntimeGenerationCommand
     stop: () => void
     createdHere: boolean
     finishing: boolean
-}>()
+    inputCommit: RuntimeCanonicalInputCommit | null
+    inputCommitAppliedRevision: number | null
+    inputCommitApplying: Promise<void> | null
+    terminalWaiters: Set<(command: RuntimeGenerationCommand) => void>
+}
+const observedCommands = new Map<string, ObservedRuntimeCommand>()
+const cancellationRequests = new Map<string, Promise<RuntimeGenerationCommand>>()
 let discoveryStarted = false
 let discoveryStopped = false
 let delegateInstalled = false
@@ -37,7 +52,10 @@ type WaitForPersistence = (
 ) => Promise<{ revision: number } | null>
 let waitForRuntimePersistence: WaitForPersistence | null = null
 const seenTerminalCommandIds = new Set<string>()
+const resolvedTerminalCommands = new Map<string, RuntimeGenerationCommand>()
 let terminalDiscoveryWatermark = Date.now() - 10 * 60_000
+const INTERRUPTED_CANONICAL_INPUT_GRACE_MS = 10_000
+const RESOLVED_TERMINAL_COMMAND_LIMIT = 256
 
 export const runtimeGenerationCommands = writable<RuntimeGenerationCommand[]>([])
 
@@ -64,17 +82,83 @@ function completedDatabaseRevision(command: RuntimeGenerationCommand) {
     return revision as number
 }
 
+function preserveCommandPayload(
+    command: RuntimeGenerationCommand,
+    previous: RuntimeGenerationCommand,
+) {
+    if (command.payload !== undefined || previous.payload === undefined) {
+        return command
+    }
+    return {
+        ...command,
+        payload: previous.payload,
+    }
+}
+
+async function waitForInterruptedCanonicalInput(command: RuntimeGenerationCommand) {
+    if (
+        command.state !== 'interrupted'
+        || (command.action !== 'send' && command.action !== 'continue')
+        || (
+            command.result?.databaseRevision !== undefined
+            && command.result?.databaseRevision !== null
+        )
+        || !waitForRuntimePersistence
+    ) {
+        return null
+    }
+    const baseRevision = command.payload?.databaseRevision
+    if (!Number.isSafeInteger(baseRevision) || (baseRevision as number) < 0) {
+        return null
+    }
+    const hasCanonicalInput = () => {
+        const character = DBState.db.characters.find(
+            (candidate) => candidate.chaId === command.characterId,
+        )
+        const chat = character?.chats.find((candidate) => candidate.id === command.chatId)
+        return chat?.message.some((message) => message.chatId === command.requestId) === true
+    }
+    try {
+        const deadline = Date.now() + INTERRUPTED_CANONICAL_INPUT_GRACE_MS
+        let remainingMs = INTERRUPTED_CANONICAL_INPUT_GRACE_MS
+        let minimumRevision = (baseRevision as number) + 1
+        while (remainingMs > 0) {
+            const persisted = await waitForRuntimePersistence(remainingMs, minimumRevision)
+            if ((persisted?.revision ?? -1) < minimumRevision) {
+                return null
+            }
+            if (hasCanonicalInput()) {
+                return persisted
+            }
+            if (persisted!.revision >= Number.MAX_SAFE_INTEGER) {
+                return null
+            }
+            minimumRevision = persisted!.revision + 1
+            remainingMs = deadline - Date.now()
+        }
+        return null
+    }
+    catch (error) {
+        // An interrupted lease may have ended before canonical input was
+        // appended. Give an already-committed snapshot a bounded adoption
+        // window, then let the caller restore the still-uncommitted draft.
+        console.warn('[Runtime Generation Interrupted Input Grace]', error)
+        return null
+    }
+}
+
 async function waitForCompletedRevision(command: RuntimeGenerationCommand) {
     if (
         command.state !== 'completed'
         && command.state !== 'failed'
         && command.state !== 'cancelled'
+        && command.state !== 'interrupted'
     ) {
-        return
+        return null
     }
     const revision = completedDatabaseRevision(command)
     if (revision === null || !waitForRuntimePersistence) {
-        return
+        return null
     }
     const persisted = await waitForRuntimePersistence(60_000, revision)
     if ((persisted?.revision ?? -1) < revision) {
@@ -82,6 +166,102 @@ async function waitForCompletedRevision(command: RuntimeGenerationCommand) {
             `Client database revision ${persisted?.revision ?? 'none'} is behind completed revision ${revision}`,
         )
     }
+    return persisted
+}
+
+function reconcileCanonicalInput(entry: ObservedRuntimeCommand) {
+    const commit = entry.inputCommit
+    if (!commit || entry.inputCommitAppliedRevision === commit.databaseRevision) {
+        return Promise.resolve()
+    }
+    if (entry.inputCommitApplying) {
+        return entry.inputCommitApplying
+    }
+    const applying = (async () => {
+        if (!waitForRuntimePersistence) {
+            throw new Error('Runtime generation delegation has not been installed')
+        }
+        const persisted = await waitForRuntimePersistence(60_000, commit.databaseRevision)
+        if ((persisted?.revision ?? -1) < commit.databaseRevision) {
+            throw new Error(
+                `Client database revision ${persisted?.revision ?? 'none'} is behind canonical input `
+                + `revision ${commit.databaseRevision}`,
+            )
+        }
+        const character = DBState.db.characters.find(
+            (candidate) => candidate.chaId === entry.command.characterId,
+        )
+        const chat = character?.chats.find((candidate) => candidate.id === entry.command.chatId)
+        const indexedMessage = chat?.message[commit.messageIndex]
+        const referencedMessage = indexedMessage?.chatId === commit.messageId
+            ? indexedMessage
+            : chat?.message.find((message) => message.chatId === commit.messageId)
+        if (!referencedMessage && persisted.revision === commit.databaseRevision) {
+            throw new Error(
+                'Canonical input message reference does not match the adopted database revision',
+            )
+        }
+        markRuntimeChatOverlayCanonical(entry.command.commandId, {
+            requestId: entry.command.requestId,
+            canonicalRevision: commit.databaseRevision,
+            messageId: commit.messageId,
+        })
+        entry.inputCommitAppliedRevision = commit.databaseRevision
+    })()
+    entry.inputCommitApplying = applying
+    void applying.finally(() => {
+        if (entry.inputCommitApplying === applying) {
+            entry.inputCommitApplying = null
+        }
+    }).catch(() => {})
+    return applying
+}
+
+function observeCanonicalInputCommit(
+    entry: ObservedRuntimeCommand,
+    commit: RuntimeCanonicalInputCommit,
+) {
+    const existing = entry.inputCommit
+    if (existing && (
+        existing.databaseRevision !== commit.databaseRevision
+        || existing.messageIndex !== commit.messageIndex
+        || existing.messageId !== commit.messageId
+    )) {
+        throw new Error('Runtime generation emitted conflicting input_committed events')
+    }
+    entry.inputCommit = commit
+    void reconcileCanonicalInput(entry).catch((error) => {
+        console.error('[Runtime Generation Input Revision Barrier]', error)
+    })
+}
+
+async function reconcileDeterministicCanonicalInput(
+    entry: ObservedRuntimeCommand,
+    adoptedTerminal: { revision: number } | null,
+) {
+    if (
+        entry.inputCommitAppliedRevision !== null
+        || (entry.command.action !== 'send' && entry.command.action !== 'continue')
+        || !waitForRuntimePersistence
+    ) {
+        return
+    }
+    if (!adoptedTerminal) {
+        return
+    }
+    const character = DBState.db.characters.find(
+        (candidate) => candidate.chaId === entry.command.characterId,
+    )
+    const chat = character?.chats.find((candidate) => candidate.id === entry.command.chatId)
+    if (!chat?.message.some((message) => message.chatId === entry.command.requestId)) {
+        return
+    }
+    markRuntimeChatOverlayCanonical(entry.command.commandId, {
+        requestId: entry.command.requestId,
+        canonicalRevision: adoptedTerminal.revision,
+        messageId: entry.command.requestId,
+    })
+    entry.inputCommitAppliedRevision = adoptedTerminal.revision
 }
 
 async function finishObservedCommand(command: RuntimeGenerationCommand) {
@@ -89,9 +269,14 @@ async function finishObservedCommand(command: RuntimeGenerationCommand) {
     if (!existing || existing.finishing) {
         return
     }
+    command = preserveCommandPayload(command, existing.command)
+    existing.command = command
     existing.finishing = true
     try {
-        await waitForCompletedRevision(command)
+        await reconcileCanonicalInput(existing)
+        const adoptedTerminal = await waitForCompletedRevision(command)
+            ?? await waitForInterruptedCanonicalInput(command)
+        await reconcileDeterministicCanonicalInput(existing, adoptedTerminal)
     }
     catch (error) {
         existing.finishing = false
@@ -99,9 +284,34 @@ async function finishObservedCommand(command: RuntimeGenerationCommand) {
         setTimeout(() => void finishObservedCommand(command), 1_000)
         return
     }
+    const terminalRevision = completedDatabaseRevision(command)
+    const canonicalMutationPersisted = typeof command.result?.canonicalMutationPersisted === 'boolean'
+        ? command.result.canonicalMutationPersisted
+        : null
+    settleRuntimeChatOverlay(command.commandId, {
+        requestId: command.requestId,
+        state: command.state,
+        terminalRevision,
+        canonicalMutationPersisted,
+    })
+    removeRuntimeChatPresentationOverlay(command.commandId)
+    removeRuntimeChatPresentationOverlay(command.requestId)
+    resolvedTerminalCommands.set(command.commandId, command)
+    while (resolvedTerminalCommands.size > RESOLVED_TERMINAL_COMMAND_LIMIT) {
+        const oldestCommandId = resolvedTerminalCommands.keys().next().value
+        if (oldestCommandId === undefined) {
+            break
+        }
+        resolvedTerminalCommands.delete(oldestCommandId)
+    }
+    for (const resolveTerminal of existing.terminalWaiters) {
+        resolveTerminal(command)
+    }
+    existing.terminalWaiters.clear()
     existing.stop()
     seenTerminalCommandIds.add(command.commandId)
     observedCommands.delete(command.commandId)
+    cancellationRequests.delete(command.commandId)
     dismissRuntimeAlertPromptsForCommand(command.commandId)
     publishCommands()
     const selectedCharacter = DBState.db.characters[get(selectedCharID)]
@@ -169,30 +379,88 @@ function handleRuntimeUiEvent(commandId: string, eventType: string, payload: Rec
 }
 
 function observeCommand(command: RuntimeGenerationCommand, createdHere = false) {
+    if (
+        (command.state === 'queued' || command.state === 'running')
+        && (command.action === 'send' || command.action === 'continue')
+        && command.payload
+    ) {
+        const baseRevision = command.payload.databaseRevision
+        const rawInput = command.payload.input
+        const rawFiles = command.payload.files
+        if (
+            Number.isSafeInteger(baseRevision)
+            && (baseRevision as number) >= 0
+            && (rawInput === undefined || typeof rawInput === 'string')
+            && (rawFiles === undefined || (
+                Array.isArray(rawFiles)
+                && rawFiles.every((file) => typeof file === 'string')
+            ))
+        ) {
+            const character = DBState.db.characters.find(
+                (candidate) => candidate.chaId === command.characterId,
+            )
+            const chat = character?.chats.find((candidate) => candidate.id === command.chatId)
+            const input = typeof rawInput === 'string' ? rawInput : ''
+            const files = Array.isArray(rawFiles) ? rawFiles as string[] : []
+            ensureRuntimeChatPresentationOverlay({
+                requestId: command.requestId,
+                commandId: command.commandId,
+                characterId: command.characterId,
+                chatId: command.chatId,
+                input,
+                files,
+                displayText: resolveRuntimeChatPresentationText({
+                    input,
+                    files,
+                    useSayNothing: DBState.db.useSayNothing,
+                    isGroup: character?.type === 'group',
+                    lastRole: chat?.message.at(-1)?.role,
+                    continueResponse: command.action === 'continue',
+                }),
+                createdAt: command.createdAt,
+                baseRevision: baseRevision as number,
+                state: command.state,
+            })
+        }
+    }
     const existing = observedCommands.get(command.commandId)
     if (existing) {
-        existing.command = command
+        existing.command = preserveCommandPayload(command, existing.command)
         existing.createdHere ||= createdHere
-        publishCommands()
+        if (!isTerminal(command)) {
+            publishCommands()
+        }
         return
     }
-    const entry = {
+    const entry: ObservedRuntimeCommand = {
         command,
         createdHere,
         finishing: false,
         stop: () => {},
+        inputCommit: null,
+        inputCommitAppliedRevision: null,
+        inputCommitApplying: null,
+        terminalWaiters: new Set(),
     }
     observedCommands.set(command.commandId, entry)
     entry.stop = runtimeClient.watch(command.commandId, {
         onSnapshot: (snapshot) => {
+            entry.command = preserveCommandPayload(snapshot, entry.command)
             if (isTerminal(snapshot)) {
-                void finishObservedCommand(snapshot)
                 return
             }
-            entry.command = snapshot
             publishCommands()
         },
         onEvent: (event) => {
+            try {
+                const inputCommit = canonicalInputCommitFromEvent(event)
+                if (inputCommit) {
+                    observeCanonicalInputCommit(entry, inputCommit)
+                }
+            }
+            catch (error) {
+                console.error('[Runtime Generation Input Commit]', error)
+            }
             if (event.eventType === 'chat_stage') {
                 const stage = event.payload.stage
                 if (typeof stage === 'number' && Number.isFinite(stage)) {
@@ -204,9 +472,8 @@ function observeCommand(command: RuntimeGenerationCommand, createdHere = false) 
         onTerminal: (terminal) => void finishObservedCommand(terminal),
         onError: (error) => console.error('[Runtime Generation Observer]', error),
     })
-    publishCommands()
-    if (isTerminal(command)) {
-        void finishObservedCommand(command)
+    if (!isTerminal(command)) {
+        publishCommands()
     }
 }
 
@@ -221,16 +488,37 @@ async function discoverCommands() {
                     limit: 100,
                 }),
             ])
-            for (const command of [...running, ...queued]) {
+            for (const discovered of [...running, ...queued]) {
+                const command = (
+                    !observedCommands.has(discovered.commandId)
+                    &&
+                    (discovered.action === 'send' || discovered.action === 'continue')
+                    && !discovered.payload
+                )
+                    ? await runtimeClient.get(discovered.commandId)
+                    : discovered
                 observeCommand(command)
             }
-            for (const command of recent) {
+            for (const discovered of recent) {
+                const command = (
+                    !observedCommands.has(discovered.commandId)
+                    && (discovered.action === 'send' || discovered.action === 'continue')
+                    && !discovered.payload
+                )
+                    ? await runtimeClient.get(discovered.commandId)
+                    : discovered
                 terminalDiscoveryWatermark = Math.max(
                     terminalDiscoveryWatermark,
                     command.updatedAt,
                 )
                 if (isTerminal(command) && !seenTerminalCommandIds.has(command.commandId)) {
                     observeCommand(command)
+                    // HTTP discovery is the durable fallback when the socket
+                    // cannot deliver its replay/terminal callback. The
+                    // finishing guard makes a concurrent socket terminal
+                    // idempotent, while finishObservedCommand still enforces
+                    // canonical input and terminal revision barriers.
+                    void finishObservedCommand(command)
                 }
             }
         }
@@ -335,12 +623,72 @@ function isTerminal(command: RuntimeGenerationCommand) {
         || command.state === 'interrupted'
 }
 
+function requestRuntimeGenerationCancellation(commandId: string) {
+    const existing = cancellationRequests.get(commandId)
+    if (existing) {
+        return existing
+    }
+    const pending = runtimeClient.cancel(commandId)
+    cancellationRequests.set(commandId, pending)
+    void pending.catch(() => {
+        if (cancellationRequests.get(commandId) === pending) {
+            cancellationRequests.delete(commandId)
+        }
+    })
+    return pending
+}
+
 export function waitForRuntimeGenerationTerminal(
     command: RuntimeGenerationCommand,
     signal?: AbortSignal,
 ): Promise<RuntimeGenerationCommand> {
+    const observed = observedCommands.get(command.commandId)
+    if (observed) {
+        return new Promise((resolve) => {
+            let settled = false
+            const finish = (terminal: RuntimeGenerationCommand) => {
+                if (settled) {
+                    return
+                }
+                settled = true
+                signal?.removeEventListener('abort', abort)
+                observed.terminalWaiters.delete(finish)
+                resolve(preserveCommandPayload(terminal, command))
+            }
+            const abort = () => {
+                if (observed.command.cancelRequestedAt !== null) {
+                    return
+                }
+                void requestRuntimeGenerationCancellation(command.commandId)
+                    .then((cancelled) => {
+                        observed.command = preserveCommandPayload(cancelled, observed.command)
+                        if (isTerminal(cancelled)) {
+                            void finishObservedCommand(cancelled)
+                        }
+                        else {
+                            publishCommands()
+                        }
+                    })
+                    .catch((error) => console.error('[Runtime Generation Cancel]', error))
+            }
+            observed.terminalWaiters.add(finish)
+            if (isTerminal(observed.command)) {
+                void finishObservedCommand(observed.command)
+            }
+            else if (signal?.aborted) {
+                abort()
+            }
+            else {
+                signal?.addEventListener('abort', abort, { once: true })
+            }
+        })
+    }
+    const resolvedTerminal = resolvedTerminalCommands.get(command.commandId)
+    if (resolvedTerminal) {
+        return Promise.resolve(preserveCommandPayload(resolvedTerminal, command))
+    }
     if (isTerminal(command)) {
-        return Promise.resolve(command)
+        return waitForInterruptedCanonicalInput(command).then(() => command)
     }
     return new Promise((resolve) => {
         let settled = false
@@ -352,10 +700,14 @@ export function waitForRuntimeGenerationTerminal(
             settled = true
             signal?.removeEventListener('abort', abort)
             stop()
-            resolve(terminal)
+            const merged = preserveCommandPayload(terminal, command)
+            void waitForInterruptedCanonicalInput(merged).then(() => resolve(merged))
         }
         const abort = () => {
-            void runtimeClient.cancel(command.commandId)
+            if (command.cancelRequestedAt !== null) {
+                return
+            }
+            void requestRuntimeGenerationCancellation(command.commandId)
                 .then((cancelled) => {
                     if (isTerminal(cancelled)) {
                         finish(cancelled)
@@ -453,7 +805,17 @@ export function shouldRestoreCancelledRuntimeDraft(command: RuntimeGenerationCom
 }
 
 export function shouldRestoreRuntimeDraft(command: RuntimeGenerationCommand) {
-    return command.result?.canonicalMutationPersisted !== true
+    if (command.action === 'send' || command.action === 'continue') {
+        const character = DBState.db.characters.find(
+            (candidate) => candidate.chaId === command.characterId,
+        )
+        const chat = character?.chats.find((candidate) => candidate.id === command.chatId)
+        if (chat?.message.some((message) => message.chatId === command.requestId)) {
+            return false
+        }
+    }
+    return command.state !== 'completed'
+        && command.result?.canonicalMutationPersisted !== true
 }
 
 export async function cancelActiveRuntimeGeneration(
@@ -475,7 +837,10 @@ export async function cancelActiveRuntimeGeneration(
     if (!active) {
         return null
     }
-    const cancelled = await runtimeClient.cancel(active.commandId)
+    if (active.cancelRequestedAt !== null) {
+        return active
+    }
+    const cancelled = await requestRuntimeGenerationCancellation(active.commandId)
     const existing = observedCommands.get(cancelled.commandId)
     if (existing) {
         existing.command = cancelled

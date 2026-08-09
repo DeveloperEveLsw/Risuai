@@ -433,6 +433,24 @@ describe('NodeDatabaseRuntime', () => {
         expect(fixture.runtime.isDirty).toBe(false)
     })
 
+    it('removes presentation-only messages from a detached canonical snapshot without touching live data', () => {
+        const live = database()
+        live.characters![0].chats![0].message = [
+            {},
+            { __risuRuntimeOptimisticId: 'pending-message' },
+            {},
+        ]
+        const liveBefore = structuredClone(live)
+        const snapshot = structuredClone(live)
+        const fixture = makeRuntime({ initial: live })
+
+        const canonical = fixture.runtime.makeCanonicalSnapshot(snapshot)
+
+        expect(canonical.characters?.[0].chats?.[0].message).toEqual([{}, {}])
+        expect(live).toEqual(liveBefore)
+        expect(canonical).toBe(snapshot)
+    })
+
     it('labels only snapshots containing active chat output as streaming', () => {
         expect(getNodeDatabaseCommitKind(database())).toBe('stable')
         const streaming = database()

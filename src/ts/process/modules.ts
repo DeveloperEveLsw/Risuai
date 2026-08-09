@@ -34,6 +34,18 @@ export interface RisuModule{
     icon?:string
 }
 
+/** Attach the effective permission to an invocation-local trigger without
+ * mutating the character/module definition stored in the database. */
+export function withTriggerLowLevelAccess<T extends { lowLevelAccess?: boolean }>(
+    trigger: T,
+    lowLevelAccess: boolean | undefined,
+): T {
+    return {
+        ...trigger,
+        lowLevelAccess,
+    }
+}
+
 export async function exportModule(module:RisuModule, arg:{
     alertEnd?:boolean
 } = {}){
@@ -464,10 +476,8 @@ export function getModuleTriggers() {
             continue
         }
         if (module.trigger) {
-            triggers = triggers.concat(module.trigger.map((t) => {
-                t.lowLevelAccess = module.lowLevelAccess
-                return t
-            }))
+            triggers = triggers.concat(module.trigger.map((trigger) =>
+                withTriggerLowLevelAccess(trigger, module.lowLevelAccess)))
         }
     }
     return triggers
