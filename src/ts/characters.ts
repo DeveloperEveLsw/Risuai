@@ -535,7 +535,8 @@ function formatTavernChat(chat:string, charName:string){
 export function characterFormatUpdate(indexOrCharacter:number|character, arg:{
     updateInteraction?:boolean,
 } = {}){
-    let cha = typeof(indexOrCharacter) === 'number' ? getCharacterByIndex(indexOrCharacter) : indexOrCharacter
+    const originalCharacter = typeof(indexOrCharacter) === 'number' ? getCharacterByIndex(indexOrCharacter) : indexOrCharacter
+    let cha = originalCharacter
     if(cha.chats.length === 0){
         cha.chats = [{
             message: [],
@@ -563,23 +564,23 @@ export function characterFormatUpdate(indexOrCharacter:number|character, arg:{
         if(checkNullish(cha.utilityBot)){
             cha.utilityBot = false
         }
-        cha.triggerscript = cha.triggerscript ?? []
-        cha.alternateGreetings = cha.alternateGreetings ?? []
-        cha.exampleMessage = cha.exampleMessage ?? ''
-        cha.creatorNotes = cha.creatorNotes ?? ''
-        cha.systemPrompt = cha.systemPrompt ?? ''
-        cha.tags = cha.tags ?? []
-        cha.creator = cha.creator ?? ''
-        cha.characterVersion = cha.characterVersion ?? ''
-        cha.personality = cha.personality ?? ''
-        cha.scenario = cha.scenario ?? ''
-        cha.firstMsgIndex = cha.firstMsgIndex ?? -1
-        cha.additionalData = cha.additionalData ?? {
+        cha.triggerscript ??= []
+        cha.alternateGreetings ??= []
+        cha.exampleMessage ??= ''
+        cha.creatorNotes ??= ''
+        cha.systemPrompt ??= ''
+        cha.tags ??= []
+        cha.creator ??= ''
+        cha.characterVersion ??= ''
+        cha.personality ??= ''
+        cha.scenario ??= ''
+        cha.firstMsgIndex ??= -1
+        cha.additionalData ??= {
             tag: [],
             creator: '',
             character_version: ''
         }
-        cha.voicevoxConfig = cha.voicevoxConfig ?? {
+        cha.voicevoxConfig ??= {
             SPEED_SCALE: 1,
             PITCH_SCALE: 0,
             INTONATION_SCALE: 1,
@@ -602,7 +603,10 @@ export function characterFormatUpdate(indexOrCharacter:number|character, arg:{
         cha.backgroundHTML ??= ''
         cha.backgroundCSS ??= ''
         cha.creation_date ??= Date.now()
-        cha.globalLore = updateLorebooks(cha.globalLore)
+        const updatedGlobalLore = updateLorebooks(cha.globalLore)
+        if(updatedGlobalLore !== cha.globalLore){
+            cha.globalLore = updatedGlobalLore
+        }
         if(!cha.newGenData){
             cha = updateInlayScreen(cha)
         }
@@ -630,8 +634,16 @@ export function characterFormatUpdate(indexOrCharacter:number|character, arg:{
     if(checkNullish(cha.customscript)){
         cha.customscript = []
     }
-    cha.lastInteraction = Date.now()
-    if(typeof(indexOrCharacter) === 'number'){
+    // Keep the historical default for callers that omit the option, while
+    // allowing read-only consumers to normalize a detached character without
+    // manufacturing an interaction timestamp.
+    if(arg.updateInteraction ?? true){
+        cha.lastInteraction = Date.now()
+    }
+    // Mutations on the database's state proxy are already observable. Avoid a
+    // redundant same-reference array write, which otherwise marks an already
+    // normalized read as a database change. Keep replacement-object behavior.
+    if(typeof(indexOrCharacter) === 'number' && cha !== originalCharacter){
         setCharacterByIndex(indexOrCharacter, cha)
     }
     for(let i = 0; i < cha.chats.length; i++){
@@ -648,11 +660,14 @@ export function characterFormatUpdate(indexOrCharacter:number|character, arg:{
 }
 
 export function updateLorebooks(book:loreBook[]){
-    return book.map((v) => {
-        v.bookVersion ??= 1
-        if(v.bookVersion >= 2){
+    let migrated = false
+    const updatedBooks = book.map((v) => {
+        const bookVersion = v.bookVersion ?? 1
+        if(bookVersion >= 2){
             return v
         }
+        migrated = true
+        v.bookVersion = bookVersion
         if(v.activationPercent){
             const perc = v.activationPercent
             v.activationPercent = null
@@ -663,6 +678,7 @@ export function updateLorebooks(book:loreBook[]){
         v.bookVersion = 2
         return v
     })
+    return migrated ? updatedBooks : book
 
 }
 
@@ -911,10 +927,19 @@ export async function changeChar(index: number, arg:{
             return
         }
     }
+    const updateInteraction = shouldUpdateCharacterInteraction()
     characterFormatUpdate(index, {
-      updateInteraction: true,
+      updateInteraction,
     });
-    selectedCharID.set(index);
+    if(updateInteraction){
+        selectedCharID.set(index);
+    }
+    else{
+        // The delegated viewer's selection is local presentation state. Using
+        // the regular store setter here can wake canonical-data subscribers
+        // (for example HypaV3) during the runtime discovery gap.
+        setSelectedCharacterForPresentation(index)
+    }
 }
 
 export type CharacterNavigationMode = 'normal' | 'locked' | 'selection-only'
@@ -949,4 +974,13 @@ export function resolveCharacterNavigationMode(
     // This covers local/preview execution, non-Node builds, and the resident
     // executor, all of which still depend on stable live client state.
     return 'locked'
+}
+
+export function shouldUpdateCharacterInteraction(
+    platform: {
+        isNodeServer: boolean
+        isServerResidentExecutor: boolean
+    } = { isNodeServer, isServerResidentExecutor },
+): boolean {
+    return !platform.isNodeServer || platform.isServerResidentExecutor
 }

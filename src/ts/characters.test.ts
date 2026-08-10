@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { get, writable } from 'svelte/store'
+import type { character } from './storage/database.svelte'
 
 const mocks = vi.hoisted(() => ({
     dbState: {
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     localGenerationExecutionActive: null as ReturnType<typeof writable<boolean>> | null,
     runtimeGenerationActive: null as ReturnType<typeof writable<boolean>> | null,
     getColdStorageItem: vi.fn(),
+    setCharacterByIndex: vi.fn(),
     setSelectedCharacterForPresentation: vi.fn((index: number) => {
         mocks.selectedCharID!.set(index)
     }),
@@ -31,6 +33,7 @@ vi.mock('./storage/database.svelte', () => ({
     getDatabase: () => mocks.dbState.db,
     getCharacterByIndex: (index: number) => mocks.dbState.db.characters[index],
     setCharacterByIndex: (index: number, character: unknown) => {
+        mocks.setCharacterByIndex(index, character)
         mocks.dbState.db.characters[index] = character
     },
 }))
@@ -109,11 +112,17 @@ vi.mock('./runtime/generationActivity.svelte', () => {
 
 import {
     changeChar,
+    characterFormatUpdate,
     resolveCharacterNavigationMode,
+    shouldUpdateCharacterInteraction,
 } from './characters'
 
-function characterFixture(overrides: Record<string, unknown> = {}) {
+function characterFixture(overrides: Partial<character> = {}): character {
     return {
+        name: 'Character 1',
+        firstMessage: '',
+        desc: '',
+        notes: '',
         chaId: 'character-1',
         chats: [{
             id: 'chat-1',
@@ -123,11 +132,58 @@ function characterFixture(overrides: Record<string, unknown> = {}) {
             localLore: [],
             fmIndex: -1,
         }],
+        chatFolders: [],
         chatPage: 0,
+        viewScreen: 'none',
+        bias: [],
+        emotionImages: [],
         firstMsgIndex: -1,
         globalLore: [],
-        newGenData: {},
+        sdData: [],
+        utilityBot: false,
+        triggerscript: [],
+        alternateGreetings: [],
+        exampleMessage: '',
+        creatorNotes: '',
+        systemPrompt: '',
+        tags: [],
+        creator: '',
+        characterVersion: '',
+        personality: '',
+        scenario: '',
+        additionalData: {
+            tag: [],
+            creator: '',
+            character_version: '',
+        },
+        voicevoxConfig: {
+            SPEED_SCALE: 1,
+            PITCH_SCALE: 0,
+            INTONATION_SCALE: 1,
+            VOLUME_SCALE: 1,
+        },
+        additionalText: '',
+        depth_prompt: {
+            depth: 0,
+            prompt: '',
+        },
+        hfTTS: {
+            model: '',
+            language: 'en',
+        },
+        backgroundHTML: '',
+        backgroundCSS: '',
+        creation_date: 100,
+        ttsMode: '',
+        newGenData: {
+            prompt: '',
+            negative: '',
+            instructions: '',
+            emotionInstructions: '',
+        },
         customscript: [],
+        postHistoryInstructions: '',
+        replaceGlobalNote: '',
         lastInteraction: 123,
         type: 'character',
         ...overrides,
@@ -142,6 +198,7 @@ describe('character navigation during generation', () => {
         mocks.localGenerationExecutionActive!.set(false)
         mocks.runtimeGenerationActive!.set(false)
         mocks.getColdStorageItem.mockReset()
+        mocks.setCharacterByIndex.mockReset()
         mocks.setSelectedCharacterForPresentation.mockClear()
     })
 
@@ -180,39 +237,138 @@ describe('character navigation during generation', () => {
         })).toBe('locked')
     })
 
-    it('does not lock an idle client or a delegated Node viewer', () => {
-        expect(resolveCharacterNavigationMode({
-            doingChat: false,
-            localExecutionActive: false,
-            runtimeActive: false,
-        }, {
-            isNodeServer: false,
-            isServerResidentExecutor: false,
-        })).toBe('normal')
-        expect(resolveCharacterNavigationMode({
-            doingChat: true,
-            localExecutionActive: false,
-            runtimeActive: false,
-        }, {
-            isNodeServer: true,
-            isServerResidentExecutor: false,
-        })).toBe('selection-only')
-        expect(resolveCharacterNavigationMode({
-            doingChat: true,
-            localExecutionActive: false,
-            runtimeActive: true,
-        }, {
-            isNodeServer: true,
-            isServerResidentExecutor: false,
-        })).toBe('selection-only')
-        expect(resolveCharacterNavigationMode({
-            doingChat: false,
-            localExecutionActive: false,
-            runtimeActive: true,
-        }, {
-            isNodeServer: true,
-            isServerResidentExecutor: false,
-        })).toBe('selection-only')
+    it.each([
+        {
+            name: 'idle browser client',
+            activity: { doingChat: false, localExecutionActive: false, runtimeActive: false },
+            platform: { isNodeServer: false, isServerResidentExecutor: false },
+            expected: 'normal',
+        },
+        {
+            name: 'idle resident executor',
+            activity: { doingChat: false, localExecutionActive: false, runtimeActive: false },
+            platform: { isNodeServer: true, isServerResidentExecutor: true },
+            expected: 'normal',
+        },
+        {
+            name: 'idle delegated Node viewer during discovery gap',
+            activity: { doingChat: false, localExecutionActive: false, runtimeActive: false },
+            platform: { isNodeServer: true, isServerResidentExecutor: false },
+            expected: 'normal',
+        },
+        {
+            name: 'delegated Node viewer during admission',
+            activity: { doingChat: true, localExecutionActive: false, runtimeActive: false },
+            platform: { isNodeServer: true, isServerResidentExecutor: false },
+            expected: 'selection-only',
+        },
+        {
+            name: 'delegated Node viewer during durable execution',
+            activity: { doingChat: false, localExecutionActive: false, runtimeActive: true },
+            platform: { isNodeServer: true, isServerResidentExecutor: false },
+            expected: 'selection-only',
+        },
+        {
+            name: 'delegated Node viewer running a local preview',
+            activity: { doingChat: true, localExecutionActive: true, runtimeActive: false },
+            platform: { isNodeServer: true, isServerResidentExecutor: false },
+            expected: 'locked',
+        },
+    ])('resolves $name as $expected', ({ activity, platform, expected }) => {
+        expect(resolveCharacterNavigationMode(activity, platform)).toBe(expected)
+    })
+
+    it.each([
+        {
+            name: 'browser client',
+            platform: { isNodeServer: false, isServerResidentExecutor: false },
+            expected: true,
+        },
+        {
+            name: 'resident executor',
+            platform: { isNodeServer: true, isServerResidentExecutor: true },
+            expected: true,
+        },
+        {
+            name: 'delegated Node viewer',
+            platform: { isNodeServer: true, isServerResidentExecutor: false },
+            expected: false,
+        },
+    ])('$name interaction timestamp policy is $expected', ({ platform, expected }) => {
+        expect(shouldUpdateCharacterInteraction(platform)).toBe(expected)
+    })
+
+    it('keeps characterFormatUpdate timestamp behavior by default and honors an explicit opt-out', () => {
+        const now = vi.spyOn(Date, 'now').mockReturnValue(456)
+        const defaultCharacter = characterFixture()
+        const readOnlyCharacter = characterFixture()
+
+        characterFormatUpdate(defaultCharacter)
+        characterFormatUpdate(readOnlyCharacter, { updateInteraction: false })
+
+        expect(defaultCharacter.lastInteraction).toBe(456)
+        expect(readOnlyCharacter.lastInteraction).toBe(123)
+        now.mockRestore()
+    })
+
+    it('still performs genuine legacy migrations when interaction updates are disabled', () => {
+        const legacyCharacter = characterFixture({
+            globalLore: [{
+                key: 'legacy',
+                secondkey: '',
+                insertorder: 0,
+                comment: '',
+                content: 'Legacy lore',
+                mode: 'normal',
+                alwaysActive: false,
+                selective: false,
+                activationPercent: 75,
+                bookVersion: 1,
+            }],
+        })
+        delete (legacyCharacter as Partial<character>).alternateGreetings
+        mocks.dbState.db.characters[0] = legacyCharacter
+
+        characterFormatUpdate(0, { updateInteraction: false })
+
+        expect(mocks.dbState.db.characters[0].alternateGreetings).toEqual([])
+        expect(mocks.dbState.db.characters[0].globalLore[0]).toMatchObject({
+            bookVersion: 2,
+            activationPercent: null,
+            content: '@@probability 75\nLegacy lore',
+        })
+        expect(mocks.dbState.db.characters[0].lastInteraction).toBe(123)
+    })
+
+    it('selects an idle delegated viewer without any canonical proxy write', async () => {
+        const writes: PropertyKey[] = []
+        const normalizedCharacter = characterFixture()
+        const characterBefore = structuredClone(normalizedCharacter)
+        const characterWithWriteListener = new Proxy(normalizedCharacter, {
+            set(target, property, value, receiver) {
+                writes.push(property)
+                return Reflect.set(target, property, value, receiver)
+            },
+        })
+        mocks.dbState.db.characters[0] = characterWithWriteListener
+        const reseter = vi.fn()
+
+        // This is the cold-start discovery gap: the resident may already be
+        // generating, but this newly loaded viewer has not observed it yet.
+        mocks.doingChat!.set(false)
+        mocks.localGenerationExecutionActive!.set(false)
+        mocks.runtimeGenerationActive!.set(false)
+
+        await changeChar(0, { reseter })
+
+        expect(reseter).toHaveBeenCalledOnce()
+        expect(mocks.setSelectedCharacterForPresentation).toHaveBeenCalledWith(0)
+        expect(get(mocks.selectedCharID!)).toBe(0)
+        expect(mocks.getColdStorageItem).not.toHaveBeenCalled()
+        expect(mocks.setCharacterByIndex).not.toHaveBeenCalled()
+        expect(writes).toEqual([])
+        expect(mocks.dbState.db.characters[0].lastInteraction).toBe(123)
+        expect(mocks.dbState.db.characters[0]).toEqual(characterBefore)
     })
 
     it('re-enters by selection only without touching canonical character data', async () => {

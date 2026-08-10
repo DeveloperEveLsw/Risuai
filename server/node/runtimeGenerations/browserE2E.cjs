@@ -173,6 +173,36 @@ function createSeedDatabase(providerPort) {
             firstMsgIndex: -1,
             replaceGlobalNote: '',
             additionalText: '',
+            // Keep the fixture in the same already-normalized shape as a
+            // production character. The undiscovered-follower assertion is
+            // specifically about a presentation-only selection; exercising
+            // real legacy migrations here would correctly create a canonical
+            // save and obscure that boundary.
+            additionalData: {
+                tag: [],
+                creator: '',
+                character_version: '',
+            },
+            voicevoxConfig: {
+                SPEED_SCALE: 1,
+                PITCH_SCALE: 0,
+                INTONATION_SCALE: 1,
+                VOLUME_SCALE: 1,
+            },
+            depth_prompt: {
+                depth: 0,
+                prompt: '',
+            },
+            hfTTS: {
+                model: '',
+                language: 'en',
+            },
+            backgroundHTML: '',
+            backgroundCSS: '',
+            creation_date: 1_700_000_000_000,
+            ttsMode: '',
+            newGenData: {},
+            lastInteraction: 1_700_000_000_000,
             reloadKeys: 0,
         }],
         characterOrder: [CHARACTER_ID],
@@ -705,6 +735,10 @@ class CdpPage {
         }
     }
 
+    async setBlockedUrlPatterns(patterns) {
+        await this.command('Network.setBlockedURLs', { urls: patterns });
+    }
+
     async waitFor(expression, options = {}) {
         return eventually(async () => await this.evaluate(expression), options);
     }
@@ -961,7 +995,7 @@ async function stopChild(child) {
     childProcesses.delete(child);
 }
 
-async function authenticateAndOpenCharacter(page, baseUrl) {
+async function authenticateToCharacterCatalog(page, baseUrl) {
     await page.navigate(baseUrl);
     await page.waitFor(`document.querySelector('#alert-input') !== null`, { timeoutMs: 20_000 });
     await page.setInput('#alert-input', CLEAR_PASSWORD);
@@ -980,6 +1014,10 @@ async function authenticateAndOpenCharacter(page, baseUrl) {
         await page.clickButtonText('Character');
     }
     await waitForCharacterChoice(page, CHARACTER_ID, CHARACTER_NAME);
+}
+
+async function authenticateAndOpenCharacter(page, baseUrl) {
+    await authenticateToCharacterCatalog(page, baseUrl);
     await clickCharacterChoice(page, CHARACTER_ID, CHARACTER_NAME);
     await page.waitFor(`document.querySelector('textarea.text-input-area') !== null`, { timeoutMs: 10_000 });
 }
@@ -1214,15 +1252,11 @@ async function runScenario() {
 
     try {
         await waitForResident(server, resident);
-        await Promise.all([
-            authenticateAndOpenCharacter(desktop, server.baseUrl),
-            authenticateAndOpenCharacter(phone, server.baseUrl),
-        ]);
+        await authenticateAndOpenCharacter(desktop, server.baseUrl);
         assert.equal(await resident.evaluate("new URL(location.href).searchParams.get('risu-runtime')"), 'executor');
         assert.equal(await desktop.evaluate('location.search'), '', 'desktop A must remain a follower');
-        assert.equal(await phone.evaluate('location.search'), '', 'phone B must remain a follower');
+        assert.equal(await phone.evaluate('location.href'), 'about:blank', 'phone B must start as a fresh follower');
         assert.equal(await desktop.evaluate('window.innerWidth'), 1280);
-        assert.equal(await phone.evaluate('window.innerWidth'), 390);
         assert.match(await phone.evaluate('navigator.userAgent'), /Mobile/);
         assert.notEqual(
             desktop.browserContextId,
@@ -1230,9 +1264,8 @@ async function runScenario() {
             'desktop and phone must use separate browser storage partitions',
         );
 
-        // Opening a character updates last-interaction metadata. Let both
-        // follower writes settle before measuring generation behavior so a
-        // fixture-only CAS race cannot masquerade as a hand-off failure.
+        // Let the initiating follower settle before measuring generation
+        // behavior so fixture setup cannot masquerade as a hand-off failure.
         const settledRevision = await waitForStableCanonicalRevision(server.baseUrl);
         const settledSnapshot = await loadCanonicalDatabase(server.baseUrl);
         assertDisplayTriggerStayedImmutable(settledSnapshot.database, 'initial follower render');
@@ -1257,6 +1290,72 @@ async function runScenario() {
         // closed while the server-resident provider stream is still running.
         await desktop.closePage();
         const completedCommand = await completedCommandPromise;
+
+        // Reproduce the undiscovered-command race deterministically. Phone B
+        // is a fresh browser partition and its runtime endpoints remain
+        // blocked while it authenticates and selects the character. It can
+        // therefore have neither the green loader nor a local doingChat flag
+        // to protect a presentation-only navigation path.
+        await eventually(async () => {
+            const snapshot = await loadCanonicalDatabase(server.baseUrl);
+            const messages = getFixtureMessages(snapshot.database);
+            return messages.filter((message) => (
+                message.role === 'user' && message.data === NORMAL_INPUT
+            )).length === 1
+                ? snapshot
+                : false;
+        }, { timeoutMs: 15_000, intervalMs: 150 });
+        const revisionBeforeFreshPhone = await waitForStableCanonicalRevision(server.baseUrl);
+        await phone.setBlockedUrlPatterns(['*runtime-generations*']);
+        await authenticateToCharacterCatalog(phone, server.baseUrl);
+        assert.equal(await phone.evaluate('location.search'), '', 'phone B must remain a follower');
+        assert.equal(await phone.evaluate('window.innerWidth'), 390);
+        const revisionBeforeUndiscoveredSelection = await waitForStableCanonicalRevision(server.baseUrl);
+        assert.equal(
+            revisionBeforeUndiscoveredSelection,
+            revisionBeforeFreshPhone,
+            'fresh phone authentication/catalog render must not mutate the canonical database',
+        );
+        const conflictIdsBeforeUndiscoveredSelection = new Set(
+            (await listDatabaseConflicts(server.baseUrl)).map((conflict) => conflict.conflictId),
+        );
+        await clickCharacterChoice(phone, CHARACTER_ID, CHARACTER_NAME);
+        await phone.waitFor(
+            `document.querySelector('textarea.text-input-area') !== null
+                && document.querySelector('button[data-runtime-generation-stop="current-chat"]') === null
+                && document.querySelector('button[aria-labelledby="cancel"]') === null
+                && document.querySelector('.runtime-chat-presentation') === null`,
+            { timeoutMs: 10_000 },
+        );
+        await sleep(2_250);
+        assert.equal(
+            await phone.evaluate(
+                `document.querySelector('button[data-runtime-generation-stop="current-chat"]') === null
+                    && document.querySelector('.runtime-chat-presentation') === null`,
+            ),
+            true,
+            'runtime command discovery must remain blocked through a normal polling interval',
+        );
+        const revisionAfterUndiscoveredSelection = await waitForStableCanonicalRevision(server.baseUrl);
+        assert.equal(
+            revisionAfterUndiscoveredSelection,
+            revisionBeforeUndiscoveredSelection,
+            'selecting a character before runtime discovery must not save lastInteraction or bump revision',
+        );
+        const conflictsAfterUndiscoveredSelection = await listDatabaseConflicts(server.baseUrl);
+        assert.deepEqual(
+            conflictsAfterUndiscoveredSelection.filter(
+                (conflict) => !conflictIdsBeforeUndiscoveredSelection.has(conflict.conflictId),
+            ),
+            [],
+            'undiscovered-command navigation must not submit a stale canonical save',
+        );
+        assert.equal(mockProvider.requests[0].completed, false);
+        assert.equal(mockProvider.requests.length, 1);
+
+        // Once the network fence is lifted, the same phone must discover the
+        // original command and attach its exact current-chat loader/Stop UI.
+        await phone.setBlockedUrlPatterns([]);
         await phone.waitFor(`document.querySelector('button[aria-labelledby="cancel"]') !== null`, {
             timeoutMs: 20_000,
         });
@@ -1451,6 +1550,9 @@ async function runScenario() {
             isolatedRoot: temporaryRoot,
             settledRevisionBeforeSend: settledRevision,
             desktopClosedDuringStream: true,
+            phoneSelectedBeforeRuntimeDiscovery: true,
+            revisionBeforeUndiscoveredSelection,
+            revisionAfterUndiscoveredSelection,
             phoneObservedRunningBeforeCompletion: true,
             phoneObservedPartialBeforeCompletion,
             phoneReenteredSameChatBeforeCompletion: true,
