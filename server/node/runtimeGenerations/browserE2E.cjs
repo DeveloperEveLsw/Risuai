@@ -36,6 +36,10 @@ const LEGACY_SAVE_HEADER = Buffer.from([0, 82, 73, 83, 85, 83, 65, 86, 69, 0, 7]
 const BLOCK_SAVE_HEADER = Buffer.from('RISUSAVE\0', 'utf8');
 const CHARACTER_ID = 'e2e-character';
 const CHAT_ID = 'e2e-chat';
+const CHARACTER_NAME = 'Runtime E2E Character';
+const OTHER_CHARACTER_ID = 'e2e-other-character';
+const OTHER_CHAT_ID = 'e2e-other-chat';
+const OTHER_CHARACTER_NAME = 'Runtime E2E Other Character';
 const CLEAR_PASSWORD = 'risu-browser-e2e-password';
 const PASSWORD_HASH = crypto.createHash('sha256').update(CLEAR_PASSWORD).digest('hex');
 const NORMAL_INPUT = 'handoff from desktop';
@@ -116,13 +120,13 @@ async function buildApplication() {
 }
 
 function createSeedDatabase(providerPort) {
-    return {
+    const database = {
         didFirstSetup: true,
         formatversion: 5,
         language: 'en',
         characters: [{
             type: 'character',
-            name: 'Runtime E2E Character',
+            name: CHARACTER_NAME,
             image: '',
             firstMessage: 'Ready for an isolated browser test.',
             desc: 'A fixture that exists only in the temporary E2E save.',
@@ -268,7 +272,7 @@ function createSeedDatabase(providerPort) {
         selectedPersona: 0,
         playMessage: false,
         notification: false,
-        betaMobileGUI: false,
+        betaMobileGUI: true,
         hideRealm: true,
         roundIcons: false,
         removeIncompleteResponse: false,
@@ -281,6 +285,27 @@ function createSeedDatabase(providerPort) {
         promptTextInfoInsideChat: false,
         heightMode: 'dvh',
     };
+
+    // A second conversation lets the real UI prove that generation controls
+    // are scoped to the command target while global admission remains locked.
+    // Clone the complete compatibility-shaped character so rendering the
+    // secondary chat exercises production code without fixture-only nulls.
+    const otherCharacter = structuredClone(database.characters[0]);
+    otherCharacter.name = OTHER_CHARACTER_NAME;
+    otherCharacter.chaId = OTHER_CHARACTER_ID;
+    otherCharacter.chats = [{
+        id: OTHER_CHAT_ID,
+        message: [],
+        note: '',
+        name: 'Other E2E Chat',
+        localLore: [],
+        fmIndex: -1,
+    }];
+    otherCharacter.chatPage = 0;
+    otherCharacter.triggerscript = [];
+    database.characters.push(otherCharacter);
+    database.characterOrder.push(OTHER_CHARACTER_ID);
+    return database;
 }
 
 function encodeLegacySave(database) {
@@ -390,11 +415,16 @@ async function startMockStreamingProvider() {
         }
         const userMessages = (body.messages ?? []).filter((message) => message.role === 'user');
         const lastUserContent = String(userMessages.at(-1)?.content ?? '');
+        let releaseCompletion;
+        const completionGate = new Promise((resolve) => {
+            releaseCompletion = resolve;
+        });
         const record = {
             body,
             lastUserContent,
             aborted: false,
             completed: false,
+            releaseCompletion,
         };
         requests.push(record);
         response.writeHead(200, {
@@ -427,9 +457,11 @@ async function startMockStreamingProvider() {
         if (!response.destroyed) {
             writeSse(response, NORMAL_PARTIAL);
         }
-        // Keep the command running long enough for the independent phone
-        // follower's normal two-second observer loop to render progress.
-        await sleep(5_000);
+        // Keep the first provider stream deterministically open while the
+        // independent phone performs its observer and navigation assertions.
+        // The scenario releases this gate only after same/other-chat routing
+        // has been proven; cleanup also releases it after a failed assertion.
+        await completionGate;
         if (!response.destroyed) {
             writeSse(response, ` ${NORMAL_PROVIDER_FINAL}`);
         }
@@ -450,6 +482,9 @@ async function startMockStreamingProvider() {
         port: server.address().port,
         requests,
         async close() {
+            for (const request of requests) {
+                request.releaseCompletion?.();
+            }
             server.closeAllConnections?.();
             await new Promise((resolve) => server.close(resolve));
         },
@@ -625,7 +660,11 @@ class CdpPage {
 
     onEvent(method, params) {
         if (method === 'Runtime.exceptionThrown') {
-            this.diagnostics.push(`exception: ${params.exceptionDetails?.text ?? 'unknown'}`);
+            this.diagnostics.push(`exception: ${
+                params.exceptionDetails?.exception?.description
+                ?? params.exceptionDetails?.text
+                ?? 'unknown'
+            }`);
         }
         else if (method === 'Log.entryAdded' && params.entry?.level === 'error') {
             this.diagnostics.push(`log: ${params.entry.text}`);
@@ -881,6 +920,31 @@ async function launchChromium() {
     return new CdpConnection(webSocket, child);
 }
 
+function characterChoiceExpression(characterId, characterName, click = false) {
+    return `(() => {
+        const byId = document.querySelector(${JSON.stringify(`[data-char-id="${characterId}"]`)});
+        const byName = [...document.querySelectorAll('button')].find((button) => (
+            [...button.querySelectorAll('span')].some((span) => (
+                span.childElementCount === 0
+                && span.textContent.trim() === ${JSON.stringify(characterName)}
+            ))
+        ));
+        const choice = byId ?? byName;
+        if (!choice) return false;
+        ${click ? 'choice.click();' : ''}
+        return true;
+    })()`;
+}
+
+async function waitForCharacterChoice(page, characterId, characterName) {
+    await page.waitFor(characterChoiceExpression(characterId, characterName), { timeoutMs: 20_000 });
+}
+
+async function clickCharacterChoice(page, characterId, characterName) {
+    const clicked = await page.evaluate(characterChoiceExpression(characterId, characterName, true));
+    assert.equal(clicked, true, `${page.name} could not click character ${characterName}`);
+}
+
 async function stopChild(child) {
     if (!child || child.exitCode !== null || child.signalCode !== null) {
         childProcesses.delete(child);
@@ -902,12 +966,88 @@ async function authenticateAndOpenCharacter(page, baseUrl) {
     await page.waitFor(`document.querySelector('#alert-input') !== null`, { timeoutMs: 20_000 });
     await page.setInput('#alert-input', CLEAR_PASSWORD);
     await page.clickButtonText('OK');
-    await page.waitFor(
-        `document.querySelector('[data-char-id="${CHARACTER_ID}"]') !== null && document.querySelector('#alert-input') === null`,
-        { timeoutMs: 20_000 },
-    );
-    await page.clickSelector(`[data-char-id="${CHARACTER_ID}"]`);
+    await page.waitFor(`document.querySelector('#alert-input') === null`, { timeoutMs: 20_000 });
+    const initialDestination = await page.waitFor(`(() => {
+        if (${characterChoiceExpression(CHARACTER_ID, CHARACTER_NAME)}) return 'character';
+        const catalogButton = [...document.querySelectorAll('button')].find((button) => (
+            [...button.querySelectorAll('span')].some((span) => (
+                span.childElementCount === 0 && span.textContent.trim() === 'Character'
+            ))
+        ));
+        return catalogButton ? 'catalog' : '';
+    })()`, { timeoutMs: 20_000 });
+    if (initialDestination === 'catalog') {
+        await page.clickButtonText('Character');
+    }
+    await waitForCharacterChoice(page, CHARACTER_ID, CHARACTER_NAME);
+    await clickCharacterChoice(page, CHARACTER_ID, CHARACTER_NAME);
     await page.waitFor(`document.querySelector('textarea.text-input-area') !== null`, { timeoutMs: 10_000 });
+}
+
+async function navigateCharacterToHome(page) {
+    const result = await page.evaluate(`(() => {
+        const mobileBack = document.querySelector('button[data-runtime-mobile-chat-back]');
+        if (mobileBack) {
+            mobileBack.click();
+            return 'mobile-home';
+        }
+        const sidebar = document.querySelector('.rs-sidebar');
+        if (!sidebar) return 'missing';
+
+        const directHome = [...sidebar.children].find((element) => (
+            element instanceof HTMLButtonElement
+            && element.textContent.trim().toLowerCase() === 'home'
+        ));
+        if (directHome) {
+            directHome.click();
+            return 'home';
+        }
+
+        const expandedMenuButtons = [...sidebar.querySelectorAll('button.ico')];
+        if (expandedMenuButtons.length >= 2) {
+            expandedMenuButtons[1].click();
+            return 'home';
+        }
+
+        const menuButton = sidebar.querySelector(':scope > button');
+        if (!menuButton) return 'missing';
+        menuButton.click();
+        return 'menu';
+    })()`);
+    assert.notEqual(result, 'missing', `${page.name} could not find the Home navigation`);
+    if (result === 'menu') {
+        await page.waitFor(
+            `document.querySelectorAll('.rs-sidebar button.ico').length >= 2`,
+            { timeoutMs: 5_000 },
+        );
+        const clickedHome = await page.evaluate(`(() => {
+            const buttons = [...document.querySelectorAll('.rs-sidebar button.ico')];
+            if (buttons.length < 2) return false;
+            buttons[1].click();
+            return true;
+        })()`);
+        assert.equal(clickedHome, true, `${page.name} could not click expanded Home navigation`);
+    }
+    try {
+        await page.waitFor(
+            `document.querySelector('textarea.text-input-area') === null
+                && ${characterChoiceExpression(CHARACTER_ID, CHARACTER_NAME)}`,
+            { timeoutMs: 10_000 },
+        );
+    }
+    catch (error) {
+        const snapshot = await page.evaluate(`({
+            bodyText: (document.body?.innerText ?? '').slice(0, 2000),
+            buttons: [...document.querySelectorAll('button')].map((button) => ({
+                text: button.textContent.trim(),
+                runtimeMobileBack: button.hasAttribute('data-runtime-mobile-chat-back'),
+            })).slice(0, 100),
+            hasTextarea: document.querySelector('textarea.text-input-area') !== null,
+        })`);
+        throw new Error(`${page.name} did not reach the character catalog after Home navigation: ${JSON.stringify(snapshot)}`, {
+            cause: error,
+        });
+    }
 }
 
 async function waitForResident(server, residentPage) {
@@ -1129,6 +1269,68 @@ async function runScenario() {
             `(document.body?.innerText ?? '').includes(${JSON.stringify(NORMAL_PARTIAL)})`,
         );
 
+        // Navigation must remain independent from the resident generation.
+        // Reproduce the mobile failure exactly: leave the chat while the green
+        // running control is visible, then enter the same character again
+        // before the provider has completed its first request.
+        const providerRequestsBeforeNavigation = mockProvider.requests.length;
+        assert.equal(providerRequestsBeforeNavigation, 1);
+        await navigateCharacterToHome(phone);
+        assert.equal(
+            mockProvider.requests[0].completed,
+            false,
+            'the provider must still be streaming after phone B leaves the chat',
+        );
+        await clickCharacterChoice(phone, CHARACTER_ID, CHARACTER_NAME);
+        await phone.waitFor(
+            `document.querySelector('textarea.text-input-area') !== null
+                && document.querySelector('button[data-runtime-generation-stop="current-chat"]') !== null`,
+            { timeoutMs: 10_000 },
+        );
+        assert.equal(
+            mockProvider.requests[0].completed,
+            false,
+            'same-chat re-entry must succeed before provider completion',
+        );
+        assert.equal(
+            mockProvider.requests.length,
+            providerRequestsBeforeNavigation,
+            'leaving and re-entering must not duplicate the upstream generation',
+        );
+        const commandAfterSameChatReentry = (await listCommands(server.baseUrl))
+            .find((command) => command.commandId === completedCommand.commandId);
+        assert.ok(
+            commandAfterSameChatReentry
+                && ['queued', 'running'].includes(commandAfterSameChatReentry.state),
+            'the original command must remain active after same-chat re-entry',
+        );
+
+        // A different conversation remains navigable, but it must never gain
+        // the original chat's Stop control. The global single-executor lock is
+        // represented by a visibly disabled Send button instead.
+        await navigateCharacterToHome(phone);
+        await clickCharacterChoice(phone, OTHER_CHARACTER_ID, OTHER_CHARACTER_NAME);
+        await phone.waitFor(
+            `document.querySelector('textarea.text-input-area') !== null
+                && document.querySelector('button[data-runtime-generation-stop="current-chat"]') === null
+                && document.querySelector('button[data-runtime-generation-blocked="another-chat"]:disabled') !== null`,
+            { timeoutMs: 10_000 },
+        );
+        assert.equal(mockProvider.requests[0].completed, false);
+        assert.equal(mockProvider.requests.length, providerRequestsBeforeNavigation);
+
+        // Return to the originating chat once more so completion is rendered
+        // by the same observer that exercised cross-character navigation.
+        await navigateCharacterToHome(phone);
+        await clickCharacterChoice(phone, CHARACTER_ID, CHARACTER_NAME);
+        await phone.waitFor(
+            `document.querySelector('textarea.text-input-area') !== null
+                && document.querySelector('button[data-runtime-generation-stop="current-chat"]') !== null`,
+            { timeoutMs: 10_000 },
+        );
+        assert.equal(mockProvider.requests.length, providerRequestsBeforeNavigation);
+        mockProvider.requests[0].releaseCompletion();
+
         const completedTerminal = await waitForTerminal(server.baseUrl, completedCommand.commandId);
         assert.equal(completedTerminal.state, 'completed', completedTerminal.error ?? 'generation failed');
         await phone.waitFor(`(document.body?.innerText ?? '').includes(${JSON.stringify(NORMAL_FINAL)})`, {
@@ -1192,6 +1394,15 @@ async function runScenario() {
         );
         assert.equal(finalMessages.filter((message) => message.role === 'user' && message.data === NORMAL_INPUT).length, 1);
         assert.equal(finalMessages.filter((message) => message.role === 'user' && message.data === CANCEL_INPUT).length, 1);
+        const otherCharacter = finalSnapshot.database.characters
+            .find((character) => character.chaId === OTHER_CHARACTER_ID);
+        const otherChat = otherCharacter?.chats
+            .find((chat) => chat.id === OTHER_CHAT_ID);
+        assert.deepEqual(
+            otherChat?.message,
+            [],
+            'visiting the other chat during generation must not create a message',
+        );
         assert.ok(
             finalMessages.filter((message) => message.role === 'char' && message.data.includes(CANCEL_PARTIAL)).length <= 1,
             'Stop must not duplicate a partially generated assistant message',
@@ -1206,7 +1417,7 @@ async function runScenario() {
         assert.deepEqual(
             finalConflicts.filter((conflict) => !initialConflictIds.has(conflict.conflictId)),
             [],
-            'presentation rendering must not produce a stale canonical database save',
+            'presentation rendering and in-flight navigation must not produce a stale canonical database save',
         );
 
         const allCommands = await listCommands(server.baseUrl);
@@ -1242,6 +1453,8 @@ async function runScenario() {
             desktopClosedDuringStream: true,
             phoneObservedRunningBeforeCompletion: true,
             phoneObservedPartialBeforeCompletion,
+            phoneReenteredSameChatBeforeCompletion: true,
+            otherChatStopControlScoped: true,
             compatibilityPipeline: ['module-lua', 'plugin-v2.1', 'module-regex'],
             compatibilityFinalMarker: NORMAL_FINAL,
             canonicalRevision: finalSnapshot.revision,

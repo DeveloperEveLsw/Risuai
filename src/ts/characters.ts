@@ -5,15 +5,17 @@ import { language } from "../lang";
 import { checkNullish, findCharacterbyId, findCharacterIndexbyId, getUserName, selectMultipleFile, selectSingleFile } from "./util";
 import { v4 as uuidv4, v4 } from 'uuid';
 import { getImageType } from "./media";
-import { DBState, MobileGUIStack, OpenRealmStore, selectedCharID } from "./stores.svelte";
+import { DBState, MobileGUIStack, OpenRealmStore, selectedCharID, setSelectedCharacterForPresentation } from "./stores.svelte";
 import { AppendableBuffer, changeChatTo, checkCharOrder, downloadFile, getFileSrc, requiresFullEncoderReload } from "./globalApi.svelte";
 import { updateInlayScreen } from "./process/inlayScreen";
 import { parseMarkdownSafe } from "./parser/parser.svelte";
 import { translateHTML } from "./translator/translator";
-import { doingChat } from "./process/index.svelte";
+import { doingChat, localGenerationExecutionActive } from "./process/index.svelte";
 import { importCharacter } from "./characterCards";
 import { PngChunk } from "./pngChunk";
 import { getColdStorageItem } from "./process/coldstorage.svelte";
+import { isNodeServer, isServerResidentExecutor } from "./platform";
+import { runtimeGenerationActive } from "./runtime/generationActivity.svelte";
 
 export function createNewCharacter() {
     DBState.db.characters.push(createBlankChar())
@@ -877,10 +879,28 @@ export async function changeChar(index: number, arg:{
     reseter?:()=>any,
 } = {}) {
     const reseter = arg.reseter ?? (() => {})
-    if(get(doingChat)){
-      return
+    const navigationMode = resolveCharacterNavigationMode({
+        doingChat: get(doingChat),
+        localExecutionActive: get(localGenerationExecutionActive),
+        runtimeActive: get(runtimeGenerationActive),
+    })
+    if(navigationMode === 'locked'){
+        return
+    }
+    if(!Number.isInteger(index) || index < 0 || !DBState.db.characters?.[index]){
+        return
     }
     reseter();
+    if(navigationMode === 'selection-only'){
+        // Cold-storage entries are intentionally incomplete list stubs. Do not
+        // present one as a real chat until the normal, persistence-capable
+        // hydration path can run after the resident command has settled.
+        if(DBState.db.characters[index].coldstorage){
+            return
+        }
+        setSelectedCharacterForPresentation(index)
+        return
+    }
     if(DBState.db.characters?.[index]?.coldstorage){
         const coldData = await getColdStorageItem(DBState.db.characters[index].coldstorage!)
         if(coldData?.character && coldData.character.chaId === DBState.db.characters[index].chaId){
@@ -895,4 +915,38 @@ export async function changeChar(index: number, arg:{
       updateInteraction: true,
     });
     selectedCharID.set(index);
+}
+
+export type CharacterNavigationMode = 'normal' | 'locked' | 'selection-only'
+
+export function resolveCharacterNavigationMode(
+    activity: {
+        doingChat: boolean
+        localExecutionActive: boolean
+        runtimeActive: boolean
+    },
+    platform: {
+        isNodeServer: boolean
+        isServerResidentExecutor: boolean
+    } = { isNodeServer, isServerResidentExecutor },
+): CharacterNavigationMode {
+    if (activity.localExecutionActive) {
+        return 'locked'
+    }
+
+    const isDelegatedViewer = platform.isNodeServer && !platform.isServerResidentExecutor
+    if (isDelegatedViewer && (activity.runtimeActive || activity.doingChat)) {
+        // A delegated admission/command is bound to its original target. Only
+        // move the viewer selection: formatting or restoring cold storage here
+        // would dirty the canonical database while the executor is saving it.
+        return 'selection-only'
+    }
+
+    if (!activity.doingChat) {
+        return 'normal'
+    }
+
+    // This covers local/preview execution, non-Node builds, and the resident
+    // executor, all of which still depend on stable live client state.
+    return 'locked'
 }

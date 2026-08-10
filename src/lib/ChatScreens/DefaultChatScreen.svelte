@@ -8,7 +8,7 @@
     import { type Message } from "../../ts/storage/database.svelte";
     import { DBState } from 'src/ts/stores.svelte';
     import { getCharImage } from "../../ts/characters";
-    import { chatProcessStage, doingChat, sendChat } from "../../ts/process/index.svelte";
+    import { chatProcessStage, doingChat, localGenerationExecutionActive, sendChat } from "../../ts/process/index.svelte";
     import { sleep } from "../../ts/util";
     import { language } from "../../lang";
     import { isExpTranslator, translate } from "../../ts/translator/translator";
@@ -48,6 +48,13 @@
         waitForRuntimeGenerationTerminal,
     } from 'src/ts/runtime/generationDelegation.svelte';
     import {
+        activeRuntimeGenerationCommands,
+        clearRuntimeGenerationPendingIntent,
+        getRuntimeGenerationTargetActivity,
+        registerRuntimeGenerationPendingIntent,
+        runtimeGenerationPendingIntents,
+    } from 'src/ts/runtime/generationActivity.svelte';
+    import {
         isRuntimeGenerationKeepaliveSafe,
         type RuntimeGenerationCreateInput,
     } from 'src/ts/runtime/generationClient';
@@ -86,13 +93,78 @@
     let isScrollingToMessage = $state(false)
     let { openModuleList = $bindable(false), openChatList = $bindable(false), customStyle = '' }: Props = $props();
     let currentCharacter = $derived(DBState.db.characters[$selectedCharID])
+    let currentChatRecord = $derived(currentCharacter?.chats[currentCharacter.chatPage])
     let currentChat = $derived(currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [])
+    let currentRuntimeGenerationActivity = $derived(getRuntimeGenerationTargetActivity(
+        $activeRuntimeGenerationCommands,
+        {
+            characterId: currentCharacter?.chaId,
+            chatId: currentChatRecord?.id,
+        },
+    ))
+    let currentRuntimePendingIntent = $derived(
+        $runtimeGenerationPendingIntents.find((intent) => (
+            intent.characterId === currentCharacter?.chaId
+            && intent.chatId === currentChatRecord?.id
+        )) ?? null,
+    )
+    let localRuntimeSubmissionActiveHere = $derived(
+        currentRuntimePendingIntent !== null,
+    )
+    let currentChatRuntimeActive = $derived(
+        currentRuntimeGenerationActivity.activeCommand !== null
+        || localRuntimeSubmissionActiveHere,
+    )
+    let currentChatRuntimeAutoActive = $derived(
+        currentRuntimeGenerationActivity.activeCommand?.action === 'auto',
+    )
+    let delegatedRuntimeAdmissionActive = $derived(
+        currentRuntimeGenerationActivity.anyActive
+        || $runtimeGenerationPendingIntents.length > 0,
+    )
+    let generationAdmissionBlocked = $derived(
+        shouldDelegateGeneration()
+            ? delegatedRuntimeAdmissionActive || $doingChat || $localGenerationExecutionActive
+            : $doingChat,
+    )
+    let showCurrentChatGenerationControl = $derived(
+        shouldDelegateGeneration() ? currentChatRuntimeActive : $doingChat,
+    )
+    let runtimeGenerationActiveElsewhere = $derived(
+        shouldDelegateGeneration()
+        && (
+            currentRuntimeGenerationActivity.activeElsewhere
+            || ($runtimeGenerationPendingIntents.length > 0 && !localRuntimeSubmissionActiveHere)
+            || $localGenerationExecutionActive
+            || ($doingChat && !delegatedRuntimeAdmissionActive)
+        ),
+    )
     let currentPresentationOverlays = $derived(
         $visibleRuntimeChatPresentationOverlays.filter((overlay) => (
             overlay.characterId === currentCharacter?.chaId
             && overlay.chatId === currentCharacter?.chats[currentCharacter.chatPage]?.id
         )),
     )
+
+    function clearLocalRuntimeSubmission(requestId: string) {
+        clearRuntimeGenerationPendingIntent(requestId)
+    }
+
+    function clearRuntimeIntent(requestId: string, controller: AbortController) {
+        clearLocalRuntimeSubmission(requestId)
+        if(abortController === controller){
+            abortController = null
+            abortControllerRuntimeTarget = null
+            abortControllerRuntimeCommandId = null
+        }
+    }
+
+    function restoreDelegatedGenerationActivity() {
+        // Never let one finished/failed submission clear the global admission
+        // lock while another durable command is still queued or running.
+        $doingChat = $activeRuntimeGenerationCommands.length > 0
+            || $runtimeGenerationPendingIntents.length > 0
+    }
 
     function scrollToBottom() {
         chatsInstance?.scrollToLatestMessage();
@@ -178,7 +250,7 @@
 
     async function sendMain(continueResponse:boolean) {
         let selectedChar = $selectedCharID
-        if($doingChat){
+        if(generationAdmissionBlocked){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -206,6 +278,27 @@
         if(shouldDelegateGeneration()){
             const character = DBState.db.characters[selectedChar]
             const chat = character?.chats?.[character.chatPage]
+            const pendingIntent = character && chat ? {
+                requestId: v4(),
+                controller: new AbortController(),
+            } : null
+            if(pendingIntent){
+                registerRuntimeGenerationPendingIntent({
+                    requestId: pendingIntent.requestId,
+                    characterId: character.chaId,
+                    chatId: chat.id,
+                    controller: pendingIntent.controller,
+                    input: messageInput,
+                    files: [...fileInput],
+                    createdAt: Date.now(),
+                })
+                abortController = pendingIntent.controller
+                abortControllerRuntimeTarget = {
+                    characterId: character.chaId,
+                    chatId: chat.id,
+                }
+                abortControllerRuntimeCommandId = null
+            }
             let canonicalHead = getCleanNodeDatabaseHead()
             if(character && chat && !canonicalHead){
                 // Finish an unrelated settings/chat save before accepting the
@@ -216,26 +309,38 @@
                     await waitForNodeDatabasePersistence()
                     canonicalHead = getCleanNodeDatabaseHead()
                 } catch (error) {
-                    $doingChat = false
-                    alertError(error)
+                    if(pendingIntent){
+                        clearRuntimeIntent(pendingIntent.requestId, pendingIntent.controller)
+                    }
+                    restoreDelegatedGenerationActivity()
+                    if(!pendingIntent?.controller.signal.aborted){
+                        alertError(error)
+                    }
+                    return
+                }
+                if(pendingIntent?.controller.signal.aborted){
+                    clearRuntimeIntent(pendingIntent.requestId, pendingIntent.controller)
+                    restoreDelegatedGenerationActivity()
                     return
                 }
                 if(!canonicalHead){
-                    $doingChat = false
+                    if(pendingIntent){
+                        clearRuntimeIntent(pendingIntent.requestId, pendingIntent.controller)
+                    }
+                    restoreDelegatedGenerationActivity()
                     alertError('The canonical server database is not ready for generation')
                     return
                 }
             }
-            if(character && chat && canonicalHead){
+            if(character && chat && canonicalHead && pendingIntent){
                 const originalInput = messageInput
                 const originalFiles = [...fileInput]
                 let commandAccepted = false
                 let restoreDraftAfterFailure = true
                 let terminalRevisionAdopted = false
                 let retainOverlayForFollower = false
-                const intentAbort = new AbortController()
-                abortController = intentAbort
-                const requestId = v4()
+                const intentAbort = pendingIntent.controller
+                const requestId = pendingIntent.requestId
                 reserveRuntimeChatPresentationRequest(requestId)
                 let overlayIdentifier = requestId
                 const presentationText = resolveRuntimeChatPresentationText({
@@ -292,10 +397,14 @@
                     const command = await commandPromise
                     commandAccepted = true
                     overlayIdentifier = command.commandId
+                    if(abortController === intentAbort){
+                        abortControllerRuntimeCommandId = command.commandId
+                    }
                     if(!keepaliveSafe){
                         createPresentationOverlay()
                     }
                     bindRuntimeChatPresentationCommand(requestId, command)
+                    clearLocalRuntimeSubmission(requestId)
                     if(messageInput === originalInput){
                         messageInput = ''
                         messageInputTranslate = ''
@@ -347,6 +456,8 @@
                         }
                         if(abortController === intentAbort){
                             abortController = null
+                            abortControllerRuntimeTarget = null
+                            abortControllerRuntimeCommandId = null
                         }
                         return
                     }
@@ -400,8 +511,11 @@
                 }
                 if(abortController === intentAbort){
                     abortController = null
+                    abortControllerRuntimeTarget = null
+                    abortControllerRuntimeCommandId = null
                 }
-                $doingChat = false
+                clearLocalRuntimeSubmission(requestId)
+                restoreDelegatedGenerationActivity()
                 return
             }
         }
@@ -461,7 +575,7 @@
     }
 
     async function reroll() {
-        if($doingChat){
+        if(generationAdmissionBlocked){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -483,7 +597,7 @@
                     payload: { databaseRevision: persisted?.revision ?? null },
                 })
             } catch (error) {
-                $doingChat = false
+                restoreDelegatedGenerationActivity()
                 alertError(error)
             }
             return
@@ -536,7 +650,7 @@
     }
 
     async function unReroll() {
-        if($doingChat){
+        if(generationAdmissionBlocked){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -558,7 +672,7 @@
                     payload: { databaseRevision: persisted?.revision ?? null },
                 })
             } catch (error) {
-                $doingChat = false
+                restoreDelegatedGenerationActivity()
                 alertError(error)
             }
             return
@@ -586,6 +700,8 @@
     }
 
     let abortController:null|AbortController = null
+    let abortControllerRuntimeTarget:null|{ characterId: string, chatId: string } = null
+    let abortControllerRuntimeCommandId:string|null = null
 
     async function sendChatMain(continued:boolean = false) {
 
@@ -615,18 +731,39 @@
 
     function abortChat(){
         if(shouldDelegateGeneration()){
-            if(abortController){
+            const character = DBState.db.characters[$selectedCharID]
+            const chat = character?.chats?.[character.chatPage]
+            if(!character || !chat){
+                return
+            }
+            if(currentRuntimePendingIntent){
+                if(messageInput === ''){
+                    messageInput = currentRuntimePendingIntent.input
+                    messageInputTranslate = ''
+                }
+                if(fileInput.length === 0){
+                    fileInput = [...currentRuntimePendingIntent.files]
+                }
+                currentRuntimePendingIntent.controller.abort('generation cancelled by user')
+                return
+            }
+            const currentActiveCommand = currentRuntimeGenerationActivity.activeCommand
+            if(
+                abortController
+                && abortControllerRuntimeCommandId !== null
+                && abortControllerRuntimeCommandId === currentActiveCommand?.commandId
+                && abortControllerRuntimeTarget?.characterId === character.chaId
+                && abortControllerRuntimeTarget.chatId === chat.id
+            ){
                 // The local signal is bound to this exact request. Falling
                 // through would also cancel an older remote command in the
                 // same chat because the global fallback prefers running work.
                 abortController.abort('generation cancelled by user')
                 return
             }
-            const character = DBState.db.characters[$selectedCharID]
-            const chat = character?.chats?.[character.chatPage]
             void cancelActiveRuntimeGeneration({
-                characterId: character?.chaId,
-                chatId: chat?.id,
+                characterId: character.chaId,
+                chatId: chat.id,
             }).catch((error) => alertError(error))
             return
         }
@@ -637,14 +774,16 @@
 
     async function runAutoMode() {
         if(shouldDelegateGeneration()){
-            if(autoMode){
-                autoMode = false
+            if(currentChatRuntimeAutoActive){
                 const character = DBState.db.characters[$selectedCharID]
                 const chat = character?.chats?.[character.chatPage]
                 await cancelActiveRuntimeGeneration({
                     characterId: character?.chaId,
                     chatId: chat?.id,
                 })
+                return
+            }
+            if(generationAdmissionBlocked){
                 return
             }
             const character = DBState.db.characters[$selectedCharID]
@@ -660,10 +799,8 @@
                     chatId: chat.id,
                     payload: { databaseRevision: persisted?.revision ?? null },
                 })
-                autoMode = true
             } catch (error) {
-                autoMode = false
-                $doingChat = false
+                restoreDelegatedGenerationActivity()
                 alertError(error)
             }
             return
@@ -989,18 +1126,31 @@
                 ></textarea>
 
 
-                {#if $doingChat || doingChatInputTranslate}
+                {#if showCurrentChatGenerationControl || doingChatInputTranslate}
                     <button
                             aria-labelledby="cancel"
+                            data-runtime-generation-stop={showCurrentChatGenerationControl ? 'current-chat' : undefined}
                             class="peer-focus:border-textcolor  flex justify-center border-y border-darkborderc items-center text-textcolor p-3 hover:bg-blue-500 hover:text-white transition-colors" onclick={abortChat}
                             style:height={inputHeight}
                     >
-                        <div class="loadmove chat-process-stage-{$chatProcessStage}" class:autoload={autoMode}></div>
+                        <div
+                            class="loadmove chat-process-stage-{$chatProcessStage}"
+                            class:autoload={shouldDelegateGeneration() ? currentChatRuntimeAutoActive : autoMode}
+                        ></div>
                     </button>
                 {:else}
                     <button
                             onclick={send}
-                            class="flex justify-center border-y border-darkborderc items-center text-textcolor p-3 peer-focus:border-textcolor hover:bg-blue-500 hover:text-white transition-colors button-icon-send"
+                            disabled={runtimeGenerationActiveElsewhere}
+                            aria-disabled={runtimeGenerationActiveElsewhere}
+                            aria-label={runtimeGenerationActiveElsewhere
+                                ? 'A response is being generated in another chat'
+                                : 'Send message'}
+                            title={runtimeGenerationActiveElsewhere
+                                ? 'A response is being generated in another chat'
+                                : undefined}
+                            data-runtime-generation-blocked={runtimeGenerationActiveElsewhere ? 'another-chat' : undefined}
+                            class="flex justify-center border-y border-darkborderc items-center text-textcolor p-3 peer-focus:border-textcolor hover:bg-blue-500 hover:text-white transition-colors button-icon-send disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-textcolor"
                             style:height={inputHeight}
                     >
                         <Send />

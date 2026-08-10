@@ -28,6 +28,20 @@ export const DynamicGUI = writable(false)
 export const sideBarClosing = writable(false)
 export const sideBarStore = writable(window.innerWidth > 1024)
 export const selectedCharID = writable(-1)
+let presentationOnlyCharacterSelectionDepth = 0
+
+/** Select a character for display without applying selection-time database
+ * defaults. Runtime generations use this while the canonical database is
+ * being updated by the resident executor. */
+export function setSelectedCharacterForPresentation(index: number) {
+    presentationOnlyCharacterSelectionDepth += 1
+    try {
+        selectedCharID.set(index)
+    }
+    finally {
+        presentationOnlyCharacterSelectionDepth -= 1
+    }
+}
 export const CurrentTriggerIdStore = writable<string | null>(null)
 export const CharEmotion = writable({} as {[key:string]: [string, string, number][]})
 export const ViewBoxsize = writable({ width: 12 * 16, height: 12 * 16 }); // Default width and height in pixels
@@ -185,7 +199,10 @@ $effect.root(() => {
     selectedCharID.subscribe((v) => {
         selIdState.selId = v
 
-        if (DBState?.db?.characters?.[selIdState.selId]) {
+        if (
+            presentationOnlyCharacterSelectionDepth === 0
+            && DBState?.db?.characters?.[selIdState.selId]
+        ) {
             if (DBState.db.hypaV3 && DBState.db.hypaV3Presets?.[DBState.db.hypaV3PresetId]?.settings?.alwaysToggleOn) {
                 DBState.db.characters[selIdState.selId].supaMemory = true;
             }

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { requestChatData } from "src/ts/process/request/request";
-    import { doingChat, type OpenAIChat } from "../../ts/process/index.svelte";
+    import { doingChat, localGenerationExecutionActive, type OpenAIChat } from "../../ts/process/index.svelte";
     import { type character, type Message, type groupChat } from "../../ts/storage/database.svelte";
 	import { DBState } from 'src/ts/stores.svelte';
     import { selectedCharID } from "../../ts/stores.svelte";
@@ -11,8 +11,10 @@
     import { language } from "src/lang";
     import { getUserName, replacePlaceholders } from "../../ts/util";
     import { onDestroy } from 'svelte';
+    import { derived } from 'svelte/store';
     import { ParseMarkdown } from "src/ts/parser/parser.svelte";
     import {defaultAutoSuggestPrompt} from "../../ts/storage/defaultPrompts.js";
+    import { runtimeGenerationActive } from 'src/ts/runtime/generationActivity.svelte';
 
     interface Props {
         send: () => any;
@@ -28,6 +30,12 @@
     let abortController:AbortController|undefined;
     let suggestionRequestId = 0;
     let chatPage:number = $state()
+    const generationAdmissionActive = derived(
+        [doingChat, localGenerationExecutionActive, runtimeGenerationActive],
+        ([$doingChat, $localGenerationExecutionActive, $runtimeGenerationActive]) => (
+            $doingChat || $localGenerationExecutionActive || $runtimeGenerationActive
+        ),
+    )
 
     const cancelSuggestionRequest = () => {
         suggestionRequestId += 1
@@ -37,7 +45,7 @@
     }
 
     const updateSuggestions = () => {
-        if($selectedCharID > -1 && !$doingChat) {
+        if($selectedCharID > -1 && !$generationAdmissionActive) {
             if(progressChatPage > 0 && progressChatPage != chatPage){
                 cancelSuggestionRequest()
             }
@@ -47,7 +55,7 @@
     }
 
     const requestSuggestions = () => {
-        if($doingChat || $selectedCharID <= -1 || (suggestMessages && suggestMessages.length > 0) || progress){
+        if($generationAdmissionActive || $selectedCharID <= -1 || (suggestMessages && suggestMessages.length > 0) || progress){
             return
         }
 
@@ -123,7 +131,7 @@
         })
     }
 
-    const unsub = doingChat.subscribe(async (v) => {
+    const unsub = generationAdmissionActive.subscribe(async (v) => {
         if(v) {
             cancelSuggestionRequest()
             suggestMessages = []
@@ -163,7 +171,7 @@
             <div class="loadmove mx-2"></div>
             <div>{language.creatingSuggestions}</div>
         </div>        
-    {:else if !$doingChat}
+    {:else if !$generationAdmissionActive}
         {#if DBState.db.translator !== ''}
             <div class="flex mr-2 mb-2">
                 <button class={"bg-textcolor2 hover:bg-darkbutton font-bold py-2 px-4 rounded-sm " + (toggleTranslate ? 'text-green-500' : 'text-textcolor')}
@@ -231,4 +239,3 @@
         100% { transform: rotate(360deg); }
     }
 </style>
-

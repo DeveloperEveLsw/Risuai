@@ -7,16 +7,19 @@
     import { runLuaButtonTrigger } from 'src/ts/process/scriptings'
     import { risuChatParser } from "src/ts/process/scripts"
     import { runTrigger } from 'src/ts/process/triggers'
+    import { doingChat, localGenerationExecutionActive } from 'src/ts/process/index.svelte'
     import {
         delegateRuntimeChatInteraction,
         shouldDelegateGeneration,
     } from 'src/ts/runtime/generationDelegation.svelte'
+    import { runtimeGenerationActive } from 'src/ts/runtime/generationActivity.svelte'
+    import { admitRuntimeChatInteraction } from 'src/ts/runtime/chatInteractionAdmission'
     import { sayTTS } from "src/ts/process/tts"
     import { DBState, ReloadChatPointer, CurrentTriggerIdStore, popupStore } from 'src/ts/stores.svelte'
     import { ConnectionOpenStore } from "src/ts/sync/multiuser"
     import { capitalize, getUserIcon, getUserName, sleep } from "src/ts/util"
     import { onDestroy, onMount } from "svelte"
-    import { type Unsubscriber } from "svelte/store"
+    import { get, type Unsubscriber } from "svelte/store"
     import { v4 as uuidv4, v4 } from 'uuid'
     import { language } from "../../lang"
     import { alertClear, alertConfirm, alertInput, alertNormal, alertRequestData, alertWait } from "../../ts/alert"
@@ -29,6 +32,7 @@
     import PopupButton from "../UI/PopupButton.svelte";
     import PartialEditController from './PartialEditController.svelte';
     import { getLLMCache, setLLMCache } from "../../ts/translator/translator"
+    import { shouldShowChatTtsControl } from './chatTtsControl'
 
     let translating = $state(false)
     let editMode = $state(false)
@@ -256,6 +260,18 @@
         if (!origin) {
             return
         }
+        const admission = admitRuntimeChatInteraction({
+            delegated: shouldDelegateGeneration(),
+            generationActive: get(doingChat) || get(localGenerationExecutionActive),
+            runtimeGenerationActive: get(runtimeGenerationActive),
+        }, () => true)
+        if (!('result' in admission)) {
+            // The resident command is bound to one canonical revision. A
+            // second manual/Lua mutation would be queued against a stale base.
+            event.preventDefault()
+            event.stopPropagation()
+            return
+        }
 
         const triggerName = origin.getAttribute('risu-trigger')
         const triggerId = origin.getAttribute('risu-id')
@@ -309,7 +325,7 @@
                 return v
             })
         }
-        
+
         if(triggerName && triggerId) {
             setTimeout(() => {
                 CurrentTriggerIdStore.set(null)
@@ -790,7 +806,7 @@
     </button>    
 {/if}
 {#if idx > -1}
-    {#if DBState.db.characters[selIdState.selId].type !== 'group' && DBState.db.characters[selIdState.selId].ttsMode !== 'none' && (DBState.db.characters[selIdState.selId].ttsMode)}
+    {#if shouldShowChatTtsControl(DBState.db.characters[selIdState.selId])}
         <button class="flex items-center hover:text-blue-500 transition-colors button-icon-tts" onclick={()=>{
             return sayTTS(null, isOptimizedStreamingMessage ? rawStreamingText : message)
         }}>

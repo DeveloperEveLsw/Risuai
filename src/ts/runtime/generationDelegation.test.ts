@@ -36,6 +36,10 @@ const mocks = vi.hoisted(() => ({
     dismissRuntimeAlertPrompt: vi.fn(),
     dismissRuntimeAlertPromptsForCommand: vi.fn(),
     presentRuntimeAlertNotice: vi.fn(),
+    localExecutionActive: null as null | {
+        set: (value: boolean) => void
+        subscribe: (run: (value: boolean) => void) => () => void
+    },
 }))
 
 vi.mock('../platform', () => ({
@@ -61,9 +65,11 @@ vi.mock('../stores.svelte', async () => {
 
 vi.mock('../process/index.svelte', async () => {
     const { writable } = await import('svelte/store')
+    mocks.localExecutionActive = writable(false)
     return {
         chatProcessStage: writable(0),
         doingChat: writable(false),
+        localGenerationExecutionActive: mocks.localExecutionActive,
         setSendChatDelegate: vi.fn((delegate: CapturedDelegate) => {
             mocks.delegate = delegate
         }),
@@ -144,6 +150,10 @@ describe('public low-level sendChat delegation', () => {
         typeof import('./generationDelegation.svelte').shouldRestoreRuntimeDraft
     let startRuntimeGenerationFollower:
         typeof import('./generationDelegation.svelte').startRuntimeGenerationFollower
+    let activeRuntimeGenerationCommands:
+        typeof import('./generationDelegation.svelte').activeRuntimeGenerationCommands
+    let getRuntimeGenerationTargetActivity:
+        typeof import('./generationDelegation.svelte').getRuntimeGenerationTargetActivity
 
     beforeEach(async () => {
         vi.resetModules()
@@ -172,6 +182,7 @@ describe('public low-level sendChat delegation', () => {
         mocks.presentRuntimeAlertNotice.mockReset().mockResolvedValue(undefined)
 
         const delegation = await import('./generationDelegation.svelte')
+        mocks.localExecutionActive!.set(false)
         const { selectedCharID } = await import('../stores.svelte')
         selectedCharID.set(0)
         installRuntimeGenerationDelegation = delegation.installRuntimeGenerationDelegation
@@ -182,6 +193,8 @@ describe('public low-level sendChat delegation', () => {
         shouldRestoreCancelledRuntimeDraft = delegation.shouldRestoreCancelledRuntimeDraft
         shouldRestoreRuntimeDraft = delegation.shouldRestoreRuntimeDraft
         startRuntimeGenerationFollower = delegation.startRuntimeGenerationFollower
+        activeRuntimeGenerationCommands = delegation.activeRuntimeGenerationCommands
+        getRuntimeGenerationTargetActivity = delegation.getRuntimeGenerationTargetActivity
     })
 
     it('persists the already-mutated database, then enqueues generate with every upstream argument', async () => {
@@ -330,6 +343,11 @@ describe('public low-level sendChat delegation', () => {
         await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledOnce())
         const { doingChat } = await import('../process/index.svelte')
         expect(get(doingChat)).toBe(true)
+        await expect(queueRuntimeGeneration({
+            ...input,
+            requestId: 'second-pending-request',
+        })).rejects.toThrow('A server generation is already in progress')
+        expect(mocks.create).toHaveBeenCalledOnce()
 
         controller.abort(new Error('generation cancelled by user'))
 
@@ -341,6 +359,22 @@ describe('public low-level sendChat delegation', () => {
             databaseRevision: 7,
         })
         expect(mocks.watchers).toHaveLength(0)
+        expect(get(doingChat)).toBe(false)
+    })
+
+    it('does not admit a delegated command during a local preview pipeline', async () => {
+        mocks.localExecutionActive!.set(true)
+
+        await expect(queueRuntimeGeneration({
+            requestId: 'blocked-by-local-preview',
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'must wait', files: [], databaseRevision: 7 },
+        })).rejects.toThrow('A server generation is already in progress')
+
+        expect(mocks.create).not.toHaveBeenCalled()
+        const { doingChat } = await import('../process/index.svelte')
         expect(get(doingChat)).toBe(false)
     })
 
@@ -618,6 +652,100 @@ describe('public low-level sendChat delegation', () => {
         }))
         await vi.waitFor(() => expect(get(doingChat)).toBe(false))
         expect(running.state).toBe('running')
+    })
+
+    it('scopes re-entered chat activity and Stop without weakening the global admission lock', async () => {
+        const running = command('running', {
+            action: 'send',
+            payload: { input: 'still generating', files: [], databaseRevision: 7 },
+        })
+        mocks.create.mockResolvedValue(running)
+
+        await queueRuntimeGeneration({
+            requestId: running.requestId,
+            action: 'send',
+            characterId: running.characterId,
+            chatId: running.chatId,
+            payload: running.payload,
+        })
+
+        const activeCommands = get(activeRuntimeGenerationCommands)
+        const initialChat = getRuntimeGenerationTargetActivity(activeCommands, {
+            characterId: 'character-1',
+            chatId: 'chat-1',
+        })
+        expect(initialChat).toMatchObject({
+            activeCommand: { commandId: 'command-1' },
+            anyActive: true,
+            activeElsewhere: false,
+        })
+
+        await expect(queueRuntimeGeneration({
+            requestId: 'second-request',
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-2',
+            payload: { input: 'must not queue', files: [], databaseRevision: 7 },
+        })).rejects.toThrow('A server generation is already in progress')
+        expect(mocks.create).toHaveBeenCalledOnce()
+
+        // Navigating elsewhere retains the global send lock, but does not
+        // expose this command as that other chat's loader/Stop target.
+        expect(getRuntimeGenerationTargetActivity(activeCommands, {
+            characterId: 'character-1',
+            chatId: 'chat-2',
+        })).toEqual({
+            activeCommand: null,
+            anyActive: true,
+            activeElsewhere: true,
+        })
+        const { doingChat } = await import('../process/index.svelte')
+        expect(get(doingChat)).toBe(true)
+        doingChat.set(false)
+        expect(getRuntimeGenerationTargetActivity(
+            get(activeRuntimeGenerationCommands),
+            { characterId: 'character-1', chatId: 'chat-2' },
+        ).activeElsewhere).toBe(true)
+        await expect(cancelActiveRuntimeGeneration({
+            characterId: 'character-1',
+            chatId: 'chat-2',
+        })).resolves.toBeNull()
+        expect(mocks.cancel).not.toHaveBeenCalled()
+
+        // Re-entering resolves the same durable command and its reconstructed
+        // presentation overlay, so the loader and exact Stop target recover.
+        expect(getRuntimeGenerationTargetActivity(
+            get(activeRuntimeGenerationCommands),
+            { characterId: 'character-1', chatId: 'chat-1' },
+        ).activeCommand?.commandId).toBe('command-1')
+        const overlay = await import('./chatPresentationOverlay.svelte')
+        expect(overlay.getRuntimeChatPresentationOverlay('command-1')).toMatchObject({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            displayText: 'still generating',
+        })
+
+        mocks.cancel.mockResolvedValue(command('running', {
+            action: 'send',
+            cancelRequestedAt: 2,
+            payload: running.payload,
+        }))
+        await cancelActiveRuntimeGeneration({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+        })
+        expect(mocks.cancel).toHaveBeenCalledOnce()
+        expect(mocks.cancel).toHaveBeenCalledWith('command-1')
+
+        mocks.watchers[0].handlers.onTerminal?.(command('cancelled', {
+            action: 'send',
+            cancelRequestedAt: 2,
+            finishedAt: 3,
+            payload: running.payload,
+            result: { databaseRevision: 7, canonicalMutationPersisted: false },
+        }))
+        await vi.waitFor(() => expect(get(activeRuntimeGenerationCommands)).toEqual([]))
+        expect(get(doingChat)).toBe(false)
     })
 
     it('reuses an already durable active cancel request without another DELETE', async () => {

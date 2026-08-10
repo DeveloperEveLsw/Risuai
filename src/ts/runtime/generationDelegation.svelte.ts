@@ -1,4 +1,4 @@
-import { get, writable } from 'svelte/store'
+import { get } from 'svelte/store'
 import {
     alertError,
     dismissRuntimeAlertPrompt,
@@ -11,6 +11,7 @@ import { isNodeServer, isServerResidentExecutor } from '../platform'
 import {
     chatProcessStage,
     doingChat,
+    localGenerationExecutionActive,
     setSendChatDelegate,
     type SendChatOptions,
 } from '../process/index.svelte'
@@ -29,6 +30,22 @@ import {
     resolveRuntimeChatPresentationText,
     settleRuntimeChatOverlay,
 } from './chatPresentationOverlay.svelte'
+import {
+    compareActiveRuntimeGenerations,
+    isActiveRuntimeGeneration,
+    publishRuntimeGenerationCommands,
+    runtimeGenerationActive,
+    type RuntimeGenerationTargetFilter,
+} from './generationActivity.svelte'
+
+export {
+    activeRuntimeGenerationCommands,
+    getRuntimeGenerationTargetActivity,
+    runtimeGenerationActive,
+    runtimeGenerationCommands,
+    type RuntimeGenerationTargetActivity,
+    type RuntimeGenerationTargetFilter,
+} from './generationActivity.svelte'
 
 const runtimeClient = new RuntimeGenerationClient()
 interface ObservedRuntimeCommand {
@@ -54,10 +71,9 @@ let waitForRuntimePersistence: WaitForPersistence | null = null
 const seenTerminalCommandIds = new Set<string>()
 const resolvedTerminalCommands = new Map<string, RuntimeGenerationCommand>()
 let terminalDiscoveryWatermark = Date.now() - 10 * 60_000
+let runtimeGenerationAdmissions = 0
 const INTERRUPTED_CANONICAL_INPUT_GRACE_MS = 10_000
 const RESOLVED_TERMINAL_COMMAND_LIMIT = 256
-
-export const runtimeGenerationCommands = writable<RuntimeGenerationCommand[]>([])
 
 export function shouldDelegateGeneration() {
     return isNodeServer && !isServerResidentExecutor
@@ -67,8 +83,8 @@ function publishCommands() {
     const commands = [...observedCommands.values()]
         .map((entry) => entry.command)
         .sort((left, right) => left.createdAt - right.createdAt)
-    runtimeGenerationCommands.set(commands)
-    doingChat.set(commands.some((command) => command.state === 'queued' || command.state === 'running'))
+    publishRuntimeGenerationCommands(commands)
+    doingChat.set(commands.some(isActiveRuntimeGeneration))
 }
 
 function completedDatabaseRevision(command: RuntimeGenerationCommand) {
@@ -545,8 +561,16 @@ export async function queueRuntimeGeneration(
     if (!shouldDelegateGeneration()) {
         throw new Error('Runtime generation delegation is not active in this browser')
     }
+    if (
+        runtimeGenerationAdmissions > 0
+        || get(runtimeGenerationActive)
+        || get(localGenerationExecutionActive)
+    ) {
+        throw new Error('A server generation is already in progress')
+    }
     startRuntimeGenerationFollower()
     doingChat.set(true)
+    runtimeGenerationAdmissions += 1
     try {
         const command = signal
             ? await runtimeClient.create(input, signal)
@@ -557,6 +581,9 @@ export async function queueRuntimeGeneration(
     catch (error) {
         publishCommands()
         throw error
+    }
+    finally {
+        runtimeGenerationAdmissions -= 1
     }
 }
 
@@ -794,11 +821,6 @@ export function installRuntimeGenerationDelegation(
         delegateUpstreamSendChat(waitForPersistence, chatProcessIndex, options))
 }
 
-export interface RuntimeGenerationTargetFilter {
-    characterId?: string
-    chatId?: string
-}
-
 export function shouldRestoreCancelledRuntimeDraft(command: RuntimeGenerationCommand) {
     return command.state === 'cancelled'
         && shouldRestoreRuntimeDraft(command)
@@ -824,16 +846,11 @@ export async function cancelActiveRuntimeGeneration(
     const active = [...observedCommands.values()]
         .map((entry) => entry.command)
         .filter((command) => (
-            (command.state === 'running' || command.state === 'queued')
+            isActiveRuntimeGeneration(command)
             && (!target.characterId || command.characterId === target.characterId)
             && (!target.chatId || command.chatId === target.chatId)
         ))
-        .sort((left, right) => {
-            if (left.state === right.state) {
-                return left.createdAt - right.createdAt
-            }
-            return left.state === 'running' ? -1 : 1
-        })[0]
+        .sort(compareActiveRuntimeGenerations)[0]
     if (!active) {
         return null
     }

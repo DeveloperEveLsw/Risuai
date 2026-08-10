@@ -33,6 +33,9 @@ import { hypaMemoryV3 } from "./memory/hypav3";
 import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
 import { pluginV2 } from "../plugins/plugins.svelte";
+import { runDelegatedOrLocalGeneration } from "./localGenerationExecution.svelte";
+
+export { localGenerationExecutionActive } from "./localGenerationExecution.svelte";
 
 export interface OpenAIChat{
     role: 'system'|'user'|'assistant'|'function'
@@ -125,13 +128,17 @@ export async function sendChat(
     chatProcessIndex = -1,
     arg: SendChatOptions = {},
 ):Promise<boolean> {
+    const delegate = sendChatDelegate
+    return await runDelegatedOrLocalGeneration(
+        delegate ? () => delegate(chatProcessIndex, arg) : null,
+        () => sendChatLocal(chatProcessIndex, arg),
+    )
+}
 
-    if(sendChatDelegate){
-        const delegated = await sendChatDelegate(chatProcessIndex, arg)
-        if(delegated !== null){
-            return delegated
-        }
-    }
+async function sendChatLocal(
+    chatProcessIndex: number,
+    arg: SendChatOptions,
+):Promise<boolean> {
 
     chatProcessStage.set(0)
     const abortSignal = arg.signal ?? (new AbortController()).signal

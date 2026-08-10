@@ -15,7 +15,7 @@
         </button>
         <span class="font-bold text-lg w-2/3 truncate">{language.menu}</span>
     {:else if $selectedCharID !== -1}
-        <button onclick={() => {
+        <button data-runtime-mobile-chat-back onclick={() => {
             selectedCharID.set(-1)
         }}>
             <ArrowLeft />
