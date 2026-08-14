@@ -17,6 +17,34 @@ import {
 
 let sourceNode:AudioBufferSourceNode = null
 
+export interface RuntimeTTSPresentationAction {
+    type: 'speak'
+    characterId: string
+    text: string
+}
+
+type RuntimeTTSBridge = (
+    action: RuntimeTTSPresentationAction,
+) => Promise<void> | void
+
+let runtimeTTSBridge: { owner: symbol; handle: RuntimeTTSBridge } | null = null
+
+/**
+ * Redirect presentation-only TTS while a resident command owns the runtime.
+ * This common boundary also covers nested trigger commands and automatic TTS,
+ * not only a top-level `/speak` parsed by DefaultChatScreen.
+ */
+export function installRuntimeTTSBridge(handle: RuntimeTTSBridge) {
+    const previous = runtimeTTSBridge
+    const owner = Symbol('runtime-tts-bridge')
+    runtimeTTSBridge = { owner, handle }
+    return () => {
+        if (runtimeTTSBridge?.owner === owner) {
+            runtimeTTSBridge = previous
+        }
+    }
+}
+
 /**
  * Run every registered TTS postprocessor hook against the audio bytes, honoring
  * replacement audio / mimeType / skip semantics. Before each hook invocation a
@@ -51,8 +79,10 @@ async function runPostprocessorPipeline(
                     characterId: ctx.characterId,
                 })
             );
-        } catch (err) {
-            console.error('[TTS postprocessor] threw, continuing with next hook:', err);
+        } catch {
+            // Keep plugin failures observable without logging arbitrary error
+            // objects supplied by presentation hooks.
+            console.error('[TTS postprocessor] threw, continuing with next hook');
             continue;
         }
 
@@ -88,6 +118,15 @@ export async function sayTTS(character:character,text:string) {
         }
 
         if(!text){
+            return
+        }
+
+        if(runtimeTTSBridge){
+            await runtimeTTSBridge.handle({
+                type: 'speak',
+                characterId: character.chaId,
+                text,
+            })
             return
         }
     
@@ -203,6 +242,7 @@ export async function sayTTS(character:character,text:string) {
                         response_format: format,
                     },
                     rawResponse: true,
+                    logFetch: false,
                 })
                 const dat = res.data
 
@@ -239,7 +279,8 @@ export async function sayTTS(character:character,text:string) {
                     headers: {
                         "Authorization": "Bearer " + db.NAIApiKey,
                     },
-                    rawResponse: true
+                    rawResponse: true,
+                    logFetch: false,
                 });
 
                 if (response.ok) {
@@ -317,7 +358,6 @@ export async function sayTTS(character:character,text:string) {
                 }
 
                 if (character.gptSoVitsConfig.use_auto_path){
-                    console.log('auto')
                     const path = await globalFetch(`${character.gptSoVitsConfig.url}/get_path`, {
                         method: 'GET',
                         headers: {
@@ -325,8 +365,8 @@ export async function sayTTS(character:character,text:string) {
                         },
                         rawResponse: false,
                         plainFetchDeforce: true,
+                        logFetch: false,
                     })
-                    console.log(path)
                     if(path.ok){
                         body.ref_audio_path = path.data.message + '/public/audio/' + character.gptSoVitsConfig.ref_audio_data.fileName
                     }
@@ -336,8 +376,6 @@ export async function sayTTS(character:character,text:string) {
                 } else {
                     body.ref_audio_path = character.gptSoVitsConfig.ref_audio_path + '/public/audio/' + character.gptSoVitsConfig.ref_audio_data.fileName
                 }
-                console.log(body)
-
                 const response = await globalFetch(`${character.gptSoVitsConfig.url}/tts`, {
                     method: 'POST',
                     headers: {
@@ -345,9 +383,8 @@ export async function sayTTS(character:character,text:string) {
                     },
                     body: body,
                     rawResponse: true,
+                    logFetch: false,
                 })
-                console.log(response)
-
                 if (response.ok) {
                     const mimeType = 'audio/wav'
                     const hookCtx = { ttsMode: character.ttsMode ?? '', characterId: character.chaId }
@@ -393,9 +430,6 @@ export async function sayTTS(character:character,text:string) {
                     mp3_bitrate: 192,
                 }
 
-
-                console.log(body)
-
                 const response = await globalFetch(`https://api.fish.audio/v1/tts`, {
                     method: 'POST',
                     headers: {
@@ -404,9 +438,8 @@ export async function sayTTS(character:character,text:string) {
                     },
                     body: body,
                     rawResponse: true,
+                    logFetch: false,
                 })
-                console.log(response)
-
                 if (response.ok) {
                     await playAudio(response.data.buffer, 'audio/mpeg', { ttsMode: character.ttsMode ?? '', characterId: character.chaId })
                 } else {
@@ -454,7 +487,6 @@ export async function getElevenTTSVoices() {
     })
     const res = await data.json()
 
-    console.log(res)
     return res.voices
 }
 

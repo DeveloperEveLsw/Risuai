@@ -55,6 +55,7 @@ import {
     NodeDatabaseHttpError,
 } from "./storage/nodeDatabaseSync";
 import { getActiveRuntimeExecutionFence } from "./runtime/executionContext";
+import { buildAssetDataUri } from "./media/assetMime";
 
 export const forageStorage = new AutoStorage()
 
@@ -315,7 +316,7 @@ export async function getFileSrc(loc: string) {
                 fileCache.res.push('loading')
                 const f: Uint8Array = await forageStorage.getItem(loc) as unknown as Uint8Array
                 fileCache.res[ind] = f
-                return `data:image/png;base64,${Buffer.from(f).toString('base64')}`
+                return buildAssetDataUri(loc, f)
             }
             else {
                 const f = fileCache.res[ind]
@@ -323,9 +324,9 @@ export async function getFileSrc(loc: string) {
                     while (fileCache.res[ind] === 'loading') {
                         await sleep(10)
                     }
-                    return `data:image/png;base64,${Buffer.from(fileCache.res[ind]).toString('base64')}`
+                    return buildAssetDataUri(loc, fileCache.res[ind] as Uint8Array)
                 }
-                return `data:image/png;base64,${Buffer.from(f).toString('base64')}`
+                return buildAssetDataUri(loc, f as Uint8Array)
             }
         }
     } catch (error) {
@@ -944,6 +945,8 @@ export interface GlobalFetchArgs {
     interceptor?: string;
     requestTimeoutMs?: number;
     networkRoute?: 'auto' | 'local_network';
+    /** Exclude sensitive request/response data from the in-app fetch log. */
+    logFetch?: boolean;
 }
 
 /**
@@ -1075,6 +1078,9 @@ export async function globalFetch(url: string, arg: GlobalFetchArgs = {}): Promi
  * @param {GlobalFetchArgs} arg - The arguments for the fetch request.
  */
 function addFetchLogInGlobalFetch(response: any, success: boolean, url: string, arg: GlobalFetchArgs, status?: number) {
+    if (arg.logFetch === false) {
+        return
+    }
     try {
         fetchLog.unshift({
             body: JSON.stringify(arg.body, null, 2),
@@ -1910,7 +1916,6 @@ export async function fetchNative(url: string, arg: {
 }): Promise<Response> {
 
     const useInterceptor = !!arg.interceptor
-    console.log(arg.body, 'body')
     if (arg.body === undefined && (arg.method === 'POST' || arg.method === 'PUT')) {
         throw new Error('Body is required for POST and PUT requests')
     }

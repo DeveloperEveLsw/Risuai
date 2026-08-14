@@ -41,6 +41,7 @@
     import { getAdditionalChatLoadPages, getInitialChatLoadPages } from 'src/ts/chatLoadPages';
     import {
         cancelActiveRuntimeGeneration,
+        playRuntimeGenerationPresentations,
         queueRuntimeGeneration,
         shouldDelegateGeneration,
         shouldRestoreCancelledRuntimeDraft,
@@ -52,6 +53,7 @@
         clearRuntimeGenerationPendingIntent,
         getRuntimeGenerationTargetActivity,
         registerRuntimeGenerationPendingIntent,
+        runtimeGenerationActive,
         runtimeGenerationPendingIntents,
     } from 'src/ts/runtime/generationActivity.svelte';
     import {
@@ -68,6 +70,7 @@
         settleRuntimeChatOverlay,
         visibleRuntimeChatPresentationOverlays,
     } from 'src/ts/runtime/chatPresentationOverlay.svelte';
+    import { runtimeAssistantOutputPresentations } from 'src/ts/runtime/assistantOutputPresentation.svelte';
 
     const loadPlaygroundMenu = () => import('../Playground/PlaygroundMenu.svelte').then(m => m.default);
     
@@ -145,6 +148,12 @@
             && overlay.chatId === currentCharacter?.chats[currentCharacter.chatPage]?.id
         )),
     )
+    let currentAssistantOutputs = $derived(
+        $runtimeAssistantOutputPresentations.filter((output) => (
+            output.characterId === currentCharacter?.chaId
+            && output.chatId === currentCharacter?.chats[currentCharacter.chatPage]?.id
+        )),
+    )
 
     function clearLocalRuntimeSubmission(requestId: string) {
         clearRuntimeGenerationPendingIntent(requestId)
@@ -162,7 +171,7 @@
     function restoreDelegatedGenerationActivity() {
         // Never let one finished/failed submission clear the global admission
         // lock while another durable command is still queued or running.
-        $doingChat = $activeRuntimeGenerationCommands.length > 0
+        $doingChat = $runtimeGenerationActive
             || $runtimeGenerationPendingIntents.length > 0
     }
 
@@ -260,7 +269,8 @@
 
         let cha = DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].message
 
-        if(messageInput.startsWith('/')){
+        const delegateGeneration = shouldDelegateGeneration()
+        if(messageInput.startsWith('/') && !delegateGeneration){
             const commandProcessed = await processMultiCommand(messageInput)
             if(commandProcessed !== false){
                 messageInput = ''
@@ -275,7 +285,7 @@
         // the request. The temporary bubble is UI-only; the resident runs the
         // real trigger/script/input pipeline exactly once and its committed
         // snapshot replaces it on every device.
-        if(shouldDelegateGeneration()){
+        if(delegateGeneration){
             const character = DBState.db.characters[selectedChar]
             const chat = character?.chats?.[character.chatPage]
             const pendingIntent = character && chat ? {
@@ -381,6 +391,7 @@
                     action: continueResponse ? 'continue' : 'send',
                     characterId: character.chaId,
                     chatId: chat.id,
+                    localPresentation: true,
                     payload: {
                         input: originalInput,
                         files: originalFiles,
@@ -418,6 +429,7 @@
                     await sleep(10)
                     updateInputSizeAll()
                     const terminal = await waitForRuntimeGenerationTerminal(command, intentAbort.signal)
+                    await playRuntimeGenerationPresentations(terminal)
                     restoreDraftAfterFailure = terminal.state === 'completed'
                         ? false
                         : shouldRestoreRuntimeDraft(terminal)
@@ -590,12 +602,15 @@
             }
             try {
                 const persisted = await waitForNodeDatabasePersistence()
-                await queueRuntimeGeneration({
+                const command = await queueRuntimeGeneration({
                     action: 'reroll',
                     characterId: character.chaId,
                     chatId: chat.id,
+                    localPresentation: true,
                     payload: { databaseRevision: persisted?.revision ?? null },
                 })
+                const terminal = await waitForRuntimeGenerationTerminal(command)
+                await playRuntimeGenerationPresentations(terminal)
             } catch (error) {
                 restoreDelegatedGenerationActivity()
                 alertError(error)
@@ -793,12 +808,15 @@
             }
             try {
                 const persisted = await waitForNodeDatabasePersistence()
-                await queueRuntimeGeneration({
+                const command = await queueRuntimeGeneration({
                     action: 'auto',
                     characterId: character.chaId,
                     chatId: chat.id,
+                    localPresentation: true,
                     payload: { databaseRevision: persisted?.revision ?? null },
                 })
+                const terminal = await waitForRuntimeGenerationTerminal(command)
+                await playRuntimeGenerationPresentations(terminal)
             } catch (error) {
                 restoreDelegatedGenerationActivity()
                 alertError(error)
@@ -1303,6 +1321,7 @@
                 bind:this={chatsInstance}
                 messages={currentChat}
                 presentationOverlays={currentPresentationOverlays}
+                assistantOutputs={currentAssistantOutputs}
                 loadPages={loadPages}
                 onReroll={reroll}
                 unReroll={unReroll}

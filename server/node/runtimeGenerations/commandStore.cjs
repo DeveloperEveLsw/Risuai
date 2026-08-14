@@ -12,6 +12,13 @@ const MAX_REPLAY_LIMIT = 10_000;
 const DEFAULT_LEASE_DURATION_MS = 15_000;
 const MAX_LEASE_DURATION_MS = 5 * 60_000;
 const PRUNE_TOMBSTONE_PATTERN = /^\.prune-[a-f0-9]{32}\.tombstone$/;
+const OUTPUT_TEMPORARY_PATTERN = /^\.output\.\d+\.[a-f0-9]{16}\.tmp$/;
+const GENERATION_OUTPUT_TYPE = 'generation_output';
+const GENERATION_OUTPUT_OPTIMIZATION_MODES = new Set([
+    'off',
+    'balanced',
+    'strong',
+]);
 
 const COMMAND_STATES = Object.freeze([
     'queued',
@@ -89,6 +96,26 @@ class StaleExecutorFenceError extends RuntimeGenerationStoreError {
             `Executor lease is not current for runtime generation command ${commandId}`,
             'STALE_EXECUTOR_FENCE',
             { commandId, executorId, fencingToken, reason, statusCode: 409 },
+        );
+    }
+}
+
+class OutputVersionConflictError extends RuntimeGenerationStoreError {
+    constructor(commandId, version, currentVersion) {
+        super(
+            `Generation output version ${version} conflicts with the existing output for command ${commandId}`,
+            'OUTPUT_VERSION_CONFLICT',
+            { commandId, version, currentVersion, statusCode: 409 },
+        );
+    }
+}
+
+class StaleOutputVersionError extends RuntimeGenerationStoreError {
+    constructor(commandId, version, currentVersion) {
+        super(
+            `Generation output version ${version} is older than version ${currentVersion} for command ${commandId}`,
+            'STALE_OUTPUT_VERSION',
+            { commandId, version, currentVersion, statusCode: 409 },
         );
     }
 }
@@ -266,6 +293,71 @@ function hashCanonicalRequest(value) {
     return crypto.createHash('sha256').update(canonicalJsonStringify(value)).digest('hex');
 }
 
+function normalizeGenerationOutputPayload(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new TypeError('generation output payload must be an object');
+    }
+    if (!Number.isSafeInteger(value.version) || value.version < 1) {
+        throw new TypeError('version must be a positive safe integer');
+    }
+    if (!Array.isArray(value.messages) || value.messages.length === 0) {
+        throw new TypeError('messages must be a non-empty array');
+    }
+    const messageIds = new Set();
+    let previousMessageIndex = -1;
+    const messages = value.messages.map((message, index) => {
+        const field = `messages[${index}]`;
+        if (!message || typeof message !== 'object' || Array.isArray(message)) {
+            throw new TypeError(`${field} must be an object`);
+        }
+        assertNonEmptyString(message.messageId, `${field}.messageId`, 512);
+        if (messageIds.has(message.messageId)) {
+            throw new TypeError('messages must contain unique messageId values');
+        }
+        messageIds.add(message.messageId);
+        if (!Number.isSafeInteger(message.messageIndex) || message.messageIndex < 0) {
+            throw new TypeError(`${field}.messageIndex must be a non-negative safe integer`);
+        }
+        if (message.messageIndex <= previousMessageIndex) {
+            throw new TypeError('messages must be ordered by strictly increasing messageIndex');
+        }
+        previousMessageIndex = message.messageIndex;
+        if (typeof message.data !== 'string') {
+            throw new TypeError(`${field}.data must be a string`);
+        }
+        if (!Number.isFinite(message.createdAt) || message.createdAt < 0) {
+            throw new TypeError(`${field}.createdAt must be a non-negative finite number`);
+        }
+        let generationInfo = null;
+        if (message.generationInfo !== null) {
+            if (!message.generationInfo
+                || typeof message.generationInfo !== 'object'
+                || Array.isArray(message.generationInfo)) {
+                throw new TypeError(`${field}.generationInfo must be a JSON object or null`);
+            }
+            canonicalJsonStringify(message.generationInfo);
+            generationInfo = cloneJson(message.generationInfo);
+        }
+        if (!GENERATION_OUTPUT_OPTIMIZATION_MODES.has(message.optimizationMode)) {
+            throw new TypeError(
+                `${field}.optimizationMode must be off, balanced, or strong`,
+            );
+        }
+        return {
+            messageId: message.messageId,
+            messageIndex: message.messageIndex,
+            data: message.data,
+            createdAt: message.createdAt,
+            generationInfo,
+            optimizationMode: message.optimizationMode,
+        };
+    });
+    return {
+        version: value.version,
+        messages,
+    };
+}
+
 function validateEvent(event, expectedSequence, commandId) {
     if (!event || typeof event !== 'object' || Array.isArray(event)) {
         throw new RuntimeGenerationStoreCorruptionError('Event record must be an object', {
@@ -388,8 +480,18 @@ class RuntimeGenerationStore {
             DEFAULT_LEASE_DURATION_MS,
             this.maxLeaseDurationMs,
         );
+        this.onCleanupError = typeof options.onCleanupError === 'function'
+            ? options.onCleanupError
+            : (error, context) => {
+                console.error(
+                    `[Runtime Generation Store] Deferred ${context.operation} cleanup failed for `
+                    + `${context.commandId}:`,
+                    error,
+                );
+            };
         this.commands = new Map();
         this.requestIndex = new Map();
+        this.outputs = new Map();
         this.storeMetadata = null;
         this.opened = false;
         this.operationTail = Promise.resolve();
@@ -420,6 +522,11 @@ class RuntimeGenerationStore {
                 }
                 assertSafeCommandId(entry.name);
                 loadedCommands.push(await this.#loadCommand(entry.name));
+                // A process restart interrupts every previously running command,
+                // so no presentation snapshot remains live. Remove both the
+                // committed file and a crash-left atomic-write temporary without
+                // parsing potentially large or incomplete presentation data.
+                await this.#removeOutputLocked(entry.name, { cleanupTemporary: true });
             }
 
             loadedCommands.sort((left, right) => {
@@ -454,6 +561,7 @@ class RuntimeGenerationStore {
 
             this.commands = commands;
             this.requestIndex = requestIndex;
+            this.outputs = new Map();
             this.storeMetadata.lastFencingToken = observedFencingToken;
 
             let recoveredInterrupted = 0;
@@ -493,6 +601,30 @@ class RuntimeGenerationStore {
                     created: false,
                     command: cloneJson(this.commands.get(existing.commandId)),
                 };
+            }
+
+            const activeCommands = [...this.commands.values()].filter((command) => (
+                command.state === 'queued' || command.state === 'running'
+            ));
+            if (
+                input.action === 'suggest'
+                && activeCommands.some((command) => command.action !== 'suggest')
+            ) {
+                const command = await this.#createCommandLocked(input, {
+                    cancelled: true,
+                    cancellationDetails: { reason: 'foreground_generation_active' },
+                });
+                return { created: true, command: cloneJson(command) };
+            }
+            if (input.action !== 'suggest') {
+                const timestamp = this.now();
+                for (const suggestion of activeCommands.filter(
+                    (command) => command.action === 'suggest',
+                )) {
+                    await this.#cancelCommandLocked(suggestion, {
+                        reason: 'foreground_generation_preempted_suggestion',
+                    }, timestamp);
+                }
             }
 
             const command = await this.#createCommandLocked(input);
@@ -622,6 +754,14 @@ class RuntimeGenerationStore {
         });
     }
 
+    async getOutput(commandId) {
+        return await this.#exclusive(async () => {
+            this.#assertOpen();
+            const command = this.#requireCommand(commandId);
+            return cloneJson(this.outputs.get(command.id) ?? null);
+        });
+    }
+
     async list(filter = {}) {
         return await this.#exclusive(async () => {
             this.#assertOpen();
@@ -723,6 +863,9 @@ class RuntimeGenerationStore {
                 await this.#assertSecureDirectory(paths.directory);
                 await this.#assertRegularFile(paths.metadata);
                 await this.#assertRegularFile(paths.events);
+                if (this.outputs.has(command.id)) {
+                    await this.#assertRegularFile(paths.output);
+                }
                 const indexed = this.requestIndex.get(command.requestId);
                 if (!indexed
                     || indexed.commandId !== command.id
@@ -749,6 +892,7 @@ class RuntimeGenerationStore {
                 await fsp.rename(paths.directory, tombstonePath);
                 this.commands.delete(command.id);
                 this.requestIndex.delete(command.requestId);
+                this.outputs.delete(command.id);
                 await this.#syncDirectory(this.rootDir);
 
                 try {
@@ -974,6 +1118,48 @@ class RuntimeGenerationStore {
         });
     }
 
+    async publishOutput(commandId, credentialInput, payload) {
+        return await this.#exclusive(async () => {
+            this.#assertOpen();
+            const credential = normalizeLeaseCredential(credentialInput);
+            const normalizedPayload = normalizeGenerationOutputPayload(payload);
+            const timestamp = this.now();
+            const { command } = this.#requireCurrentLease(commandId, credential, timestamp);
+
+            const existing = this.outputs.get(command.id) ?? null;
+            if (existing && normalizedPayload.version < existing.version) {
+                throw new StaleOutputVersionError(
+                    command.id,
+                    normalizedPayload.version,
+                    existing.version,
+                );
+            }
+            if (existing && normalizedPayload.version === existing.version) {
+                const existingPayload = normalizeGenerationOutputPayload(existing);
+                if (canonicalJsonStringify(existingPayload)
+                    !== canonicalJsonStringify(normalizedPayload)) {
+                    throw new OutputVersionConflictError(
+                        command.id,
+                        normalizedPayload.version,
+                        existing.version,
+                    );
+                }
+                return { created: false, output: cloneJson(existing) };
+            }
+
+            const output = {
+                type: GENERATION_OUTPUT_TYPE,
+                commandId: command.id,
+                ...normalizedPayload,
+                timestamp,
+            };
+            const paths = this.#commandPaths(command.id);
+            await this.#writeJsonAtomic(paths.directory, paths.output, output, 'output');
+            this.outputs.set(command.id, output);
+            return { created: true, output: cloneJson(output) };
+        });
+    }
+
     /** Persist the canonical user-message barrier exactly once. Unlike normal
      * progress this fact may be recorded after cancel_requested: the resident
      * already committed the input, and followers still need that durable fact
@@ -1161,6 +1347,7 @@ class RuntimeGenerationStore {
                 fencingToken: credential.fencingToken,
             }, timestamp);
             await this.#clearLeaseLocked(timestamp);
+            await this.#removeOutputBestEffortLocked(command.id, { cleanupTemporary: true });
             return cloneJson(command);
         });
     }
@@ -1197,6 +1384,7 @@ class RuntimeGenerationStore {
                 fencingToken: credential.fencingToken,
             }, timestamp);
             await this.#clearLeaseLocked(timestamp);
+            await this.#removeOutputBestEffortLocked(command.id, { cleanupTemporary: true });
             return cloneJson(command);
         });
     }
@@ -1213,6 +1401,7 @@ class RuntimeGenerationStore {
 
     async #cancelCommandLocked(command, normalizedDetails, timestamp) {
         if (command.state === 'cancelled' || TERMINAL_COMMAND_STATES.has(command.state)) {
+            await this.#removeOutputBestEffortLocked(command.id, { cleanupTemporary: true });
             return command;
         }
         if (command.state !== 'queued' && command.state !== 'running') {
@@ -1243,6 +1432,7 @@ class RuntimeGenerationStore {
             previousState: 'queued',
             result: null,
         }, timestamp);
+        await this.#removeOutputBestEffortLocked(command.id, { cleanupTemporary: true });
         return command;
     }
 
@@ -1272,6 +1462,7 @@ class RuntimeGenerationStore {
                 fencingToken: credential.fencingToken,
             }, timestamp);
             await this.#clearLeaseLocked(timestamp);
+            await this.#removeOutputBestEffortLocked(command.id, { cleanupTemporary: true });
             return cloneJson(command);
         });
     }
@@ -1298,6 +1489,9 @@ class RuntimeGenerationStore {
             });
         }
         await this.#clearLeaseLocked(timestamp);
+        if (command && TERMINAL_COMMAND_STATES.has(command.state)) {
+            await this.#removeOutputBestEffortLocked(command.id, { cleanupTemporary: true });
+        }
         return command ?? null;
     }
 
@@ -1664,10 +1858,10 @@ class RuntimeGenerationStore {
         await this.#writeJsonAtomic(this.rootDir, this.#storeMetadataPath(), this.storeMetadata);
     }
 
-    async #writeJsonAtomic(directory, targetPath, value) {
+    async #writeJsonAtomic(directory, targetPath, value, temporaryLabel = 'metadata') {
         const temporaryPath = path.join(
             directory,
-            `.metadata.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`,
+            `.${temporaryLabel}.${process.pid}.${crypto.randomBytes(8).toString('hex')}.tmp`,
         );
         let handle;
         try {
@@ -1686,6 +1880,54 @@ class RuntimeGenerationStore {
             }
             await fsp.unlink(temporaryPath).catch(() => {});
             throw error;
+        }
+    }
+
+    async #removeOutputLocked(commandId, options = {}) {
+        const paths = this.#commandPaths(commandId);
+        this.outputs.delete(commandId);
+        let removed = false;
+        try {
+            await fsp.unlink(paths.output);
+            removed = true;
+        }
+        catch (error) {
+            if (error?.code !== 'ENOENT') {
+                throw error;
+            }
+        }
+        if (options.cleanupTemporary) {
+            const entries = await fsp.readdir(paths.directory, { withFileTypes: true });
+            for (const entry of entries) {
+                if (!OUTPUT_TEMPORARY_PATTERN.test(entry.name)) {
+                    continue;
+                }
+                await fsp.unlink(path.join(paths.directory, entry.name));
+                removed = true;
+            }
+        }
+        if (removed) {
+            await this.#syncDirectory(paths.directory);
+        }
+    }
+
+    async #removeOutputBestEffortLocked(commandId, options = {}) {
+        try {
+            await this.#removeOutputLocked(commandId, options);
+            return true;
+        }
+        catch (error) {
+            try {
+                this.onCleanupError(error, {
+                    commandId,
+                    operation: 'assistant output',
+                });
+            }
+            catch {
+                // Cleanup reporting must never turn presentation-file removal
+                // back into a terminal protocol failure.
+            }
+            return false;
         }
     }
 
@@ -1761,6 +2003,7 @@ class RuntimeGenerationStore {
             directory,
             metadata: path.join(directory, 'meta.json'),
             events: path.join(directory, 'events.ndjson'),
+            output: path.join(directory, 'output.json'),
         };
     }
 
@@ -1804,10 +2047,12 @@ module.exports = {
     IdempotencyConflictError,
     InvalidCommandStateError,
     MAX_LEASE_DURATION_MS,
+    OutputVersionConflictError,
     RuntimeGenerationStore,
     RuntimeGenerationStoreCorruptionError,
     RuntimeGenerationStoreError,
     STORE_SCHEMA_VERSION,
+    StaleOutputVersionError,
     StaleExecutorFenceError,
     canonicalJsonStringify,
     hashCanonicalRequest,

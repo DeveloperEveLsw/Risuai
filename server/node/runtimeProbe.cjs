@@ -84,6 +84,9 @@ async function main() {
                 let backendError = ''
                 let executorReady = false
                 let executorAgeMs = null
+                let runtimeAlive = false
+                let runtimePhase = 'unavailable'
+                let runtimeAgeMs = null
                 const backendController = new AbortController()
                 const backendTimeout = setTimeout(() => backendController.abort(), 5000)
                 try {
@@ -102,6 +105,18 @@ async function main() {
                     executorReady = executorResponse.ok && executorHealth?.ready === true
                     executorAgeMs = Number.isFinite(executorHealth?.ageMs)
                         ? executorHealth.ageMs
+                        : null
+                    const livenessResponse = await fetch('/runtime-startup/liveness', {
+                        cache: 'no-store',
+                        signal: backendController.signal
+                    })
+                    const liveness = await livenessResponse.json()
+                    runtimeAlive = livenessResponse.ok && liveness?.alive === true
+                    runtimePhase = typeof liveness?.phase === 'string'
+                        ? liveness.phase
+                        : 'unavailable'
+                    runtimeAgeMs = Number.isFinite(liveness?.ageMs)
+                        ? liveness.ageMs
                         : null
                 }
                 catch (error) {
@@ -122,6 +137,9 @@ async function main() {
                     backendError,
                     executorReady,
                     executorAgeMs,
+                    runtimeAlive,
+                    runtimePhase,
+                    runtimeAgeMs,
                     inputCount: document.querySelectorAll('input, textarea').length,
                     buttonCount: document.querySelectorAll('button').length,
                     bodyText: (document.body?.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 800)
@@ -133,6 +151,7 @@ async function main() {
                 summary.nodeMode === true &&
                 summary.secureContext === true &&
                 summary.backendReachable === true &&
+                summary.runtimeAlive === true &&
                 summary.executorReady === true
             )) {
                 throw new Error('The resident RisuAI page failed its readiness checks')

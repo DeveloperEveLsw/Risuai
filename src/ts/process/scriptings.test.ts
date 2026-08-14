@@ -143,3 +143,32 @@ test('keeps explicit false as the generation stop signal', async () => {
   expect(result.res).toBe(false)
   expect(result.stopSending).toBe(true)
 })
+
+test('revokes an edit-display access key even when the Lua callback throws', async () => {
+  const setVar = vi.fn(() => true)
+  const code = `
+    local previousId = nil
+    listenEdit('editDisplay', function(id, value)
+      if previousId ~= nil then
+        setState(previousId, 'stale-display-write', 'blocked')
+      end
+      previousId = id
+      error('fixture edit-display failure')
+    end)
+  `
+  const input = {
+    char: {} as never,
+    chat: { message: [] } as never,
+    setVar,
+    getVar: () => 'null',
+    mode: 'editDisplay',
+    data: 'visible text',
+  } as const
+
+  await runScripted(code, input)
+  await runScripted(code, input)
+
+  // The second invocation deliberately tries the first invocation's key.
+  // A failed display hook must not leave that presentation capability alive.
+  expect(setVar).not.toHaveBeenCalled()
+})

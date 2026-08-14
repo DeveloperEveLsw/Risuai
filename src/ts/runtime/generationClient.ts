@@ -1,4 +1,5 @@
 import { getNodeServerProxyAuth } from '../storage/nodeStorage'
+import type { MessageGenerationInfo, StreamingDisplayOptimizationMode } from '../storage/database.svelte'
 import type { CanonicalGenerationAction, CanonicalGenerationTarget } from './canonicalGeneration.svelte'
 
 export type RuntimeGenerationState =
@@ -28,7 +29,17 @@ export interface RuntimeGenerationCommand extends CanonicalGenerationTarget {
     lastSequence: number
     payload?: Record<string, unknown>
     reused?: boolean
+    /** Executor/create-response-only signal; never part of the durable command. */
+    presentationChannel?: boolean
 }
+
+export interface RuntimePresentationSpeakAction {
+    type: 'speak'
+    characterId: string
+    text: string
+}
+
+export type RuntimePresentationAction = RuntimePresentationSpeakAction
 
 export interface RuntimeGenerationEvent {
     type: 'generation_event'
@@ -37,6 +48,28 @@ export interface RuntimeGenerationEvent {
     eventType: string
     timestamp: number
     payload: Record<string, unknown>
+}
+
+export interface RuntimeGenerationOutputMessage {
+    messageId: string
+    messageIndex: number
+    data: string
+    createdAt: number
+    generationInfo: MessageGenerationInfo | null
+    optimizationMode: StreamingDisplayOptimizationMode
+}
+
+export interface RuntimeGenerationOutput {
+    type: 'generation_output'
+    commandId: string
+    version: number
+    messages: RuntimeGenerationOutputMessage[]
+    timestamp: number
+}
+
+export interface RuntimeGenerationOutputInput {
+    version: number
+    messages: RuntimeGenerationOutputMessage[]
 }
 
 export interface RuntimeCanonicalInputCommit {
@@ -84,6 +117,8 @@ export interface RuntimeGenerationCreateInput extends CanonicalGenerationTarget 
     action: CanonicalGenerationAction
     requestId?: string
     payload?: Record<string, unknown>
+    /** Open an ephemeral, initiating-client-only presentation mailbox. */
+    localPresentation?: boolean
 }
 
 export const RUNTIME_GENERATION_KEEPALIVE_MAX_BYTES = 60 * 1024
@@ -121,6 +156,7 @@ export function isRuntimeGenerationKeepaliveSafe(
 export interface RuntimeGenerationWatchHandlers {
     onSnapshot?: (snapshot: RuntimeGenerationSnapshot) => void
     onEvent?: (event: RuntimeGenerationEvent) => void
+    onOutput?: (output: RuntimeGenerationOutput) => void
     onError?: (error: Error) => void
     onTerminal?: (command: RuntimeGenerationCommand) => void
 }
@@ -142,7 +178,7 @@ export interface RuntimeGenerationClientOptions {
     fetchImpl?: typeof fetch
     webSocketFactory?: (url: string) => WebSocketLike
     location?: Pick<Location, 'protocol' | 'host'>
-    cryptoImpl?: Pick<Crypto, 'randomUUID'>
+    cryptoImpl?: Pick<Crypto, 'randomUUID'> & Partial<Pick<Crypto, 'subtle'>>
     reconnectDelayMs?: number
 }
 
@@ -232,6 +268,48 @@ function asEvent(value: unknown): RuntimeGenerationEvent | null {
         return null
     }
     return value as unknown as RuntimeGenerationEvent
+}
+
+function asOutput(value: unknown): RuntimeGenerationOutput | null {
+    if (
+        !isRecord(value)
+        || value.type !== 'generation_output'
+        || typeof value.commandId !== 'string'
+        || value.commandId.length === 0
+        || !Number.isSafeInteger(value.version)
+        || (value.version as number) < 1
+        || !Array.isArray(value.messages)
+        || value.messages.length === 0
+        || typeof value.timestamp !== 'number'
+        || !Number.isFinite(value.timestamp)
+        || value.timestamp < 0
+    ) {
+        return null
+    }
+    const messageIds = new Set<string>()
+    let previousMessageIndex = -1
+    for (const message of value.messages) {
+        if (
+            !isRecord(message)
+            || typeof message.messageId !== 'string'
+            || message.messageId.length === 0
+            || messageIds.has(message.messageId)
+            || !Number.isSafeInteger(message.messageIndex)
+            || (message.messageIndex as number) < 0
+            || (message.messageIndex as number) <= previousMessageIndex
+            || typeof message.data !== 'string'
+            || typeof message.createdAt !== 'number'
+            || !Number.isFinite(message.createdAt)
+            || message.createdAt < 0
+            || (message.generationInfo !== null && !isRecord(message.generationInfo))
+            || !['off', 'balanced', 'strong'].includes(message.optimizationMode as string)
+        ) {
+            return null
+        }
+        messageIds.add(message.messageId)
+        previousMessageIndex = message.messageIndex as number
+    }
+    return value as unknown as RuntimeGenerationOutput
 }
 
 function asSnapshot(value: unknown): RuntimeGenerationSnapshot | null {
@@ -328,8 +406,13 @@ export class RuntimeGenerationClient {
     private readonly fetchImpl: typeof fetch
     private readonly webSocketFactory: (url: string) => WebSocketLike
     private readonly location: Pick<Location, 'protocol' | 'host'>
-    private readonly cryptoImpl: Pick<Crypto, 'randomUUID'>
+    private readonly cryptoImpl: Pick<Crypto, 'randomUUID'> & Partial<Pick<Crypto, 'subtle'>>
     private readonly reconnectDelayMs: number
+    private readonly presentationTokens = new Map<string, string>()
+    private readonly presentationConsumptions = new Map<
+        string,
+        Promise<RuntimePresentationAction[]>
+    >()
 
     constructor(options: RuntimeGenerationClientOptions = {}) {
         this.getAuth = options.getAuth ?? getNodeServerProxyAuth
@@ -345,6 +428,9 @@ export class RuntimeGenerationClient {
         signal?: AbortSignal,
     ): Promise<RuntimeGenerationCommand> {
         const requestId = input.requestId ?? this.cryptoImpl.randomUUID()
+        const presentationToken = input.localPresentation
+            ? this.cryptoImpl.randomUUID()
+            : null
         const prepared = prepareRuntimeGenerationCreate(input, requestId)
         const serializedPayload = (JSON.parse(prepared.body) as { payload: Record<string, unknown> }).payload
         // Fetch keepalive has a browser-wide 64 KiB request-body quota. It is
@@ -356,7 +442,12 @@ export class RuntimeGenerationClient {
             method: 'POST',
             ...(useKeepalive ? { keepalive: true } : {}),
             signal,
-            headers: { 'Idempotency-Key': requestId },
+            headers: {
+                'Idempotency-Key': requestId,
+                ...(presentationToken
+                    ? { 'X-Risu-Runtime-Presentation-Token': presentationToken }
+                    : {}),
+            },
             body: prepared.body,
         }
         try {
@@ -366,6 +457,15 @@ export class RuntimeGenerationClient {
                         throw runtimeAbortError(signal)
                     }
                     const command = asCommand(await this.request('/runtime-generations', init))
+                    if (
+                        presentationToken
+                        && typeof command.presentationChannel !== 'boolean'
+                    ) {
+                        throw new Error('Malformed runtime presentation channel response')
+                    }
+                    if (presentationToken && command.presentationChannel) {
+                        this.presentationTokens.set(command.commandId, presentationToken)
+                    }
                     // POST intentionally omits payload from its public response.
                     // Preserve the exact serialized envelope locally so crash
                     // fallback and cross-device overlay observation retain the
@@ -400,7 +500,10 @@ export class RuntimeGenerationClient {
             // linearized by the same full idempotency envelope: the server
             // either cancels the command that won create, or durably records a
             // terminal cancellation that a delayed create can only reuse.
-            return await this.cancelByRequest({ ...input, requestId })
+            return await this.cancelByRequest(
+                { ...input, requestId },
+                presentationToken ?? undefined,
+            )
         }
     }
 
@@ -409,6 +512,27 @@ export class RuntimeGenerationClient {
             `/runtime-generations/${encodeURIComponent(commandId)}`,
             signal ? { signal } : {},
         ))
+    }
+
+    async getOutput(
+        commandId: string,
+        signal?: AbortSignal,
+    ): Promise<RuntimeGenerationOutput | null> {
+        const body = await this.request(
+            `/runtime-generations/${encodeURIComponent(commandId)}/output`,
+            signal ? { signal } : {},
+        )
+        if (!isRecord(body) || !Object.hasOwn(body, 'output')) {
+            throw new Error('Malformed runtime generation output response')
+        }
+        if (body.output === null) {
+            return null
+        }
+        const output = asOutput(body.output)
+        if (!output || output.commandId !== commandId) {
+            throw new Error('Malformed runtime generation output response')
+        }
+        return output
     }
 
     async list(query: Partial<Pick<RuntimeGenerationCommand, 'state' | 'requestId' | 'action' | 'characterId' | 'chatId'>> & {
@@ -436,13 +560,19 @@ export class RuntimeGenerationClient {
 
     async cancelByRequest(
         input: RuntimeGenerationCreateInput & { requestId: string },
+        presentationToken?: string,
     ): Promise<RuntimeGenerationCommand> {
         const prepared = prepareRuntimeGenerationCreate(input, input.requestId)
         const serializedPayload = (JSON.parse(prepared.body) as { payload: Record<string, unknown> }).payload
         const init: RequestInit = {
             method: 'DELETE',
             ...(prepared.keepaliveSafe ? { keepalive: true } : {}),
-            headers: { 'Idempotency-Key': input.requestId },
+            headers: {
+                'Idempotency-Key': input.requestId,
+                ...(presentationToken
+                    ? { 'X-Risu-Runtime-Presentation-Token': presentationToken }
+                    : {}),
+            },
             body: prepared.body,
         }
         const path = `/runtime-generations/by-request/${encodeURIComponent(input.requestId)}`
@@ -456,8 +586,21 @@ export class RuntimeGenerationClient {
                 ) {
                     throw new Error('Malformed runtime generation request cancellation response')
                 }
-                return withExpectedRuntimeGenerationPayload(
+                const command = await this.restoreExpectedPrivatePayload(
                     asCommand(body.command),
+                    serializedPayload,
+                )
+                if (
+                    presentationToken
+                    && typeof command.presentationChannel !== 'boolean'
+                ) {
+                    throw new Error('Malformed runtime presentation channel response')
+                }
+                if (presentationToken && command.presentationChannel) {
+                    this.presentationTokens.set(command.commandId, presentationToken)
+                }
+                return withExpectedRuntimeGenerationPayload(
+                    command,
                     input,
                     input.requestId,
                     serializedPayload,
@@ -635,6 +778,218 @@ export class RuntimeGenerationClient {
         }
     }
 
+    async publishOutput(
+        commandId: string,
+        lease: RuntimeExecutorLease,
+        input: RuntimeGenerationOutputInput,
+        signal?: AbortSignal,
+    ): Promise<RuntimeGenerationOutput> {
+        // Rebuild the public input explicitly so runtime callers cannot smuggle
+        // lease or server-owned wire fields through a structurally wider object.
+        const serializedInput = JSON.parse(JSON.stringify({
+            version: input.version,
+            messages: input.messages.map((message) => ({
+                messageId: message.messageId,
+                messageIndex: message.messageIndex,
+                data: message.data,
+                createdAt: message.createdAt,
+                generationInfo: message.generationInfo,
+                optimizationMode: message.optimizationMode,
+            })),
+        })) as RuntimeGenerationOutputInput
+        if (!asOutput({
+            type: 'generation_output',
+            commandId,
+            ...serializedInput,
+            timestamp: 0,
+        })) {
+            throw new Error('Malformed runtime generation output input')
+        }
+        const path = `/runtime-generations/${encodeURIComponent(commandId)}/output`
+        const body = JSON.stringify({
+            executorId: lease.executorId,
+            fencingToken: lease.fencingToken,
+            ...serializedInput,
+        })
+        const init: RequestInit = {
+            method: 'PUT',
+            signal,
+            body,
+        }
+        while (true) {
+            try {
+                const response = await this.request(path, init)
+                if (!isRecord(response) || typeof response.reused !== 'boolean') {
+                    throw new Error('Malformed runtime generation output publish response')
+                }
+                const output = asOutput(response.output)
+                if (
+                    !output
+                    || output.commandId !== commandId
+                    || !jsonEquivalent(
+                        {
+                            version: output.version,
+                            messages: output.messages,
+                        },
+                        serializedInput,
+                    )
+                ) {
+                    throw new Error('Malformed runtime generation output publish response')
+                }
+                return output
+            }
+            catch (error) {
+                if (signal?.aborted) {
+                    throw runtimeAbortError(signal)
+                }
+                if (
+                    !(error instanceof RuntimeGenerationTransportError)
+                    && !isRetryableRuntimeAdmissionHttpError(error)
+                ) {
+                    throw error
+                }
+                await retryDelay(this.reconnectDelayMs, signal)
+            }
+        }
+    }
+
+    async publishPresentationAction(
+        commandId: string,
+        lease: RuntimeExecutorLease,
+        actionId: string,
+        action: RuntimePresentationAction,
+        signal?: AbortSignal,
+    ) {
+        const path = `/runtime-generations/${encodeURIComponent(commandId)}`
+            + `/presentation/${encodeURIComponent(actionId)}`
+        const init: RequestInit = {
+            method: 'PUT',
+            signal,
+            body: JSON.stringify({
+                executorId: lease.executorId,
+                fencingToken: lease.fencingToken,
+                action,
+            }),
+        }
+        while (true) {
+            try {
+                const body = await this.request(path, init)
+                if (
+                    !isRecord(body)
+                    || typeof body.accepted !== 'boolean'
+                    || typeof body.reused !== 'boolean'
+                    || body.accepted === body.reused
+                ) {
+                    throw new Error('Malformed runtime presentation publish response')
+                }
+                return { accepted: body.accepted, reused: body.reused }
+            }
+            catch (error) {
+                if (signal?.aborted) {
+                    throw runtimeAbortError(signal)
+                }
+                if (
+                    !(error instanceof RuntimeGenerationTransportError)
+                    && !isRetryableRuntimeAdmissionHttpError(error)
+                ) {
+                    throw error
+                }
+                await retryDelay(this.reconnectDelayMs, signal)
+            }
+        }
+    }
+
+    /**
+     * Consume effects only when this RuntimeGenerationClient admitted the
+     * command. The server returns the same ephemeral value until the explicit
+     * acknowledgement, which makes an ambiguous response retry-safe; the
+     * in-process promise prevents two late waiters from replaying it.
+     */
+    async consumePresentationActions(
+        commandId: string,
+        signal?: AbortSignal,
+    ): Promise<RuntimePresentationAction[]> {
+        const existing = this.presentationConsumptions.get(commandId)
+        if (existing) {
+            // The first initiating waiter owns playback. Concurrent and late
+            // waiters intentionally observe no effects rather than sharing the
+            // fulfilled action array and replaying it.
+            return []
+        }
+        const token = this.presentationTokens.get(commandId)
+        if (!token) {
+            return []
+        }
+        const consuming = (async () => {
+            const path = `/runtime-generations/${encodeURIComponent(commandId)}`
+                + '/presentation/consume'
+            const init: RequestInit = {
+                method: 'POST',
+                signal,
+                headers: { 'X-Risu-Runtime-Presentation-Token': token },
+                body: '{}',
+            }
+            let response: unknown
+            while (true) {
+                try {
+                    response = await this.request(path, init)
+                    break
+                }
+                catch (error) {
+                    if (signal?.aborted) {
+                        throw runtimeAbortError(signal)
+                    }
+                    if (
+                        !(error instanceof RuntimeGenerationTransportError)
+                        && !isRetryableRuntimeAdmissionHttpError(error)
+                    ) {
+                        throw error
+                    }
+                    await retryDelay(this.reconnectDelayMs, signal)
+                }
+            }
+            if (!isRecord(response) || !Array.isArray(response.actions)) {
+                throw new Error('Malformed runtime presentation consume response')
+            }
+            const actions = response.actions.map((value) => {
+                if (
+                    !isRecord(value)
+                    || value.type !== 'speak'
+                    || typeof value.characterId !== 'string'
+                    || typeof value.text !== 'string'
+                ) {
+                    throw new Error('Malformed runtime presentation action')
+                }
+                return value as unknown as RuntimePresentationAction
+            })
+            // Remove the local capability before acknowledgement/playback so
+            // concurrent or late waiters in this browser can never replay it.
+            this.presentationTokens.delete(commandId)
+            void this.request(path, {
+                method: 'DELETE',
+                headers: { 'X-Risu-Runtime-Presentation-Token': token },
+            }).catch(() => {
+                // The memory-only server mailbox expires independently. A lost
+                // acknowledgement must not make the visible browser replay.
+            })
+            return actions
+        })()
+        this.presentationConsumptions.set(commandId, consuming)
+        try {
+            return await consuming
+        }
+        finally {
+            if (this.presentationConsumptions.get(commandId) === consuming) {
+                this.presentationConsumptions.delete(commandId)
+            }
+        }
+    }
+
+    discardPresentationActions(commandId: string) {
+        this.presentationTokens.delete(commandId)
+        this.presentationConsumptions.delete(commandId)
+    }
+
     async complete(
         commandId: string,
         lease: RuntimeExecutorLease,
@@ -664,6 +1019,7 @@ export class RuntimeGenerationClient {
         let stopped = false
         let socket: WebSocketLike | null = null
         let cursor = afterSequence
+        let latestOutputVersion = 0
         let latestSnapshot: RuntimeGenerationSnapshot | null = null
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null
         let terminalLookupTimer: ReturnType<typeof setTimeout> | null = null
@@ -781,6 +1137,22 @@ export class RuntimeGenerationClient {
                     }
                     return
                 }
+                if (isRecord(parsed) && parsed.type === 'generation_output') {
+                    const output = asOutput(parsed)
+                    if (!output || output.commandId !== commandId) {
+                        nextSocket.close(1002, 'invalid output')
+                        return
+                    }
+                    // Output versions are a cumulative, independently ordered
+                    // stream. A reconnect replays the latest value, so equal or
+                    // older versions are harmless duplicates and gaps are valid.
+                    if (output.version <= latestOutputVersion) {
+                        return
+                    }
+                    latestOutputVersion = output.version
+                    handlers.onOutput?.(output)
+                    return
+                }
                 const event = asEvent(parsed)
                 if (!event || event.commandId !== commandId) {
                     nextSocket.close(1002, 'invalid event')
@@ -847,6 +1219,48 @@ export class RuntimeGenerationClient {
                 }),
             },
         )
+    }
+
+    private async restoreExpectedPrivatePayload(
+        command: RuntimeGenerationCommand,
+        expectedPayload: Record<string, unknown>,
+    ) {
+        if (command.payload === undefined || jsonEquivalent(command.payload, expectedPayload)) {
+            return command
+        }
+        const marker = command.payload.__runtimePrivateInput
+        const expectedInput = expectedPayload.input
+        if (
+            !isRecord(marker)
+            || command.payload.input !== ''
+            || typeof expectedInput !== 'string'
+            || !expectedInput.startsWith('/')
+            || typeof marker.sha256 !== 'string'
+            || !Number.isSafeInteger(marker.byteLength)
+        ) {
+            return command
+        }
+        const expectedRest = { ...expectedPayload }
+        const redactedRest = { ...command.payload }
+        delete expectedRest.input
+        delete redactedRest.input
+        delete redactedRest.__runtimePrivateInput
+        const encoded = new TextEncoder().encode(expectedInput)
+        if (
+            encoded.byteLength !== marker.byteLength
+            || !jsonEquivalent(expectedRest, redactedRest)
+            || !this.cryptoImpl.subtle
+        ) {
+            return command
+        }
+        const digest = new Uint8Array(await this.cryptoImpl.subtle.digest('SHA-256', encoded))
+        const digestHex = [...digest]
+            .map((value) => value.toString(16).padStart(2, '0'))
+            .join('')
+        if (digestHex !== marker.sha256) {
+            return command
+        }
+        return { ...command, payload: expectedPayload }
     }
 
     private async request(path: string, init: RequestInit = {}) {

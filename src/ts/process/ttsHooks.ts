@@ -78,8 +78,11 @@ export async function runHookPipeline<Ctx extends object, Res extends { skip?: b
             } else {
                 result = await hookPromise;
             }
-        } catch (err) {
-            console.error('[TTS hook] threw, continuing with next hook:', err);
+        } catch {
+            // A preprocessor receives the raw utterance. Do not forward an
+            // arbitrary plugin error object to logs because it may echo that
+            // private text in its message or attached metadata.
+            console.error('[TTS hook] threw, continuing with next hook');
             continue;
         }
 

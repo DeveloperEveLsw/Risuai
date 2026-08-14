@@ -26,6 +26,8 @@ const {
     createRuntimeGenerationServer,
     normalizeExecutorIp,
 } = require('./runtimeGenerations/serverApi.cjs');
+const { createRuntimeStartupServer } = require('./runtimeStartup/serverApi.cjs');
+const { RuntimePluginPermissionStore } = require('./runtimeStartup/permissionStore.cjs');
 const {
     HubProxyPolicyError,
     buildHubRequestHeaders,
@@ -152,6 +154,10 @@ const RUNTIME_GENERATION_MAX_TERMINAL_COMMANDS = positiveIntegerEnvironment(
 const runtimeGenerationStateDir = path.join(savePath, '__runtime_generations');
 const runtimeGenerationStore = new RuntimeGenerationStore({
     rootDir: runtimeGenerationStateDir,
+});
+const runtimePluginPermissionStore = new RuntimePluginPermissionStore({
+    rootDir: path.join(savePath, '__runtime_plugin_permissions'),
+    legacyRootDir: savePath,
 });
 let runtimeGenerationPruneRunning = false;
 
@@ -366,6 +372,14 @@ const runtimeGenerationServer = createRuntimeGenerationServer({
     executorIp: process.env.RISU_RUNTIME_EXECUTOR_IP,
 });
 runtimeGenerationServer.registerRoutes(app);
+const runtimeStartupServer = createRuntimeStartupServer({
+    authenticate: checkProxyAuth,
+    routeMiddleware: authenticatedRouteLimiter,
+    executorIp: process.env.RISU_RUNTIME_EXECUTOR_IP,
+    getExecutorHealth: runtimeGenerationServer.getExecutorHealth,
+    permissionStore: runtimePluginPermissionStore,
+});
+runtimeStartupServer.registerRoutes(app);
 function isHex(str) {
     return hexRegex.test(str.toUpperCase().trim()) || str === '__password';
 }
@@ -2735,6 +2749,7 @@ async function startServer() {
             setupDatabaseSyncWebSocket(server);
             setupProxyStreamWebSocket(server);
             runtimeGenerationServer.setupWebSocket(server);
+            runtimeStartupServer.setupWebSocket(server);
             server.listen(port, () => {
                 console.log("[Server] HTTPS server is running.");
                 console.log(`[Server] https://localhost:${port}/`);
@@ -2745,6 +2760,7 @@ async function startServer() {
             setupDatabaseSyncWebSocket(server);
             setupProxyStreamWebSocket(server);
             runtimeGenerationServer.setupWebSocket(server);
+            runtimeStartupServer.setupWebSocket(server);
             server.listen(port, () => {
                 console.log("[Server] HTTP server is running.");
                 console.log(`[Server] http://localhost:${port}/`);

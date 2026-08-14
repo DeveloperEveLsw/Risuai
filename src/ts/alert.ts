@@ -64,9 +64,17 @@ async function presentBlockingAlert(data: alertData) {
     if (runtimeAlertBridge) {
         return await runtimeAlertBridge.prompt(data)
     }
-    alertStoreImported.set(data)
-    await waitAlert()
-    return String(get(alertStoreImported).msg ?? '')
+    let response = ''
+    const present = directRuntimeAlertQueue.then(async () => {
+        alertStoreImported.set(data)
+        await waitAlert()
+        response = String(get(alertStoreImported).msg ?? '')
+    })
+    directRuntimeAlertQueue = present.catch((error) => {
+        console.error('[Local Alert Prompt]', error)
+    })
+    await present
+    return response
 }
 
 function relayRuntimeNotice(data: alertData) {
@@ -115,16 +123,28 @@ export function presentRuntimeAlertPrompt(envelope: RuntimeAlertPromptEnvelope) 
             return
         }
         state.presenting = true
+        // Observe every store transition instead of polling. AlertComp writes
+        // the answer and `type: none` in one synchronous update; another UI
+        // update can replace that value before a timer-based poll runs, which
+        // would close the dialog without ever resolving the runtime prompt.
+        let promptPresented = false
+        let unsubscribe = () => {}
+        const submittedResponse = new Promise<string>((resolve) => {
+            unsubscribe = alertStoreImported.subscribe((current) => {
+                if (promptPresented && current.type === 'none') {
+                    resolve(String(current.msg ?? ''))
+                }
+            })
+        })
+        promptPresented = true
         alertStoreImported.set({ ...state.prompt })
-        while (!state.dismissed && get(alertStoreImported).type !== 'none') {
-            await sleep(10)
-        }
+        const response = await submittedResponse
+        unsubscribe()
         state.presenting = false
         if (state.dismissed) {
             state.resolve(null)
             return
         }
-        const response = String(get(alertStoreImported).msg ?? '')
         // Do not leave prompt answers (often API keys) sitting in the shared
         // UI store after the response body has been constructed.
         alertStoreImported.set({ type: 'none', msg: '' })

@@ -51,6 +51,7 @@ export async function registerMCPModule(arg: {
         callTool,
     });
     registeredCustomPluginMCPs.set(arg.identifier, client);
+    return client;
 }
 
 export async function unregisterMCPModule(identifier: string) {

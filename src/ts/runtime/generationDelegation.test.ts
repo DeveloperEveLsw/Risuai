@@ -29,9 +29,13 @@ const mocks = vi.hoisted(() => ({
     alertError: vi.fn(),
     create: vi.fn(),
     get: vi.fn(),
+    getOutput: vi.fn(),
     list: vi.fn(),
     cancel: vi.fn(),
     respondToUiPrompt: vi.fn(),
+    consumePresentationActions: vi.fn(),
+    discardPresentationActions: vi.fn(),
+    sayTTS: vi.fn(),
     presentRuntimeAlertPrompt: vi.fn(),
     dismissRuntimeAlertPrompt: vi.fn(),
     dismissRuntimeAlertPromptsForCommand: vi.fn(),
@@ -76,6 +80,8 @@ vi.mock('../process/index.svelte', async () => {
     }
 })
 
+vi.mock('../process/tts', () => ({ sayTTS: mocks.sayTTS }))
+
 vi.mock('./generationClient', () => ({
     canonicalInputCommitFromEvent: (event: { eventType: string, payload: Record<string, unknown> }) => (
         event.eventType === 'input_committed' ? event.payload : null
@@ -84,9 +90,12 @@ vi.mock('./generationClient', () => ({
         return {
             create: mocks.create,
             get: mocks.get,
+            getOutput: mocks.getOutput,
             list: mocks.list,
             cancel: mocks.cancel,
             respondToUiPrompt: mocks.respondToUiPrompt,
+            consumePresentationActions: mocks.consumePresentationActions,
+            discardPresentationActions: mocks.discardPresentationActions,
             watch: vi.fn((_commandId: string, handlers: RuntimeGenerationWatchHandlers) => {
                 const stop = vi.fn()
                 mocks.watchers.push({ handlers, stop })
@@ -140,6 +149,10 @@ describe('public low-level sendChat delegation', () => {
         typeof import('./generationDelegation.svelte').delegateRuntimeChatInteraction
     let queueRuntimeGeneration:
         typeof import('./generationDelegation.svelte').queueRuntimeGeneration
+    let requestRuntimeSuggestions:
+        typeof import('./generationDelegation.svelte').requestRuntimeSuggestions
+    let deterministicRuntimeSuggestionRequestId:
+        typeof import('./generationDelegation.svelte').deterministicRuntimeSuggestionRequestId
     let waitForRuntimeGenerationTerminal:
         typeof import('./generationDelegation.svelte').waitForRuntimeGenerationTerminal
     let cancelActiveRuntimeGeneration:
@@ -148,6 +161,8 @@ describe('public low-level sendChat delegation', () => {
         typeof import('./generationDelegation.svelte').shouldRestoreCancelledRuntimeDraft
     let shouldRestoreRuntimeDraft:
         typeof import('./generationDelegation.svelte').shouldRestoreRuntimeDraft
+    let playRuntimeGenerationPresentations:
+        typeof import('./generationDelegation.svelte').playRuntimeGenerationPresentations
     let startRuntimeGenerationFollower:
         typeof import('./generationDelegation.svelte').startRuntimeGenerationFollower
     let activeRuntimeGenerationCommands:
@@ -173,9 +188,13 @@ describe('public low-level sendChat delegation', () => {
         mocks.alertError.mockReset()
         mocks.create.mockReset()
         mocks.get.mockReset()
+        mocks.getOutput.mockReset().mockResolvedValue(null)
         mocks.list.mockReset().mockImplementation(() => new Promise(() => {}))
         mocks.cancel.mockReset()
         mocks.respondToUiPrompt.mockReset().mockResolvedValue({})
+        mocks.consumePresentationActions.mockReset().mockResolvedValue([])
+        mocks.discardPresentationActions.mockReset()
+        mocks.sayTTS.mockReset().mockResolvedValue(undefined)
         mocks.presentRuntimeAlertPrompt.mockReset()
         mocks.dismissRuntimeAlertPrompt.mockReset()
         mocks.dismissRuntimeAlertPromptsForCommand.mockReset()
@@ -188,10 +207,13 @@ describe('public low-level sendChat delegation', () => {
         installRuntimeGenerationDelegation = delegation.installRuntimeGenerationDelegation
         delegateRuntimeChatInteraction = delegation.delegateRuntimeChatInteraction
         queueRuntimeGeneration = delegation.queueRuntimeGeneration
+        requestRuntimeSuggestions = delegation.requestRuntimeSuggestions
+        deterministicRuntimeSuggestionRequestId = delegation.deterministicRuntimeSuggestionRequestId
         waitForRuntimeGenerationTerminal = delegation.waitForRuntimeGenerationTerminal
         cancelActiveRuntimeGeneration = delegation.cancelActiveRuntimeGeneration
         shouldRestoreCancelledRuntimeDraft = delegation.shouldRestoreCancelledRuntimeDraft
         shouldRestoreRuntimeDraft = delegation.shouldRestoreRuntimeDraft
+        playRuntimeGenerationPresentations = delegation.playRuntimeGenerationPresentations
         startRuntimeGenerationFollower = delegation.startRuntimeGenerationFollower
         activeRuntimeGenerationCommands = delegation.activeRuntimeGenerationCommands
         getRuntimeGenerationTargetActivity = delegation.getRuntimeGenerationTargetActivity
@@ -223,6 +245,7 @@ describe('public low-level sendChat delegation', () => {
             action: 'generate',
             characterId: 'character-1',
             chatId: 'chat-1',
+            localPresentation: true,
             payload: {
                 chatProcessIndex: 3,
                 chatAdditonalTokens: 42,
@@ -236,6 +259,202 @@ describe('public low-level sendChat delegation', () => {
             finishedAt: 2,
             result: { generated: true },
         }))).resolves.toBe(true)
+    })
+
+    it('deduplicates automatic suggestions by target revision without foreground activity', async () => {
+        const waitForPersistence = vi.fn(async (_timeout?: number, minimumRevision?: number) => ({
+            revision: minimumRevision ?? 23,
+        }))
+        installRuntimeGenerationDelegation(waitForPersistence)
+        mocks.create.mockImplementation(async (input) => command('queued', {
+            commandId: 'suggest-command',
+            requestId: input.requestId,
+            action: 'suggest',
+            characterId: input.characterId,
+            chatId: input.chatId,
+            payload: input.payload,
+        }))
+
+        const first = requestRuntimeSuggestions({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+        })
+        const second = requestRuntimeSuggestions({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+        })
+        await vi.waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(2))
+
+        const firstInput = mocks.create.mock.calls[0][0]
+        const secondInput = mocks.create.mock.calls[1][0]
+        expect(firstInput.requestId).toBe(secondInput.requestId)
+        expect(firstInput).toMatchObject({
+            action: 'suggest',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { databaseRevision: 23, force: false },
+        })
+        expect(deterministicRuntimeSuggestionRequestId({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            databaseRevision: 23,
+        })).toBe(firstInput.requestId)
+        expect(deterministicRuntimeSuggestionRequestId({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            databaseRevision: 24,
+        })).not.toBe(firstInput.requestId)
+        const { doingChat } = await import('../process/index.svelte')
+        expect(get(doingChat)).toBe(false)
+        expect(get(activeRuntimeGenerationCommands).map((entry) => entry.action)).toEqual(['suggest'])
+        expect(getRuntimeGenerationTargetActivity(
+            get(activeRuntimeGenerationCommands),
+            { characterId: 'character-1', chatId: 'chat-1' },
+        ).anyActive).toBe(false)
+
+        mocks.watchers[0].handlers.onTerminal?.(command('completed', {
+            commandId: 'suggest-command',
+            requestId: firstInput.requestId,
+            action: 'suggest',
+            finishedAt: 2,
+            result: {
+                suggestionsUpdated: true,
+                suggestionCount: 2,
+                databaseRevision: 24,
+                canonicalMutationPersisted: true,
+            },
+        }))
+        await expect(Promise.all([first, second])).resolves.toEqual([
+            { state: 'completed', suggestionsUpdated: true, suggestionCount: 2 },
+            { state: 'completed', suggestionsUpdated: true, suggestionCount: 2 },
+        ])
+    })
+
+    it('uses a fresh force-refresh id and keeps suggestion failures out of the global error modal', async () => {
+        installRuntimeGenerationDelegation(vi.fn(async () => ({ revision: 30 })))
+        mocks.create.mockImplementation(async (input) => command('queued', {
+            commandId: 'forced-suggest-command',
+            requestId: input.requestId,
+            action: 'suggest',
+            payload: input.payload,
+        }))
+
+        const pending = requestRuntimeSuggestions({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            force: true,
+        })
+        await vi.waitFor(() => expect(mocks.watchers).toHaveLength(1))
+        const forcedId = mocks.create.mock.calls[0][0].requestId
+        expect(forcedId).not.toBe(deterministicRuntimeSuggestionRequestId({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            databaseRevision: 30,
+        }))
+
+        mocks.watchers[0].handlers.onTerminal?.(command('failed', {
+            commandId: 'forced-suggest-command',
+            requestId: forcedId,
+            action: 'suggest',
+            finishedAt: 2,
+            error: 'private provider detail',
+            result: { databaseRevision: 30, canonicalMutationPersisted: false },
+        }))
+        await expect(pending).rejects.toThrow('Server suggestion request did not complete')
+        expect(mocks.alertError).not.toHaveBeenCalled()
+    })
+
+    it('admits foreground work while a background suggestion is active', async () => {
+        mocks.create.mockImplementation(async (input) => command(
+            input.action === 'suggest' ? 'running' : 'queued',
+            {
+                commandId: `${input.action}-command`,
+                requestId: input.requestId ?? `${input.action}-request`,
+                action: input.action,
+                characterId: input.characterId,
+                chatId: input.chatId,
+                payload: input.payload,
+            },
+        ))
+
+        await queueRuntimeGeneration({
+            action: 'suggest',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { databaseRevision: 7, force: false },
+        })
+        await expect(queueRuntimeGeneration({
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { databaseRevision: 7, input: 'foreground' },
+        })).resolves.toMatchObject({ action: 'send' })
+
+        const { doingChat } = await import('../process/index.svelte')
+        expect(get(doingChat)).toBe(true)
+        expect(getRuntimeGenerationTargetActivity(
+            get(activeRuntimeGenerationCommands),
+            { characterId: 'character-1', chatId: 'chat-1' },
+        ).activeCommand?.action).toBe('send')
+    })
+
+    it('presents cumulative assistant output until the terminal database revision is adopted', async () => {
+        let resolvePersistence!: (value: { revision: number }) => void
+        const waitForPersistence = vi.fn(() => new Promise<{ revision: number }>((resolve) => {
+            resolvePersistence = resolve
+        }))
+        installRuntimeGenerationDelegation(waitForPersistence)
+        mocks.create.mockResolvedValue(command('running'))
+
+        const accepted = await queueRuntimeGeneration({
+            action: 'generate',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { databaseRevision: 7 },
+        })
+        const presentation = await import('./assistantOutputPresentation.svelte')
+        mocks.watchers[0].handlers.onOutput?.({
+            type: 'generation_output',
+            commandId: accepted.commandId,
+            version: 3,
+            messages: [{
+                messageId: 'assistant-message-1',
+                messageIndex: 1,
+                data: 'partial answer',
+                createdAt: 100,
+                generationInfo: null,
+                optimizationMode: 'off',
+            }],
+            timestamp: 101,
+        })
+
+        expect(get(presentation.runtimeAssistantOutputPresentations)).toEqual([
+            expect.objectContaining({
+                commandId: 'command-1',
+                characterId: 'character-1',
+                chatId: 'chat-1',
+                version: 3,
+                data: 'partial answer',
+            }),
+        ])
+
+        mocks.watchers[0].handlers.onTerminal?.(command('completed', {
+            finishedAt: 2,
+            result: {
+                generated: true,
+                databaseRevision: 8,
+                canonicalMutationPersisted: true,
+            },
+        }))
+        await vi.waitFor(() => {
+            expect(waitForPersistence).toHaveBeenCalledWith(60_000, 8)
+        })
+        expect(get(presentation.runtimeAssistantOutputPresentations)).toHaveLength(1)
+
+        resolvePersistence({ revision: 8 })
+        await vi.waitFor(() => {
+            expect(get(presentation.runtimeAssistantOutputPresentations)).toHaveLength(0)
+        })
     })
 
     it('queues a manual chat trigger only after the follower revision is durable', async () => {
@@ -257,6 +476,7 @@ describe('public low-level sendChat delegation', () => {
             action: 'manual-trigger',
             characterId: 'character-1',
             chatId: 'chat-1',
+            localPresentation: true,
             payload: {
                 databaseRevision: 51,
                 manualName: 'community-action',
@@ -290,6 +510,7 @@ describe('public low-level sendChat delegation', () => {
             action: 'lua-button',
             characterId: 'character-1',
             chatId: 'chat-1',
+            localPresentation: true,
             payload: {
                 databaseRevision: 61,
                 data: 'community-button-payload',
@@ -806,6 +1027,68 @@ describe('public low-level sendChat delegation', () => {
         }))).toBe(false)
     })
 
+    it('plays completed presentation effects only in the initiating direct caller', async () => {
+        mocks.consumePresentationActions.mockResolvedValueOnce([{
+            type: 'speak',
+            characterId: 'character-1',
+            text: 'visible-browser speech',
+        }])
+
+        await playRuntimeGenerationPresentations(command('completed', {
+            action: 'send',
+            finishedAt: 3,
+        }))
+
+        expect(mocks.consumePresentationActions).toHaveBeenCalledWith(
+            'command-1',
+            expect.any(AbortSignal),
+        )
+        expect(mocks.sayTTS).toHaveBeenCalledOnce()
+        expect(mocks.sayTTS).toHaveBeenCalledWith(
+            mocks.dbState.db.characters[0],
+            'visible-browser speech',
+        )
+    })
+
+    it('bounds an unavailable presentation side channel without changing terminal success', async () => {
+        vi.useFakeTimers()
+        const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+        mocks.consumePresentationActions.mockImplementation(
+            (_commandId: string, signal: AbortSignal) => new Promise((_resolve, reject) => {
+                signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+            }),
+        )
+        try {
+            const pending = playRuntimeGenerationPresentations(command('completed', {
+                action: 'send',
+                finishedAt: 3,
+            }))
+            await vi.advanceTimersByTimeAsync(5_001)
+            await expect(pending).resolves.toBeUndefined()
+
+            expect(mocks.discardPresentationActions).toHaveBeenCalledWith('command-1')
+            expect(mocks.sayTTS).not.toHaveBeenCalled()
+        }
+        finally {
+            errorLog.mockRestore()
+            vi.useRealTimers()
+        }
+    })
+
+    it.each(['failed', 'cancelled', 'interrupted'] as const)(
+        'discards %s presentation ownership without consuming or playing',
+        async (state) => {
+            await playRuntimeGenerationPresentations(command(state, {
+                action: 'send',
+                finishedAt: 3,
+            }))
+
+            expect(mocks.discardPresentationActions).toHaveBeenCalledWith('command-1')
+            expect(mocks.consumePresentationActions).not.toHaveBeenCalled()
+            expect(mocks.sayTTS).not.toHaveBeenCalled()
+        },
+    )
+
     it('surfaces a failed resident terminal state to the original sendChat caller', async () => {
         mocks.create.mockResolvedValue(command('queued'))
         installRuntimeGenerationDelegation(vi.fn(async () => ({ revision: 25 })))
@@ -1001,9 +1284,24 @@ describe('public low-level sendChat delegation', () => {
             return new Promise(() => {})
         })
         mocks.get.mockResolvedValue(hydrated)
+        mocks.getOutput.mockResolvedValue({
+            type: 'generation_output',
+            commandId: 'command-1',
+            version: 5,
+            messages: [{
+                messageId: 'assistant-1',
+                messageIndex: 1,
+                data: 'remote partial',
+                createdAt: 10,
+                generationInfo: null,
+                optimizationMode: 'off',
+            }],
+            timestamp: 11,
+        })
 
         startRuntimeGenerationFollower()
         const overlay = await import('./chatPresentationOverlay.svelte')
+        const assistant = await import('./assistantOutputPresentation.svelte')
         await vi.waitFor(() => {
             expect(overlay.getRuntimeChatPresentationOverlay('command-1')).toMatchObject({
                 requestId: 'request-1',
@@ -1012,8 +1310,17 @@ describe('public low-level sendChat delegation', () => {
                 phase: 'running',
             })
         })
+        await vi.waitFor(() => {
+            expect(assistant.getRuntimeAssistantOutputPresentation('command-1')).toMatchObject({
+                version: 5,
+                data: 'remote partial',
+                characterId: 'character-1',
+                chatId: 'chat-1',
+            })
+        })
         expect(mocks.get).toHaveBeenCalledOnce()
         expect(mocks.get).toHaveBeenCalledWith('command-1')
+        expect(mocks.getOutput).toHaveBeenCalledWith('command-1')
     })
 
     it('finishes an observed command from HTTP terminal discovery when its socket is unavailable', async () => {
@@ -1046,6 +1353,7 @@ describe('public low-level sendChat delegation', () => {
             }
             return Promise.resolve([terminal])
         })
+        mocks.getOutput.mockRejectedValueOnce(new Error('optional output endpoint unavailable'))
         const waitForPersistence = vi.fn(async () => ({ revision: 8 }))
         installRuntimeGenerationDelegation(waitForPersistence)
 

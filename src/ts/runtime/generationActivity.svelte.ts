@@ -10,6 +10,12 @@ function isActiveRuntimeGeneration(command: RuntimeGenerationCommand) {
     return command.state === 'queued' || command.state === 'running'
 }
 
+/** Suggestions use the durable resident executor but remain a background UI
+ * concern: they must not turn on the chat loader or block a foreground send. */
+function isForegroundRuntimeGeneration(command: RuntimeGenerationCommand) {
+    return isActiveRuntimeGeneration(command) && command.action !== 'suggest'
+}
+
 function compareActiveRuntimeGenerations(
     left: RuntimeGenerationCommand,
     right: RuntimeGenerationCommand,
@@ -54,7 +60,7 @@ export const activeRuntimeGenerationCommands = derived(
 
 export const runtimeGenerationActive = derived(
     activeRuntimeGenerationCommands,
-    ($commands) => $commands.length > 0,
+    ($commands) => $commands.some(isForegroundRuntimeGeneration),
 )
 
 /** Browser-memory-only admissions that have not received their durable
@@ -100,11 +106,11 @@ export function getRuntimeGenerationTargetActivity(
     commands: readonly RuntimeGenerationCommand[],
     target: RuntimeGenerationTargetFilter,
 ): RuntimeGenerationTargetActivity {
-    const anyActive = commands.some(isActiveRuntimeGeneration)
+    const anyActive = commands.some(isForegroundRuntimeGeneration)
     const activeCommand = target.characterId && target.chatId
         ? commands
             .filter((command) => (
-                isActiveRuntimeGeneration(command)
+                isForegroundRuntimeGeneration(command)
                 && command.characterId === target.characterId
                 && command.chatId === target.chatId
             ))
@@ -125,4 +131,8 @@ export function publishRuntimeGenerationCommands(
     commandState.set(commands)
 }
 
-export { isActiveRuntimeGeneration, compareActiveRuntimeGenerations }
+export {
+    isActiveRuntimeGeneration,
+    isForegroundRuntimeGeneration,
+    compareActiveRuntimeGenerations,
+}

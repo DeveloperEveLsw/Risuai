@@ -34,6 +34,7 @@ import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
 import { pluginV2 } from "../plugins/plugins.svelte";
 import { runDelegatedOrLocalGeneration } from "./localGenerationExecution.svelte";
+import { emitRuntimeStreamingOutput } from "../runtime/runtimeStreamingOutput.svelte";
 
 export { localGenerationExecutionActive } from "./localGenerationExecution.svelte";
 
@@ -1615,6 +1616,7 @@ async function sendChatLocal(
     let result = ''
     let emoChanged = false
     let resendChat = false
+    let emitFinalRuntimeStreamingOutput = () => {}
     
     if(abortSignal.aborted === true){
         return false
@@ -1644,7 +1646,31 @@ async function sendChatLocal(
             })
         }
         const outputMessageId = DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex]?.chatId
+        const outputMessageCreatedAt = DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex]?.time ?? Date.now()
         const performanceMode: StreamingDisplayOptimizationMode = DBState.db.streamingDisplayOptimizationMode ?? 'off'
+        const emitProcessedStreamingOutput = (messageIndex = msgIndex) => {
+            const outputMessage = DBState.db.characters[selectedChar].chats[selectedChat].message[messageIndex]
+            if(!outputMessageId || !outputMessage){
+                return
+            }
+            emitRuntimeStreamingOutput({
+                messageId: outputMessageId,
+                messageIndex,
+                data: outputMessage.data,
+                createdAt: outputMessageCreatedAt,
+                generationInfo,
+                optimizationMode: performanceMode,
+            })
+        }
+        emitFinalRuntimeStreamingOutput = () => {
+            const outputIndex = findMessageIndexByChatId(
+                DBState.db.characters[selectedChar].chats[selectedChat],
+                outputMessageId,
+            )
+            if(outputIndex !== -1){
+                emitProcessedStreamingOutput(outputIndex)
+            }
+        }
         DBState.db.characters[selectedChar].chats[selectedChat].isStreaming = true
         DBState.db.characters[selectedChar].chats[selectedChat].activeStreamingDisplayOptimizationMode = performanceMode
         DBState.db.characters[selectedChar].reloadKeys += 1
@@ -1686,11 +1712,16 @@ async function sendChatLocal(
                     }
                     if(deferStreamingPostProcessing){
                         DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex].data = reformatContent(prefix + nextResult)
+                        // Strong mode intentionally defers edit-output work;
+                        // publish its cumulative raw display value now and
+                        // replace it with the processed final value below.
+                        emitProcessedStreamingOutput()
                         DBState.db.characters[selectedChar].reloadKeys += 1
                         continue
                     }
                     let result2 = await processScriptFull(nowChatroom, reformatContent(prefix + nextResult), 'editoutput', msgIndex)
                     DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex].data = result2.data
+                    emitProcessedStreamingOutput()
                     emoChanged = result2.emoChanged
                     DBState.db.characters[selectedChar].reloadKeys += 1
                 } while(streamingFlushQueued || pendingStreamingResult !== null)
@@ -1750,6 +1781,7 @@ async function sendChatLocal(
                     else{
                         let result2 = await processScriptFull(nowChatroom, reformatContent(prefix + result), 'editoutput', msgIndex)
                         DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex].data = result2.data
+                        emitProcessedStreamingOutput()
                         emoChanged = result2.emoChanged
                         DBState.db.characters[selectedChar].reloadKeys += 1
                     }
@@ -1776,6 +1808,7 @@ async function sendChatLocal(
                 if(deferStreamingPostProcessing && receivedStreamingResult){
                     let result2 = await processScriptFull(nowChatroom, reformatContent(prefix + result), 'editoutput', msgIndex)
                     DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex].data = result2.data
+                    emitProcessedStreamingOutput()
                     emoChanged = result2.emoChanged
                 }
             }
@@ -1823,6 +1856,9 @@ async function sendChatLocal(
         currentChat = DBState.db.characters[selectedChar].chats[selectedChat]
         const listenerMessageIndex = findMessageIndexByChatId(currentChat, outputMessageId)
         await runChatOutputListeners(currentChar, currentChat, selectedChar, selectedChat, listenerMessageIndex)
+        if(listenerMessageIndex !== -1){
+            emitProcessedStreamingOutput(listenerMessageIndex)
+        }
         if(DBState.db.ttsAutoSpeech){
             await sayTTS(currentChar, result)
         }
@@ -1929,6 +1965,7 @@ async function sendChatLocal(
     }
 
     if(needsAutoContinue){
+        emitFinalRuntimeStreamingOutput()
         doingChat.set(false)
         return await sendChat(chatProcessIndex, {
             chatAdditonalTokens: arg.chatAdditonalTokens,
@@ -1948,6 +1985,7 @@ async function sendChatLocal(
         },'emotion', abortSignal)
 
         DBState.db.characters[selectedChar].chats[selectedChat].message[DBState.db.characters[selectedChar].chats[selectedChat].message.length - 1].data += rq
+        emitFinalRuntimeStreamingOutput()
     }
 
     stageTimings.stage3Duration = Date.now() - stageTimings.stage3Start
@@ -1972,7 +2010,7 @@ async function sendChatLocal(
         if(lastMessageIndex >= 0 && DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo) {
             DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo = generationInfo
         }
-        
+        emitFinalRuntimeStreamingOutput()
         doingChat.set(false)
         return await sendChat(chatProcessIndex, {
             signal: abortSignal
@@ -2082,6 +2120,7 @@ async function sendChatLocal(
 
                 
 
+                emitFinalRuntimeStreamingOutput()
                 return true
             }
 
@@ -2144,16 +2183,20 @@ async function sendChatLocal(
 
             if(rq.type === 'fail'){
                 if(abortSignal.aborted){
+                    emitFinalRuntimeStreamingOutput()
                     return true
                 }
                 throwError(rq.result)
+                emitFinalRuntimeStreamingOutput()
                 return true
             }
             if(rq.type === 'streaming' || rq.type === 'multiline'){
                 if(abortSignal.aborted){
+                    emitFinalRuntimeStreamingOutput()
                     return true
                 }
                 throwError('Unexpected response type')
+                emitFinalRuntimeStreamingOutput()
                 return true
             }
             else{
@@ -2195,10 +2238,12 @@ async function sendChatLocal(
                     }
                 } catch (error) {
                     throwError(language.errors.httpError + `${error}`)
+                    emitFinalRuntimeStreamingOutput()
                     return true
                 }
             }
             
+            emitFinalRuntimeStreamingOutput()
             return true
 
 
@@ -2239,6 +2284,7 @@ async function sendChatLocal(
         DBState.db.characters[selectedChar].chats[selectedChat].message[lastMessageIndex].generationInfo = generationInfo
     }
 
+    emitFinalRuntimeStreamingOutput()
     return true
 }
 

@@ -9,9 +9,17 @@ const DEFAULT_REPLAY_PAGE_SIZE = 1_000;
 const DEFAULT_MAX_REQUEST_PAYLOAD_BYTES = 256 * 1024;
 const DEFAULT_MAX_PROGRESS_PAYLOAD_BYTES = 64 * 1024;
 const DEFAULT_MAX_TERMINAL_PAYLOAD_BYTES = 256 * 1024;
+const DEFAULT_MAX_OUTPUT_PAYLOAD_BYTES = 2 * 1024 * 1024;
+const DEFAULT_WEBSOCKET_OUTPUT_BUFFER_HIGH_WATER_BYTES = 512 * 1024;
 const DEFAULT_MAX_UI_PROMPT_RESPONSE_BYTES = 64 * 1024;
 const DEFAULT_UI_PROMPT_RESPONSE_TTL_MS = 35 * 60_000;
 const DEFAULT_UI_PROMPT_RESPONSE_LIMIT = 512;
+const DEFAULT_PRESENTATION_MAILBOX_TTL_MS = 35 * 60_000;
+const DEFAULT_PRESENTATION_MAILBOX_LIMIT = 512;
+const DEFAULT_PRESENTATION_MAILBOX_MAX_ACTIONS = 64;
+const DEFAULT_PRESENTATION_ACTION_MAX_BYTES = 64 * 1024;
+const PRESENTATION_TOKEN_HEADER = 'x-risu-runtime-presentation-token';
+const PRIVATE_INPUT_MARKER = '__runtimePrivateInput';
 const UI_PROMPT_TYPES = new Set([
     'error',
     'normal',
@@ -37,8 +45,20 @@ const RUNTIME_GENERATION_ACTIONS = Object.freeze([
     'generate',
     'manual-trigger',
     'lua-button',
+    'suggest',
 ]);
 const RUNTIME_GENERATION_ACTION_SET = new Set(RUNTIME_GENERATION_ACTIONS);
+const TERMINAL_RUNTIME_GENERATION_STATES = new Set([
+    'completed',
+    'failed',
+    'cancelled',
+    'interrupted',
+]);
+const GENERATION_OUTPUT_OPTIMIZATION_MODES = new Set([
+    'off',
+    'balanced',
+    'strong',
+]);
 
 function stableJsonStringify(value) {
     if (value === null || typeof value === 'boolean' || typeof value === 'string') {
@@ -239,6 +259,23 @@ function wireGenerationEvent(commandId, record) {
     };
 }
 
+function wireGenerationOutput(output) {
+    return {
+        type: 'generation_output',
+        commandId: output.commandId,
+        version: output.version,
+        messages: output.messages.map((message) => ({
+            messageId: message.messageId,
+            messageIndex: message.messageIndex,
+            data: message.data,
+            createdAt: message.createdAt,
+            generationInfo: message.generationInfo,
+            optimizationMode: message.optimizationMode,
+        })),
+        timestamp: output.timestamp,
+    };
+}
+
 function rejectWebSocketUpgrade(socket, status, message) {
     if (socket.destroyed) {
         return;
@@ -271,16 +308,61 @@ function createRuntimeGenerationServer(options) {
     const maxRequestPayloadBytes = options.maxRequestPayloadBytes ?? DEFAULT_MAX_REQUEST_PAYLOAD_BYTES;
     const maxProgressPayloadBytes = options.maxProgressPayloadBytes ?? DEFAULT_MAX_PROGRESS_PAYLOAD_BYTES;
     const maxTerminalPayloadBytes = options.maxTerminalPayloadBytes ?? DEFAULT_MAX_TERMINAL_PAYLOAD_BYTES;
+    const maxOutputPayloadBytes = options.maxOutputPayloadBytes ?? DEFAULT_MAX_OUTPUT_PAYLOAD_BYTES;
+    const webSocketOutputBufferHighWaterBytes = options.webSocketOutputBufferHighWaterBytes
+        ?? DEFAULT_WEBSOCKET_OUTPUT_BUFFER_HIGH_WATER_BYTES;
+    if (!Number.isSafeInteger(webSocketOutputBufferHighWaterBytes)
+        || webSocketOutputBufferHighWaterBytes < 0) {
+        throw new TypeError(
+            'webSocketOutputBufferHighWaterBytes must be a non-negative safe integer',
+        );
+    }
     const maxUiPromptResponseBytes = options.maxUiPromptResponseBytes
         ?? DEFAULT_MAX_UI_PROMPT_RESPONSE_BYTES;
     const uiPromptResponseTtlMs = options.uiPromptResponseTtlMs
         ?? DEFAULT_UI_PROMPT_RESPONSE_TTL_MS;
     const uiPromptResponseLimit = options.uiPromptResponseLimit
         ?? DEFAULT_UI_PROMPT_RESPONSE_LIMIT;
+    const presentationMailboxTtlMs = options.presentationMailboxTtlMs
+        ?? DEFAULT_PRESENTATION_MAILBOX_TTL_MS;
+    const presentationMailboxLimit = options.presentationMailboxLimit
+        ?? DEFAULT_PRESENTATION_MAILBOX_LIMIT;
+    const presentationMailboxMaxActions = options.presentationMailboxMaxActions
+        ?? DEFAULT_PRESENTATION_MAILBOX_MAX_ACTIONS;
+    const presentationActionMaxBytes = options.presentationActionMaxBytes
+        ?? DEFAULT_PRESENTATION_ACTION_MAX_BYTES;
+    for (const [field, value] of [
+        ['presentationMailboxTtlMs', presentationMailboxTtlMs],
+        ['presentationMailboxLimit', presentationMailboxLimit],
+        ['presentationMailboxMaxActions', presentationMailboxMaxActions],
+        ['presentationActionMaxBytes', presentationActionMaxBytes],
+    ]) {
+        if (!Number.isSafeInteger(value) || value <= 0) {
+            throw new TypeError(`${field} must be a positive safe integer`);
+        }
+    }
     const socketTickets = new Map();
     const subscribers = new Map();
     const uiPromptResponses = new Map();
+    // Presentation effects are deliberately outside the durable command store.
+    // Only the browser that supplied the unlogged capability on admission can
+    // consume them, so raw TTS text never enters command/event/snapshot/WS data.
+    const presentationMailboxes = new Map();
+    // Admission is provisioned before the durable create. A concurrent claim
+    // can therefore attach the channel by requestId without observing a gap.
+    const pendingPresentationMailboxes = new Map();
     let lastExecutorContactAt = 0;
+
+    function getExecutorHealth() {
+        const timestamp = now();
+        const ageMs = lastExecutorContactAt > 0
+            ? Math.max(0, timestamp - lastExecutorContactAt)
+            : null;
+        return {
+            ready: ageMs !== null && ageMs <= 10_000,
+            ageMs,
+        };
+    }
 
     function uiPromptResponseKey(commandId, promptId) {
         return `${commandId}\0${promptId}`;
@@ -318,6 +400,243 @@ function createRuntimeGenerationServer(options) {
             response,
             expiresAt: timestamp + uiPromptResponseTtlMs,
         });
+    }
+
+    function presentationTokenFromRequest(req) {
+        const token = normalizeHeader(req.headers[PRESENTATION_TOKEN_HEADER]);
+        if (!token) {
+            return null;
+        }
+        if (token.length < 32 || token.length > 256 || !/^[A-Za-z0-9._~-]+$/.test(token)) {
+            throw new TypeError('Runtime presentation token is malformed');
+        }
+        return token;
+    }
+
+    function presentationTokenHash(token) {
+        return crypto.createHash('sha256').update(token).digest();
+    }
+
+    function presentationTokenMatches(mailbox, token) {
+        if (!mailbox.tokenHash || !token) {
+            return false;
+        }
+        const candidate = presentationTokenHash(token);
+        return candidate.length === mailbox.tokenHash.length
+            && crypto.timingSafeEqual(candidate, mailbox.tokenHash);
+    }
+
+    function prunePresentationMailboxes(timestamp = now()) {
+        for (const [commandId, mailbox] of presentationMailboxes) {
+            if (mailbox.expiresAt <= timestamp) {
+                presentationMailboxes.delete(commandId);
+            }
+        }
+        for (const [requestId, mailbox] of pendingPresentationMailboxes) {
+            if (mailbox.expiresAt <= timestamp) {
+                pendingPresentationMailboxes.delete(requestId);
+            }
+        }
+    }
+
+    function presentationMailboxCapacity() {
+        return presentationMailboxes.size + pendingPresentationMailboxes.size;
+    }
+
+    function reservePresentationCapacity() {
+        while (presentationMailboxCapacity() >= presentationMailboxLimit) {
+            const oldestPending = pendingPresentationMailboxes.keys().next().value;
+            if (oldestPending) {
+                pendingPresentationMailboxes.delete(oldestPending);
+                continue;
+            }
+            const oldestActive = presentationMailboxes.keys().next().value;
+            if (!oldestActive) {
+                break;
+            }
+            presentationMailboxes.delete(oldestActive);
+        }
+    }
+
+    function privateInputEnvelope(request) {
+        const input = request.payload?.input;
+        if ((request.action !== 'send' && request.action !== 'continue')
+            || typeof input !== 'string'
+            || !input.startsWith('/')) {
+            return { request, privateInput: null };
+        }
+        const inputBytes = Buffer.from(input);
+        const marker = {
+            sha256: crypto.createHash('sha256').update(inputBytes).digest('hex'),
+            byteLength: inputBytes.byteLength,
+        };
+        return {
+            request: {
+                ...request,
+                payload: {
+                    ...request.payload,
+                    input: '',
+                    [PRIVATE_INPUT_MARKER]: marker,
+                },
+            },
+            privateInput: input,
+        };
+    }
+
+    function preparePresentationAdmission(request, token) {
+        const prepared = privateInputEnvelope(request);
+        if (!token && prepared.privateInput === null) {
+            return request;
+        }
+        const timestamp = now();
+        prunePresentationMailboxes(timestamp);
+        const existing = pendingPresentationMailboxes.get(request.requestId);
+        if (existing) {
+            // A same-token retry must keep the exact private value. A different
+            // token can still resolve the durable idempotent command, but it
+            // never becomes a presentation consumer.
+            const sameOwner = token
+                ? presentationTokenMatches(existing, token)
+                : existing.tokenHash === null;
+            if (sameOwner && (
+                existing.expectedRequestHash !== request.requestHash
+                || existing.privateInput !== prepared.privateInput
+            )) {
+                throw new TypeError('Runtime presentation retry changed its private input');
+            }
+            return prepared.request;
+        }
+        reservePresentationCapacity();
+        pendingPresentationMailboxes.set(request.requestId, {
+            commandId: null,
+            requestId: request.requestId,
+            tokenHash: token ? presentationTokenHash(token) : null,
+            expectedRequestHash: request.requestHash,
+            actions: new Map(),
+            privateInput: prepared.privateInput,
+            expiresAt: timestamp + presentationMailboxTtlMs,
+        });
+        return prepared.request;
+    }
+
+    function ensurePresentationMailbox(command) {
+        prunePresentationMailboxes();
+        const existing = presentationMailboxes.get(command.id);
+        if (existing) {
+            pendingPresentationMailboxes.delete(command.requestId);
+            return existing;
+        }
+        const pending = pendingPresentationMailboxes.get(command.requestId);
+        if (!pending) {
+            return null;
+        }
+        pendingPresentationMailboxes.delete(command.requestId);
+        if (command.state !== 'queued' && command.state !== 'running') {
+            return null;
+        }
+        const marker = privateInputMarker(command);
+        const privateInput = pending.privateInput;
+        const privateBytes = typeof privateInput === 'string'
+            ? Buffer.from(privateInput)
+            : null;
+        const privateInputValid = !marker
+            ? privateInput === null
+            : !!privateBytes
+                && marker.byteLength === privateBytes.byteLength
+                && marker.sha256 === crypto.createHash('sha256')
+                    .update(privateBytes)
+                    .digest('hex');
+        if (
+            pending.expectedRequestHash !== command.requestHash
+            || !privateInputValid
+        ) {
+            return null;
+        }
+        pending.commandId = command.id;
+        presentationMailboxes.set(command.id, pending);
+        return pending;
+    }
+
+    function presentationChannelForToken(command, token) {
+        if (!token) {
+            return false;
+        }
+        const mailbox = ensurePresentationMailbox(command);
+        return !!mailbox && presentationTokenMatches(mailbox, token);
+    }
+
+    function discardRejectedPresentationAdmission(request, token) {
+        if (!request) {
+            return;
+        }
+        const pending = pendingPresentationMailboxes.get(request.requestId);
+        if (!pending || pending.expectedRequestHash !== request.requestHash) {
+            return;
+        }
+        const sameOwner = token
+            ? presentationTokenMatches(pending, token)
+            : pending.tokenHash === null;
+        if (sameOwner) {
+            pendingPresentationMailboxes.delete(request.requestId);
+        }
+    }
+
+    function privateInputMarker(command) {
+        const marker = command.payload?.[PRIVATE_INPUT_MARKER];
+        return marker && typeof marker === 'object' && !Array.isArray(marker)
+            ? marker
+            : null;
+    }
+
+    function executorCommand(command, mailbox) {
+        const publicValue = publicCommand(command, { includePayload: true });
+        const marker = privateInputMarker(command);
+        if (!marker) {
+            return {
+                ...publicValue,
+                presentationChannel: !!mailbox?.tokenHash,
+            };
+        }
+        if (!mailbox || typeof mailbox.privateInput !== 'string') {
+            return null;
+        }
+        const payload = { ...publicValue.payload, input: mailbox.privateInput };
+        delete payload[PRIVATE_INPUT_MARKER];
+        return {
+            ...publicValue,
+            payload,
+            presentationChannel: !!mailbox.tokenHash,
+        };
+    }
+
+    function clearPresentationMailbox(commandId, requestId = null) {
+        presentationMailboxes.delete(commandId);
+        if (requestId) {
+            pendingPresentationMailboxes.delete(requestId);
+        }
+    }
+
+    function presentationAction(body) {
+        const actionId = assertNonEmptyString(body?.actionId, 'actionId', 128);
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(actionId)) {
+            throw new TypeError('actionId contains unsupported characters');
+        }
+        const rawAction = assertJsonObject(body?.action, 'action');
+        const type = assertNonEmptyString(rawAction.type, 'action.type', 32);
+        if (type !== 'speak') {
+            throw new TypeError(`Unsupported runtime presentation action: ${type}`);
+        }
+        const action = {
+            type,
+            characterId: assertNonEmptyString(
+                rawAction.characterId,
+                'action.characterId',
+                512,
+            ),
+            text: assertString(rawAction.text, 'action.text', 32_768),
+        };
+        assertSerializedLimit(action, 'presentation action', presentationActionMaxBytes);
+        return { actionId, action };
     }
 
     function registerRoute(app, method, routePath, handler) {
@@ -401,6 +720,10 @@ function createRuntimeGenerationServer(options) {
                 ...(error.code ? { code: error.code } : {}),
                 ...(error.existingCommandId ? { existingCommandId: error.existingCommandId } : {}),
                 ...(error.reason ? { reason: error.reason } : {}),
+                ...(Number.isSafeInteger(error.version) ? { version: error.version } : {}),
+                ...(Number.isSafeInteger(error.currentVersion)
+                    ? { currentVersion: error.currentVersion }
+                    : {}),
             });
             return;
         }
@@ -473,13 +796,103 @@ function createRuntimeGenerationServer(options) {
         return value;
     }
 
+    function closeBackpressuredSubscriber(subscriber) {
+        if (subscriber.closing) {
+            return;
+        }
+        subscriber.closing = true;
+        subscriber.pendingOutput = null;
+        try {
+            // A graceful close frame would sit behind the very output backlog
+            // we are trying to discard. Termination makes the browser reconnect
+            // immediately, where the durable latest aggregate is replayed.
+            if (typeof subscriber.ws.terminate === 'function') {
+                subscriber.ws.terminate();
+            }
+            else {
+                subscriber.ws.close(1013, 'Runtime output backpressure');
+            }
+        }
+        catch {
+            // The close/error listener performs subscriber cleanup. If the
+            // transport has already failed there is nothing left to enqueue.
+        }
+    }
+
+    function outputBufferAtHighWater(subscriber) {
+        const bufferedAmount = Number(subscriber.ws.bufferedAmount ?? 0);
+        return Number.isFinite(bufferedAmount)
+            && bufferedAmount >= webSocketOutputBufferHighWaterBytes;
+    }
+
+    function drainSubscriberOutput(subscriber) {
+        if (subscriber.closing
+            || subscriber.terminalObserved
+            || !subscriber.ready
+            || subscriber.outputSendInFlight
+            || !subscriber.pendingOutput
+            || subscriber.ws.readyState !== subscriber.ws.OPEN) {
+            return;
+        }
+        if (outputBufferAtHighWater(subscriber)) {
+            closeBackpressuredSubscriber(subscriber);
+            return;
+        }
+
+        const output = subscriber.pendingOutput;
+        subscriber.pendingOutput = null;
+        subscriber.outputSendInFlight = true;
+        subscriber.lastOutputVersion = output.version;
+        try {
+            subscriber.ws.send(JSON.stringify(output), (error) => {
+                subscriber.outputSendInFlight = false;
+                if (error) {
+                    closeBackpressuredSubscriber(subscriber);
+                    return;
+                }
+                // At most one full aggregate is handed to ws at a time. Any
+                // number of intermediate cumulative versions collapse into the
+                // single newest pending value while a slow send is in flight.
+                drainSubscriberOutput(subscriber);
+            });
+        }
+        catch {
+            subscriber.outputSendInFlight = false;
+            closeBackpressuredSubscriber(subscriber);
+        }
+    }
+
+    function queueSubscriberOutput(subscriber, output) {
+        if (subscriber.closing
+            || subscriber.terminalObserved
+            || output.version <= subscriber.lastOutputVersion
+            || (subscriber.pendingOutput
+                && output.version <= subscriber.pendingOutput.version)) {
+            return;
+        }
+        if (subscriber.ready && outputBufferAtHighWater(subscriber)) {
+            closeBackpressuredSubscriber(subscriber);
+            return;
+        }
+        subscriber.pendingOutput = output;
+        drainSubscriberOutput(subscriber);
+    }
+
     function broadcastRecord(commandId, record) {
         const clients = subscribers.get(commandId);
         if (!clients) {
             return;
         }
         const event = wireGenerationEvent(commandId, record);
+        const terminal = TERMINAL_RUNTIME_GENERATION_STATES.has(record.type);
         for (const subscriber of clients) {
+            if (terminal) {
+                // Mark terminal before touching the transport so an in-flight
+                // output callback can never drain a newer presentation frame
+                // after the lifecycle event.
+                subscriber.terminalObserved = true;
+                subscriber.pendingOutput = null;
+            }
             if (subscriber.ws.readyState !== subscriber.ws.OPEN) {
                 continue;
             }
@@ -490,8 +903,33 @@ function createRuntimeGenerationServer(options) {
             if (event.sequence <= subscriber.lastSequence) {
                 continue;
             }
-            subscriber.ws.send(JSON.stringify(event));
-            subscriber.lastSequence = event.sequence;
+            if (terminal && subscriber.outputSendInFlight && outputBufferAtHighWater(subscriber)) {
+                // Do not put the terminal marker behind an output backlog. A
+                // reconnect replays the durable terminal record by sequence.
+                closeBackpressuredSubscriber(subscriber);
+                continue;
+            }
+            try {
+                subscriber.ws.send(JSON.stringify(event));
+                subscriber.lastSequence = event.sequence;
+            }
+            catch {
+                closeBackpressuredSubscriber(subscriber);
+            }
+        }
+    }
+
+    function broadcastOutput(commandId, outputRecord) {
+        const clients = subscribers.get(commandId);
+        if (!clients) {
+            return;
+        }
+        const output = wireGenerationOutput(outputRecord);
+        for (const subscriber of clients) {
+            if (subscriber.ws.readyState !== subscriber.ws.OPEN) {
+                continue;
+            }
+            queueSubscriberOutput(subscriber, output);
         }
     }
 
@@ -522,6 +960,7 @@ function createRuntimeGenerationServer(options) {
         const interrupted = await store.expireLease();
         if (interrupted) {
             clearUiPromptResponses(interrupted.id);
+            clearPresentationMailbox(interrupted.id, interrupted.requestId);
             await broadcastLatestTransition(interrupted);
         }
         return interrupted;
@@ -534,6 +973,68 @@ function createRuntimeGenerationServer(options) {
         };
     }
 
+    function generationOutputPayload(body) {
+        const version = parsePositiveSafeInteger(body?.version, 'version');
+        if (!Array.isArray(body?.messages) || body.messages.length === 0) {
+            throw new TypeError('messages must be a non-empty array');
+        }
+        const messageIds = new Set();
+        let previousMessageIndex = -1;
+        const messages = body.messages.map((rawMessage, index) => {
+            const field = `messages[${index}]`;
+            const message = assertJsonObject(rawMessage, field);
+            const messageId = assertNonEmptyString(message.messageId, `${field}.messageId`, 512);
+            if (messageIds.has(messageId)) {
+                throw new TypeError('messages must contain unique messageId values');
+            }
+            messageIds.add(messageId);
+            const messageIndex = parseNonNegativeSafeInteger(
+                message.messageIndex,
+                `${field}.messageIndex`,
+            );
+            if (!Number.isSafeInteger(messageIndex)) {
+                throw new TypeError(`${field}.messageIndex must be a non-negative safe integer`);
+            }
+            if (messageIndex <= previousMessageIndex) {
+                throw new TypeError('messages must be ordered by strictly increasing messageIndex');
+            }
+            previousMessageIndex = messageIndex;
+            if (typeof message.data !== 'string') {
+                throw new TypeError(`${field}.data must be a string`);
+            }
+            if (!Number.isFinite(message.createdAt) || message.createdAt < 0) {
+                throw new TypeError(`${field}.createdAt must be a non-negative finite number`);
+            }
+            const generationInfo = message.generationInfo === null
+                ? null
+                : assertJsonObject(message.generationInfo, `${field}.generationInfo`);
+            const optimizationMode = assertNonEmptyString(
+                message.optimizationMode,
+                `${field}.optimizationMode`,
+                16,
+            );
+            if (!GENERATION_OUTPUT_OPTIMIZATION_MODES.has(optimizationMode)) {
+                throw new TypeError(
+                    `${field}.optimizationMode must be off, balanced, or strong`,
+                );
+            }
+            return {
+                messageId,
+                messageIndex,
+                data: message.data,
+                createdAt: message.createdAt,
+                generationInfo,
+                optimizationMode,
+            };
+        });
+        const payload = {
+            version,
+            messages,
+        };
+        assertSerializedLimit(payload, 'output payload', maxOutputPayloadBytes);
+        return payload;
+    }
+
     function registerRoutes(app) {
         // This endpoint deliberately exposes only liveness, not credentials or
         // command data. The Chromium container uses it to prove that the
@@ -541,12 +1042,8 @@ function createRuntimeGenerationServer(options) {
         // claim loop; merely loading a logo or opening a CDP target is not
         // sufficient readiness.
         registerRoute(app, 'get', '/runtime-generations/executor/health', (_req, res) => {
-            const timestamp = now();
-            const ageMs = lastExecutorContactAt > 0
-                ? Math.max(0, timestamp - lastExecutorContactAt)
-                : null;
-            const ready = ageMs !== null && ageMs <= 10_000;
-            res.status(ready ? 200 : 503).send({ ready, ageMs });
+            const health = getExecutorHealth();
+            res.status(health.ready ? 200 : 503).send(health);
         });
 
         registerRoute(app, 'post', '/runtime-generations/executor/claim-next', async (req, res, next) => {
@@ -574,9 +1071,31 @@ function createRuntimeGenerationServer(options) {
                 ) {
                     await broadcastLatestTransition(claimed.command);
                 }
+                const presentationMailbox = ensurePresentationMailbox(claimed.command);
+                const claimedCommand = executorCommand(claimed.command, presentationMailbox);
+                if (!claimedCommand) {
+                    // Private slash input is intentionally memory-only. After
+                    // restart/expiry it cannot be reconstructed, so fail the
+                    // claimed command closed instead of executing an empty or
+                    // partially redacted command.
+                    const beforeSequence = claimed.command.lastSequence;
+                    const failed = await store.fail(
+                        claimed.command.id,
+                        claimed.lease,
+                        'Private runtime command input is no longer available',
+                        {
+                            databaseRevision: claimed.command.payload?.databaseRevision ?? null,
+                            canonicalMutationPersisted: false,
+                        },
+                    );
+                    clearPresentationMailbox(failed.id, failed.requestId);
+                    await broadcastRecordsAfter(failed.id, beforeSequence);
+                    res.send({ claimed: false });
+                    return;
+                }
                 res.send({
                     claimed: true,
-                    command: publicCommand(claimed.command, { includePayload: true }),
+                    command: claimedCommand,
                     lease: claimed.lease,
                 });
             }
@@ -617,16 +1136,30 @@ function createRuntimeGenerationServer(options) {
             if (!await requireObserverAuth(req, res)) {
                 return;
             }
+            let presentationToken = null;
+            let request = null;
             try {
-                const request = runtimeGenerationRequest(req);
+                presentationToken = presentationTokenFromRequest(req);
+                request = preparePresentationAdmission(
+                    runtimeGenerationRequest(req),
+                    presentationToken,
+                );
                 const created = await store.create(request);
+                const presentationChannel = presentationChannelForToken(
+                    created.command,
+                    presentationToken,
+                );
                 const responseBody = {
                     ...publicCommand(created.command),
                     reused: !created.created,
+                    ...(presentationToken ? { presentationChannel } : {}),
                 };
                 res.status(created.created ? 201 : 200).send(responseBody);
             }
             catch (error) {
+                if (error?.code === 'IDEMPOTENCY_CONFLICT') {
+                    discardRejectedPresentationAdmission(request, presentationToken);
+                }
                 sendRouteError(error, res, next);
             }
         });
@@ -703,6 +1236,178 @@ function createRuntimeGenerationServer(options) {
                 sendRouteError(error, res, next);
             }
         });
+
+        registerRoute(app, 'get', '/runtime-generations/:commandId/output', async (req, res, next) => {
+            if (!await requireObserverAuth(req, res)) {
+                return;
+            }
+            try {
+                const output = await store.getOutput(req.params.commandId);
+                res.setHeader('Cache-Control', 'no-store');
+                res.send({ output: output ? wireGenerationOutput(output) : null });
+            }
+            catch (error) {
+                sendRouteError(error, res, next);
+            }
+        });
+
+        registerRoute(app, 'put', '/runtime-generations/:commandId/output', async (req, res, next) => {
+            if (!await requireExecutorAuth(req, res)) {
+                return;
+            }
+            try {
+                await expireLeaseAndBroadcast();
+                const credentials = executorCredentials(req.body);
+                const payload = generationOutputPayload(req.body);
+                const published = await store.publishOutput(
+                    req.params.commandId,
+                    credentials,
+                    payload,
+                );
+                if (published.created) {
+                    broadcastOutput(req.params.commandId, published.output);
+                }
+                res.setHeader('Cache-Control', 'no-store');
+                res.status(published.created ? 201 : 200).send({
+                    output: wireGenerationOutput(published.output),
+                    reused: !published.created,
+                });
+            }
+            catch (error) {
+                sendRouteError(error, res, next);
+            }
+        });
+
+        registerRoute(
+            app,
+            'put',
+            '/runtime-generations/:commandId/presentation/:actionId',
+            async (req, res, next) => {
+                if (!await requireExecutorAuth(req, res)) {
+                    return;
+                }
+                try {
+                    await expireLeaseAndBroadcast();
+                    const credentials = executorCredentials(req.body);
+                    await store.assertCurrentLease(req.params.commandId, credentials);
+                    prunePresentationMailboxes();
+                    const mailbox = presentationMailboxes.get(req.params.commandId);
+                    if (!mailbox) {
+                        res.status(404).send({
+                            error: 'Runtime presentation mailbox is unavailable',
+                            code: 'PRESENTATION_MAILBOX_UNAVAILABLE',
+                        });
+                        return;
+                    }
+                    const normalized = presentationAction({
+                        actionId: req.params.actionId,
+                        action: req.body?.action,
+                    });
+                    const existing = mailbox.actions.get(normalized.actionId);
+                    if (existing
+                        && stableJsonStringify(existing) !== stableJsonStringify(normalized.action)) {
+                        res.status(409).send({
+                            error: 'Runtime presentation action conflicts with its existing value',
+                            code: 'PRESENTATION_ACTION_CONFLICT',
+                        });
+                        return;
+                    }
+                    if (!existing) {
+                        if (mailbox.actions.size >= presentationMailboxMaxActions) {
+                            res.status(413).send({
+                                error: 'Runtime presentation mailbox action limit exceeded',
+                                code: 'PRESENTATION_ACTION_LIMIT',
+                            });
+                            return;
+                        }
+                        mailbox.actions.set(normalized.actionId, normalized.action);
+                    }
+                    mailbox.expiresAt = now() + presentationMailboxTtlMs;
+                    res.setHeader('Cache-Control', 'no-store');
+                    res.status(existing ? 200 : 201).send({
+                        accepted: !existing,
+                        reused: !!existing,
+                    });
+                }
+                catch (error) {
+                    sendRouteError(error, res, next);
+                }
+            },
+        );
+
+        registerRoute(
+            app,
+            'post',
+            '/runtime-generations/:commandId/presentation/consume',
+            async (req, res, next) => {
+                if (!await requireObserverAuth(req, res)) {
+                    return;
+                }
+                try {
+                    const token = presentationTokenFromRequest(req);
+                    prunePresentationMailboxes();
+                    const mailbox = token
+                        ? presentationMailboxes.get(req.params.commandId)
+                        : null;
+                    if (!mailbox || !presentationTokenMatches(mailbox, token)) {
+                        res.status(404).send({
+                            error: 'Runtime presentation mailbox is unavailable',
+                            code: 'PRESENTATION_MAILBOX_UNAVAILABLE',
+                        });
+                        return;
+                    }
+                    const command = await store.get(req.params.commandId);
+                    if (command.state !== 'completed') {
+                        // Failed/cancelled/interrupted commands discard effects
+                        // at their terminal transition. A running command may
+                        // not expose a presentation effect before its outcome.
+                        res.status(409).send({
+                            error: 'Runtime presentation is not ready',
+                            code: 'PRESENTATION_NOT_READY',
+                        });
+                        return;
+                    }
+                    const actions = [...mailbox.actions.values()];
+                    mailbox.expiresAt = now() + presentationMailboxTtlMs;
+                    res.setHeader('Cache-Control', 'no-store');
+                    res.send({ actions });
+                }
+                catch (error) {
+                    sendRouteError(error, res, next);
+                }
+            },
+        );
+
+        registerRoute(
+            app,
+            'delete',
+            '/runtime-generations/:commandId/presentation/consume',
+            async (req, res, next) => {
+                if (!await requireObserverAuth(req, res)) {
+                    return;
+                }
+                try {
+                    const token = presentationTokenFromRequest(req);
+                    prunePresentationMailboxes();
+                    const mailbox = token
+                        ? presentationMailboxes.get(req.params.commandId)
+                        : null;
+                    if (!mailbox || !presentationTokenMatches(mailbox, token)) {
+                        res.status(404).send({
+                            error: 'Runtime presentation mailbox is unavailable',
+                            code: 'PRESENTATION_MAILBOX_UNAVAILABLE',
+                        });
+                        return;
+                    }
+                    clearPresentationMailbox(req.params.commandId, mailbox.requestId);
+                    res.setHeader('Cache-Control', 'no-store');
+                    res.send({ acknowledged: true });
+                }
+                catch (error) {
+                    sendRouteError(error, res, next);
+                }
+            },
+        );
 
         registerRoute(app, 'post', '/runtime-generations/:commandId/socket-ticket', async (req, res, next) => {
             if (!await requireObserverAuth(req, res)) {
@@ -892,6 +1597,14 @@ function createRuntimeGenerationServer(options) {
                 const before = await store.get(req.params.commandId);
                 const command = await store.complete(req.params.commandId, credentials, result);
                 clearUiPromptResponses(command.id);
+                // Idempotent admission retries can briefly reserve a pending
+                // entry after the executor already attached the live mailbox.
+                // Terminal completion must not retain that duplicate private
+                // input for the rest of its TTL.
+                pendingPresentationMailboxes.delete(command.requestId);
+                if (presentationMailboxes.get(command.id)?.tokenHash === null) {
+                    clearPresentationMailbox(command.id, command.requestId);
+                }
                 await broadcastRecordsAfter(command.id, before.lastSequence);
                 res.send({ success: true, command: publicCommand(command) });
             }
@@ -922,6 +1635,7 @@ function createRuntimeGenerationServer(options) {
                         result,
                     );
                     clearUiPromptResponses(command.id);
+                    clearPresentationMailbox(command.id, command.requestId);
                     await broadcastRecordsAfter(command.id, before.lastSequence);
                     res.send({ success: true, command: publicCommand(command) });
                 }
@@ -951,6 +1665,7 @@ function createRuntimeGenerationServer(options) {
                     details,
                 );
                 clearUiPromptResponses(command.id);
+                clearPresentationMailbox(command.id, command.requestId);
                 await broadcastRecordsAfter(command.id, before.lastSequence);
                 res.send({ success: true, command: publicCommand(command) });
             }
@@ -963,14 +1678,26 @@ function createRuntimeGenerationServer(options) {
             if (!await requireObserverAuth(req, res)) {
                 return;
             }
+            let presentationToken = null;
+            let request = null;
             try {
-                const request = runtimeGenerationRequest(req, req.params.requestId);
+                presentationToken = presentationTokenFromRequest(req);
+                request = preparePresentationAdmission(
+                    runtimeGenerationRequest(req, req.params.requestId),
+                    presentationToken,
+                );
                 const cancellation = await store.cancelByRequest(request, {
                     reason: 'user_cancel_by_request',
                 });
                 const command = cancellation.command;
+                let presentationChannel = presentationChannelForToken(
+                    command,
+                    presentationToken,
+                );
                 if (command.state === 'cancelled') {
                     clearUiPromptResponses(command.id);
+                    clearPresentationMailbox(command.id, command.requestId);
+                    presentationChannel = false;
                 }
                 if (command.lastSequence > cancellation.previousLastSequence) {
                     await broadcastRecordsAfter(command.id, cancellation.previousLastSequence);
@@ -978,10 +1705,16 @@ function createRuntimeGenerationServer(options) {
                 res.send({
                     success: true,
                     created: cancellation.created,
-                    command: publicCommand(command, { includePayload: true }),
+                    command: {
+                        ...publicCommand(command, { includePayload: true }),
+                        ...(presentationToken ? { presentationChannel } : {}),
+                    },
                 });
             }
             catch (error) {
+                if (error?.code === 'IDEMPOTENCY_CONFLICT') {
+                    discardRejectedPresentationAdmission(request, presentationToken);
+                }
                 sendRouteError(error, res, next);
             }
         });
@@ -995,6 +1728,7 @@ function createRuntimeGenerationServer(options) {
                 const command = await store.cancel(req.params.commandId, { reason: 'user_cancel' });
                 if (command.state === 'cancelled') {
                     clearUiPromptResponses(command.id);
+                    clearPresentationMailbox(command.id, command.requestId);
                 }
                 if (command.lastSequence > before.lastSequence) {
                     await broadcastRecordsAfter(command.id, before.lastSequence);
@@ -1057,8 +1791,13 @@ function createRuntimeGenerationServer(options) {
             const subscriber = {
                 ws,
                 ready: false,
+                closing: false,
+                terminalObserved: false,
                 pendingEvents: [],
+                pendingOutput: null,
+                outputSendInFlight: false,
                 lastSequence: afterSequence,
+                lastOutputVersion: 0,
             };
             let commandSubscribers = subscribers.get(commandId);
             if (!commandSubscribers) {
@@ -1094,6 +1833,8 @@ function createRuntimeGenerationServer(options) {
                 }));
 
                 let replayCursor = afterSequence;
+                let terminalObserved = TERMINAL_RUNTIME_GENERATION_STATES.has(command.state);
+                subscriber.terminalObserved = terminalObserved;
                 while (ws.readyState === ws.OPEN) {
                     const page = await store.replay(commandId, {
                         afterSequence: replayCursor,
@@ -1103,6 +1844,8 @@ function createRuntimeGenerationServer(options) {
                         if (ws.readyState === ws.OPEN) {
                             ws.send(JSON.stringify(wireGenerationEvent(commandId, record)));
                         }
+                        terminalObserved ||= TERMINAL_RUNTIME_GENERATION_STATES.has(record.type);
+                        subscriber.terminalObserved = terminalObserved;
                     }
                     replayCursor = page.nextCursor;
                     if (!page.hasMore) {
@@ -1110,19 +1853,54 @@ function createRuntimeGenerationServer(options) {
                     }
                 }
 
+                const persistedOutput = await store.getOutput(commandId);
+                const latestCommand = await store.get(commandId);
+                terminalObserved ||= TERMINAL_RUNTIME_GENERATION_STATES.has(latestCommand.state);
+
                 subscriber.pendingEvents.sort((left, right) => left.sequence - right.sequence);
                 for (const event of subscriber.pendingEvents) {
                     if (event.sequence > replayCursor && ws.readyState === ws.OPEN) {
                         ws.send(JSON.stringify(event));
                         replayCursor = event.sequence;
                     }
+                    terminalObserved ||= TERMINAL_RUNTIME_GENERATION_STATES.has(event.eventType);
+                    subscriber.terminalObserved = terminalObserved;
                 }
                 subscriber.pendingEvents = [];
                 subscriber.lastSequence = replayCursor;
+                let latestOutput = null;
+                if (!terminalObserved) {
+                    const persistedWireOutput = persistedOutput
+                        ? wireGenerationOutput(persistedOutput)
+                        : null;
+                    if (!persistedWireOutput) {
+                        latestOutput = subscriber.pendingOutput;
+                    }
+                    else if (!subscriber.pendingOutput
+                        || persistedWireOutput.version >= subscriber.pendingOutput.version) {
+                        latestOutput = persistedWireOutput;
+                    }
+                    else {
+                        latestOutput = subscriber.pendingOutput;
+                    }
+                }
+                subscriber.pendingOutput = null;
                 subscriber.ready = true;
+                subscriber.terminalObserved = terminalObserved;
+                if (latestOutput && ws.readyState === ws.OPEN) {
+                    queueSubscriberOutput(subscriber, latestOutput);
+                }
+                if (subscriber.closing || ws.readyState !== ws.OPEN) {
+                    return;
+                }
                 pingTimer = setInterval(() => {
                     if (ws.readyState === ws.OPEN) {
-                        ws.send(JSON.stringify({ type: 'generation_ping', ts: now() }));
+                        try {
+                            ws.send(JSON.stringify({ type: 'generation_ping', ts: now() }));
+                        }
+                        catch {
+                            closeBackpressuredSubscriber(subscriber);
+                        }
                     }
                 }, 15_000);
             }
@@ -1140,6 +1918,7 @@ function createRuntimeGenerationServer(options) {
 
     return {
         expireLeaseAndBroadcast,
+        getExecutorHealth,
         registerRoutes,
         setupWebSocket,
     };

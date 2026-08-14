@@ -1,6 +1,7 @@
 import { get } from 'svelte/store'
 import { installRuntimeAlertBridge, type alertData } from '../alert'
 import { chatProcessStage } from '../process/index.svelte'
+import { installRuntimeTTSBridge } from '../process/tts'
 import { isServerResidentExecutor } from '../platform'
 import {
     executeCanonicalAuto,
@@ -9,6 +10,7 @@ import {
     executeCanonicalManualTrigger,
     executeCanonicalReroll,
     executeCanonicalSend,
+    executeCanonicalSuggestion,
     executeCanonicalUnreroll,
     type CanonicalInputMessageReference,
     type CanonicalGenerationResult,
@@ -18,11 +20,17 @@ import {
     RuntimeGenerationHttpError,
     type RuntimeExecutorLease,
     type RuntimeGenerationCommand,
+    type RuntimeGenerationOutputInput,
+    type RuntimeGenerationOutputMessage,
 } from './generationClient'
 import {
     clearActiveRuntimeExecutionFence,
     setActiveRuntimeExecutionFence,
 } from './executionContext'
+import {
+    installRuntimeStreamingOutputPublisher,
+    type RuntimeStreamingOutputSnapshot,
+} from './runtimeStreamingOutput.svelte'
 
 export interface ResidentExecutorOptions {
     client?: RuntimeGenerationClient
@@ -31,6 +39,7 @@ export interface ResidentExecutorOptions {
     leaseDurationMs?: number
     heartbeatIntervalMs?: number
     maxCommandRuntimeMs?: number
+    presentationPublishTimeoutMs?: number
     waitForPersistence: (
         timeoutMs?: number,
         minimumRevision?: number,
@@ -47,7 +56,154 @@ export interface ResidentExecutorHandle {
 
 const EXECUTOR_SESSION_KEY = 'risu-resident-executor-id'
 const DEFAULT_MAX_COMMAND_RUNTIME_MS = 30 * 60_000
+const RUNTIME_OUTPUT_PUBLISH_INTERVAL_MS = 125
+const RUNTIME_OUTPUT_PUBLISH_TIMEOUT_MS = 5_000
+const RUNTIME_PRESENTATION_PUBLISH_TIMEOUT_MS = 5_000
 let activeHandle: ResidentExecutorHandle | null = null
+
+interface ResidentRuntimeOutputPublisher {
+    enqueue: (snapshot: RuntimeStreamingOutputSnapshot) => void
+    flush: () => Promise<void>
+    dispose: () => void
+}
+
+function createResidentRuntimeOutputPublisher(options: {
+    publish: (input: RuntimeGenerationOutputInput) => Promise<unknown>
+    signal: AbortSignal
+    onError: (error: unknown) => void
+}): ResidentRuntimeOutputPublisher {
+    const latestMessages = new Map<string, RuntimeGenerationOutputMessage>()
+    let pending: RuntimeGenerationOutputMessage[] | null = null
+    let inFlight: Promise<void> | null = null
+    let publishTimer: ReturnType<typeof setTimeout> | null = null
+    let lastPublishStartedAt: number | null = null
+    let nextVersion = 1
+    let publishFailed = false
+    let disposed = false
+
+    const clearPublishTimer = () => {
+        if (publishTimer !== null) {
+            clearTimeout(publishTimer)
+            publishTimer = null
+        }
+    }
+
+    const startPublish = () => {
+        if (
+            disposed
+            || options.signal.aborted
+            || publishFailed
+            || inFlight !== null
+            || pending === null
+        ) {
+            return
+        }
+        clearPublishTimer()
+        const messages = pending
+        pending = null
+        const input: RuntimeGenerationOutputInput = {
+            version: nextVersion,
+            messages,
+        }
+        nextVersion += 1
+        lastPublishStartedAt = Date.now()
+        try {
+            inFlight = Promise.resolve(options.publish(input))
+                .then(() => undefined)
+                .catch((error) => {
+                    publishFailed = true
+                    options.onError(error)
+                })
+                .finally(() => {
+                    inFlight = null
+                    schedulePublish()
+                })
+        }
+        catch (error) {
+            publishFailed = true
+            options.onError(error)
+        }
+    }
+
+    const schedulePublish = (immediate = false) => {
+        if (
+            disposed
+            || options.signal.aborted
+            || publishFailed
+            || inFlight !== null
+            || pending === null
+            || publishTimer !== null
+        ) {
+            return
+        }
+        const elapsed = lastPublishStartedAt === null
+            ? RUNTIME_OUTPUT_PUBLISH_INTERVAL_MS
+            : Date.now() - lastPublishStartedAt
+        const wait = immediate
+            ? 0
+            : Math.max(0, RUNTIME_OUTPUT_PUBLISH_INTERVAL_MS - elapsed)
+        if (wait === 0) {
+            startPublish()
+            return
+        }
+        publishTimer = setTimeout(() => {
+            publishTimer = null
+            startPublish()
+        }, wait)
+    }
+
+    return {
+        enqueue: (snapshot) => {
+            if (disposed || options.signal.aborted || publishFailed) {
+                return
+            }
+            // A resend/output trigger may replace a message and truncate the
+            // suffix at the same canonical index. Drop that now so followers
+            // never retain a stale bubble while the canonical pipeline has
+            // already replaced it. Ordinary group/auto messages use increasing
+            // indexes and therefore preserve every earlier entry.
+            for (const [messageId, existing] of latestMessages) {
+                if (
+                    messageId !== snapshot.messageId
+                    && existing.messageIndex >= snapshot.messageIndex
+                ) {
+                    latestMessages.delete(messageId)
+                }
+            }
+            latestMessages.set(snapshot.messageId, {
+                ...snapshot,
+                generationInfo: snapshot.generationInfo ?? null,
+            })
+            pending = [...latestMessages.values()].sort(
+                (left, right) => left.messageIndex - right.messageIndex,
+            )
+            schedulePublish()
+        },
+        flush: async () => {
+            clearPublishTimer()
+            while (!disposed && !options.signal.aborted) {
+                if (publishFailed) {
+                    return
+                }
+                if (inFlight !== null) {
+                    await inFlight
+                    continue
+                }
+                if (pending !== null) {
+                    startPublish()
+                    continue
+                }
+                return
+            }
+        },
+        dispose: () => {
+            disposed = true
+            pending = null
+            latestMessages.clear()
+            clearPublishTimer()
+        },
+    }
+}
 
 function delay(milliseconds: number, signal?: AbortSignal) {
     return new Promise<void>((resolve) => {
@@ -103,6 +259,7 @@ async function executeCommand(
     command: RuntimeGenerationCommand,
     signal: AbortSignal,
     onInputAppended?: (reference: CanonicalInputMessageReference) => Promise<void>,
+    onCanonicalMutation?: () => void,
 ) {
     const payload = command.payload ?? {}
     const target = {
@@ -125,6 +282,7 @@ async function executeCommand(
                 signal,
                 canonicalInputMessageId: command.requestId,
                 onInputAppended,
+                onCanonicalMutation,
             })
         }
         case 'reroll':
@@ -169,6 +327,8 @@ async function executeCommand(
             }
             return await executeCanonicalLuaButton({ ...target, data })
         }
+        case 'suggest':
+            return await executeCanonicalSuggestion({ ...target, signal })
         default:
             throw new TypeError(`Unsupported generation command action: ${String(command.action)}`)
     }
@@ -204,8 +364,16 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
     const leaseDurationMs = options.leaseDurationMs ?? 20_000
     const heartbeatIntervalMs = options.heartbeatIntervalMs ?? 5_000
     const maxCommandRuntimeMs = options.maxCommandRuntimeMs ?? DEFAULT_MAX_COMMAND_RUNTIME_MS
+    const presentationPublishTimeoutMs = options.presentationPublishTimeoutMs
+        ?? RUNTIME_PRESENTATION_PUBLISH_TIMEOUT_MS
     if (!Number.isSafeInteger(maxCommandRuntimeMs) || maxCommandRuntimeMs <= 0) {
         throw new TypeError('maxCommandRuntimeMs must be a positive safe integer')
+    }
+    if (
+        !Number.isSafeInteger(presentationPublishTimeoutMs)
+        || presentationPublishTimeoutMs <= 0
+    ) {
+        throw new TypeError('presentationPublishTimeoutMs must be a positive safe integer')
     }
     const reload = options.reload ?? (() => location.reload())
     const rootAbort = new AbortController()
@@ -230,6 +398,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
         let cancelRequested = command.cancelRequestedAt !== null
         let executionStarted = false
         let canonicalInputPersisted = false
+        let canonicalCommandMutationObserved = false
         let stoppedHeartbeat = false
         const heartbeatAbort = new AbortController()
         let lastStage = get(chatProcessStage)
@@ -240,6 +409,9 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
         }>()
         let uninstallAlertBridge = () => {}
         let runtimeAlertsCleaned = false
+        let runtimeOutputPublisher: ResidentRuntimeOutputPublisher | null = null
+        let restoreRuntimeOutputPublisher = () => {}
+        let restoreRuntimeTTSBridge = () => {}
         commandAbort.signal.addEventListener('abort', () => {
             if (commandAbort.signal.reason !== 'cancel_requested') {
                 protocolAbort.abort(commandAbort.signal.reason)
@@ -488,7 +660,13 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
         }
         const canonicalMutationWasPersisted = (persisted: { revision: number } | null) => {
             if (command.action === 'send' || command.action === 'continue') {
-                return canonicalInputPersisted
+                return canonicalInputPersisted || (
+                    canonicalCommandMutationObserved
+                    && executionStarted
+                    && !!persisted
+                    && typeof requestedRevision === 'number'
+                    && persisted.revision > requestedRevision
+                )
             }
             return executionStarted
                 && !!persisted
@@ -552,11 +730,158 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
                 databaseRevision: requestedRevision ?? null,
             })
             executionStarted = true
+            runtimeOutputPublisher = createResidentRuntimeOutputPublisher({
+                publish: async (input) => {
+                    const publishAbort = new AbortController()
+                    const abortFromProtocol = () => publishAbort.abort(protocolAbort.signal.reason)
+                    let removePublishAbortListener = () => {}
+                    const publishAborted = new Promise<never>((_resolve, reject) => {
+                        const rejectFromAbort = () => {
+                            const reason = publishAbort.signal.reason
+                            reject(reason instanceof Error
+                                ? reason
+                                : new Error(typeof reason === 'string'
+                                    ? reason
+                                    : 'Runtime output publish aborted'))
+                        }
+                        publishAbort.signal.addEventListener('abort', rejectFromAbort, { once: true })
+                        removePublishAbortListener = () => {
+                            publishAbort.signal.removeEventListener('abort', rejectFromAbort)
+                        }
+                    })
+                    if (protocolAbort.signal.aborted) {
+                        abortFromProtocol()
+                    }
+                    else {
+                        protocolAbort.signal.addEventListener('abort', abortFromProtocol, { once: true })
+                    }
+                    const publishTimeout = setTimeout(() => {
+                        const timeoutError = new Error(
+                            `Runtime output publish exceeded ${RUNTIME_OUTPUT_PUBLISH_TIMEOUT_MS} ms`,
+                        )
+                        timeoutError.name = 'TimeoutError'
+                        publishAbort.abort(timeoutError)
+                    }, RUNTIME_OUTPUT_PUBLISH_TIMEOUT_MS)
+                    try {
+                        if (publishAbort.signal.aborted) {
+                            return await publishAborted
+                        }
+                        return await Promise.race([
+                            client.publishOutput(
+                                command.commandId,
+                                lease,
+                                input,
+                                publishAbort.signal,
+                            ),
+                            publishAborted,
+                        ])
+                    }
+                    finally {
+                        clearTimeout(publishTimeout)
+                        protocolAbort.signal.removeEventListener('abort', abortFromProtocol)
+                        removePublishAbortListener()
+                    }
+                },
+                signal: protocolAbort.signal,
+                onError: (outputError) => {
+                    if (isFenceRejection(outputError)) {
+                        fenceRejected = true
+                        commandAbort.abort('stale executor fence')
+                        return
+                    }
+                    if (!protocolAbort.signal.aborted) {
+                        reportError(outputError)
+                    }
+                },
+            })
+            restoreRuntimeOutputPublisher = installRuntimeStreamingOutputPublisher(
+                runtimeOutputPublisher.enqueue,
+            )
+            restoreRuntimeTTSBridge = installRuntimeTTSBridge(async (action) => {
+                // The resident never performs presentation-only effects. A
+                // command admitted by a new direct client has an ephemeral
+                // private mailbox; older, expired, or restarted channels
+                // deliberately degrade to silence instead of playing in the
+                // hidden Chromium session.
+                if (!command.presentationChannel) {
+                    return
+                }
+                const presentationAbort = new AbortController()
+                const abortFromProtocol = () => {
+                    presentationAbort.abort(protocolAbort.signal.reason)
+                }
+                if (protocolAbort.signal.aborted) {
+                    abortFromProtocol()
+                }
+                else {
+                    protocolAbort.signal.addEventListener(
+                        'abort',
+                        abortFromProtocol,
+                        { once: true },
+                    )
+                }
+                const timeoutError = new Error(
+                    `Runtime presentation publish exceeded `
+                    + `${presentationPublishTimeoutMs} ms`,
+                )
+                timeoutError.name = 'TimeoutError'
+                const publishTimeout = setTimeout(() => {
+                    presentationAbort.abort(timeoutError)
+                }, presentationPublishTimeoutMs)
+                const publishAborted = new Promise<never>((_resolve, reject) => {
+                    const rejectFromAbort = () => {
+                        const reason = presentationAbort.signal.reason
+                        reject(reason instanceof Error
+                            ? reason
+                            : new Error(typeof reason === 'string'
+                                ? reason
+                                : 'Runtime presentation publish aborted'))
+                    }
+                    if (presentationAbort.signal.aborted) {
+                        rejectFromAbort()
+                    }
+                    else {
+                        presentationAbort.signal.addEventListener(
+                            'abort',
+                            rejectFromAbort,
+                            { once: true },
+                        )
+                    }
+                })
+                try {
+                    await Promise.race([
+                        client.publishPresentationAction(
+                            command.commandId,
+                            lease,
+                            crypto.randomUUID(),
+                            action,
+                            presentationAbort.signal,
+                        ),
+                        publishAborted,
+                    ])
+                }
+                catch (presentationError) {
+                    if (isFenceRejection(presentationError)) {
+                        fenceRejected = true
+                        commandAbort.abort('stale executor fence')
+                        throw presentationError
+                    }
+                    reportError(presentationError)
+                }
+                finally {
+                    clearTimeout(publishTimeout)
+                    protocolAbort.signal.removeEventListener('abort', abortFromProtocol)
+                }
+            })
             const result: CanonicalGenerationResult = await executeCommand(
                 command,
                 commandAbort.signal,
                 persistCanonicalInput,
+                () => {
+                    canonicalCommandMutationObserved = true
+                },
             )
+            await runtimeOutputPublisher.flush()
             if (cancelRequested) {
                 await finishCancellation()
                 return
@@ -585,6 +910,7 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
                 fenceRejected = true
                 return
             }
+            await runtimeOutputPublisher?.flush()
             if (!cancelRequested) {
                 try {
                     await refreshCancellationState(error)
@@ -650,6 +976,9 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
             }
         }
         finally {
+            restoreRuntimeTTSBridge()
+            restoreRuntimeOutputPublisher()
+            runtimeOutputPublisher?.dispose()
             clearTimeout(watchdogTimer)
             commandAbort.abort('command terminal')
             cleanupRunResources()

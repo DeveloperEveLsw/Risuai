@@ -4,15 +4,21 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { once } = require('node:events');
 const fs = require('node:fs/promises');
+const http = require('node:http');
 const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 const { afterEach, test } = require('node:test');
+const express = require('express');
 const WebSocket = require('ws');
+
+const { RuntimeGenerationStore } = require('./commandStore.cjs');
+const { createRuntimeGenerationServer } = require('./serverApi.cjs');
 
 const serverScript = path.resolve(__dirname, '..', 'server.cjs');
 const temporaryDirectories = new Set();
 const childProcesses = new Set();
+const inProcessServers = new Set();
 const sockets = new Set();
 
 afterEach(async () => {
@@ -20,6 +26,10 @@ afterEach(async () => {
         socket.terminate();
     }
     sockets.clear();
+    await Promise.all([...inProcessServers].map((server) => {
+        return new Promise((resolve) => server.close(() => resolve()));
+    }));
+    inProcessServers.clear();
     await Promise.all([...childProcesses].map(stopChild));
     childProcesses.clear();
     await Promise.all(
@@ -65,6 +75,20 @@ async function createFixtureDirectory() {
     return { directoryPath, savePath, password };
 }
 
+async function readDirectoryText(directoryPath) {
+    const chunks = [];
+    for (const entry of await fs.readdir(directoryPath, { withFileTypes: true })) {
+        const entryPath = path.join(directoryPath, entry.name);
+        if (entry.isDirectory()) {
+            chunks.push(await readDirectoryText(entryPath));
+        }
+        else if (entry.isFile()) {
+            chunks.push(await fs.readFile(entryPath, 'utf8'));
+        }
+    }
+    return chunks.join('\n');
+}
+
 async function startServerFixture(directoryFixture = null, environment = {}) {
     const fixture = directoryFixture ?? await createFixtureDirectory();
     const port = await getUnusedPort();
@@ -104,6 +128,52 @@ async function startServerFixture(directoryFixture = null, environment = {}) {
         await new Promise((resolve) => setTimeout(resolve, 40));
     }
     throw new Error(`Server did not become ready: ${lastError}\n${output.join('')}`);
+}
+
+async function startInProcessServerFixture(runtimeServerOptions = {}) {
+    const fixture = await createFixtureDirectory();
+    const store = new RuntimeGenerationStore({
+        rootDir: path.join(fixture.savePath, '__runtime_generations'),
+        defaultLeaseDurationMs: 5_000,
+        maxLeaseDurationMs: 60_000,
+    });
+    await store.open();
+    const {
+        decorateStore,
+        ...serverOptions
+    } = runtimeServerOptions;
+    const runtimeStore = typeof decorateStore === 'function'
+        ? decorateStore(store)
+        : store;
+    const app = express();
+    app.use(express.json({ limit: '10mb' }));
+    const runtimeServer = createRuntimeGenerationServer({
+        store: runtimeStore,
+        authenticate: async (req, res) => {
+            if (req.headers['risu-auth'] === fixture.password) {
+                return true;
+            }
+            res.status(401).send({ error: 'Unauthorized' });
+            return false;
+        },
+        ...serverOptions,
+    });
+    runtimeServer.registerRoutes(app);
+    const server = http.createServer(app);
+    runtimeServer.setupWebSocket(server);
+    await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+    });
+    inProcessServers.add(server);
+    const address = server.address();
+    return {
+        ...fixture,
+        store,
+        server,
+        port: address.port,
+        baseUrl: `http://127.0.0.1:${address.port}`,
+    };
 }
 
 async function requestJson(fixture, requestPath, options = {}) {
@@ -167,6 +237,31 @@ async function claimNext(fixture, executorId, leaseDurationMs = 5_000) {
     return await requestJson(fixture, '/runtime-generations/executor/claim-next', {
         body: { executorId, leaseDurationMs },
     });
+}
+
+function generationOutputMessage(version, overrides = {}) {
+    return {
+        messageId: 'assistant-message-1',
+        messageIndex: 1,
+        data: `assistant-partial-${version}`,
+        createdAt: 1_700_000_000_100,
+        generationInfo: {
+            generationId: 'generation-output-1',
+            model: 'integration-model',
+        },
+        optimizationMode: 'balanced',
+        ...overrides,
+    };
+}
+
+function generationOutputBody(credentials, version, overrides = {}) {
+    const { messages, ...messageOverrides } = overrides;
+    return {
+        executorId: credentials.executorId,
+        fencingToken: credentials.fencingToken,
+        version,
+        messages: messages ?? [generationOutputMessage(version, messageOverrides)],
+    };
 }
 
 function createMessageCollector(ws) {
@@ -332,6 +427,18 @@ test('generate fallback commands retain normal create, list, get, and replay sem
         `/runtime-generations/${encodeURIComponent(luaButton.body.commandId)}`,
     );
     assert.deepEqual(loadedLuaButton.body.payload, { data: 'community-button-payload' });
+
+    const suggestion = await createCommand(fixture, 'suggest', {
+        action: 'suggest',
+        payload: { databaseRevision: 7, force: false },
+    });
+    assert.equal(suggestion.response.status, 201);
+    assert.equal(suggestion.body.action, 'suggest');
+    const loadedSuggestion = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(suggestion.body.commandId)}`,
+    );
+    assert.deepEqual(loadedSuggestion.body.payload, { databaseRevision: 7, force: false });
 });
 
 test('cancel-by-request durably linearizes Stop before create and rejects payload collisions', {
@@ -936,6 +1043,708 @@ test('resident UI prompts are validated, replayable, and accept only the first d
     ), 'utf8');
     assert.equal(persistedEvents.includes(canarySecret), false);
     await Promise.all([closeSocket(desktop.ws), closeSocket(phone.ws)]);
+});
+
+test('private TTS presentation is claim-race safe, journal-free, and consumed once by its admitting client', {
+    timeout: 20_000,
+}, async () => {
+    let releaseCreateRoute;
+    const createRouteBarrier = new Promise((resolve) => {
+        releaseCreateRoute = resolve;
+    });
+    let underlyingCreateCommitted;
+    const underlyingCreateCommit = new Promise((resolve) => {
+        underlyingCreateCommitted = resolve;
+    });
+    const fixture = await startInProcessServerFixture({
+        decorateStore: (store) => new Proxy(store, {
+            get(target, property) {
+                if (property === 'create') {
+                    return async (input) => {
+                        const created = await target.create(input);
+                        underlyingCreateCommitted();
+                        await createRouteBarrier;
+                        return created;
+                    };
+                }
+                const value = Reflect.get(target, property, target);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
+        }),
+    });
+    const token = 'presentation-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const otherToken = 'presentation-token-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const slashSecret = 'slash-speech-canary-DO-NOT-PERSIST';
+    const actionSecret = 'resolved-speech-canary-DO-NOT-PERSIST';
+    const requestBody = {
+        requestId: 'request-private-presentation',
+        action: 'send',
+        characterId: 'character-1',
+        chatId: 'chat-1',
+        payload: {
+            input: `/pass ${slashSecret} | /speak`,
+            databaseRevision: 7,
+        },
+    };
+
+    // Start claim while create still owns the store operation. The mailbox is
+    // provisioned before durable create, so whichever continuation resumes
+    // first cannot expose a false presentationChannel to the executor.
+    const createPending = requestJson(fixture, '/runtime-generations', {
+        headers: { 'X-Risu-Runtime-Presentation-Token': token },
+        body: requestBody,
+    });
+    await underlyingCreateCommit;
+    const conflictingPrivateInput = await requestJson(fixture, '/runtime-generations', {
+        headers: { 'X-Risu-Runtime-Presentation-Token': otherToken },
+        body: {
+            ...requestBody,
+            payload: {
+                ...requestBody.payload,
+                input: '/speak conflicting-private-input-must-not-run',
+            },
+        },
+    });
+    assert.equal(conflictingPrivateInput.response.status, 409);
+    assert.equal(conflictingPrivateInput.body.code, 'IDEMPOTENCY_CONFLICT');
+    const claim = await claimNext(fixture, 'resident-private-presentation');
+    releaseCreateRoute();
+    const created = await createPending;
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.presentationChannel, true);
+    assert.equal(claim.body.claimed, true);
+    assert.equal(claim.body.command.presentationChannel, true);
+    assert.equal(claim.body.command.payload.input, requestBody.payload.input);
+    const commandId = created.body.commandId;
+    const credentials = claim.body.lease;
+
+    const duplicate = await requestJson(fixture, '/runtime-generations', {
+        headers: { 'X-Risu-Runtime-Presentation-Token': otherToken },
+        body: requestBody,
+    });
+    assert.equal(duplicate.response.status, 200);
+    assert.equal(duplicate.body.reused, true);
+    assert.equal(duplicate.body.presentationChannel, false);
+
+    const observer = await openCommandSocket(fixture, commandId, 'presentation-follower');
+    const published = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}`
+            + '/presentation/action-1',
+        {
+            method: 'PUT',
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                action: {
+                    type: 'speak',
+                    characterId: 'character-1',
+                    text: actionSecret,
+                },
+            },
+        },
+    );
+    assert.equal(published.response.status, 201);
+
+    const publicRunning = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}`,
+    );
+    assert.equal(publicRunning.body.payload.input, '');
+    assert.equal(JSON.stringify(publicRunning.body).includes(slashSecret), false);
+    assert.equal(JSON.stringify(publicRunning.body).includes(actionSecret), false);
+
+    const completed = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/complete`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                result: {
+                    generated: false,
+                    commandProcessed: true,
+                    databaseRevision: 7,
+                    canonicalMutationPersisted: false,
+                },
+            },
+        },
+    );
+    assert.equal(completed.response.status, 200);
+    await observer.waitFor((message) => message.eventType === 'completed');
+
+    const replay = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/events?afterSequence=0`,
+    );
+    for (const publicValue of [
+        created.body,
+        completed.body,
+        replay.body,
+        observer.messages,
+    ]) {
+        const serialized = JSON.stringify(publicValue);
+        assert.equal(serialized.includes(slashSecret), false);
+        assert.equal(serialized.includes(actionSecret), false);
+    }
+    const durableGenerationFiles = await readDirectoryText(
+        path.join(fixture.savePath, '__runtime_generations'),
+    );
+    assert.equal(durableGenerationFiles.includes(slashSecret), false);
+    assert.equal(durableGenerationFiles.includes(actionSecret), false);
+
+    const wrongConsumer = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/presentation/consume`,
+        {
+            headers: { 'X-Risu-Runtime-Presentation-Token': otherToken },
+            body: {},
+        },
+    );
+    assert.equal(wrongConsumer.response.status, 404);
+
+    const consumeOptions = {
+        headers: { 'X-Risu-Runtime-Presentation-Token': token },
+        body: {},
+    };
+    const consumed = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/presentation/consume`,
+        consumeOptions,
+    );
+    assert.equal(consumed.response.status, 200);
+    assert.deepEqual(consumed.body.actions, [{
+        type: 'speak',
+        characterId: 'character-1',
+        text: actionSecret,
+    }]);
+    const responseLossRetry = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/presentation/consume`,
+        consumeOptions,
+    );
+    assert.deepEqual(responseLossRetry.body, consumed.body);
+
+    const acknowledged = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/presentation/consume`,
+        {
+            method: 'DELETE',
+            headers: { 'X-Risu-Runtime-Presentation-Token': token },
+        },
+    );
+    assert.equal(acknowledged.response.status, 200);
+    const consumedAgain = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/presentation/consume`,
+        consumeOptions,
+    );
+    assert.equal(consumedAgain.response.status, 404);
+
+    const noTokenSecret = 'headerless-speech-canary-DO-NOT-PERSIST';
+    const noTokenCreate = await requestJson(fixture, '/runtime-generations', {
+        body: {
+            requestId: 'request-headerless-private-presentation',
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: {
+                input: `/speak ${noTokenSecret}`,
+                databaseRevision: 7,
+            },
+        },
+    });
+    assert.equal(noTokenCreate.response.status, 201);
+    assert.equal(JSON.stringify(noTokenCreate.body).includes(noTokenSecret), false);
+    const noTokenClaim = await claimNext(fixture, 'resident-headerless-private');
+    assert.equal(noTokenClaim.body.command.payload.input, `/speak ${noTokenSecret}`);
+    assert.equal(noTokenClaim.body.command.presentationChannel, false);
+    await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(noTokenCreate.body.commandId)}/complete`,
+        {
+            body: {
+                executorId: noTokenClaim.body.lease.executorId,
+                fencingToken: noTokenClaim.body.lease.fencingToken,
+                result: { databaseRevision: 7, canonicalMutationPersisted: false },
+            },
+        },
+    );
+    const durableAfterHeaderless = await readDirectoryText(
+        path.join(fixture.savePath, '__runtime_generations'),
+    );
+    assert.equal(durableAfterHeaderless.includes(noTokenSecret), false);
+    await closeSocket(observer.ws);
+});
+
+test('failed and expired presentation mailboxes drop audio, and private slash input fails closed after restart', {
+    timeout: 25_000,
+}, async () => {
+    const token = 'presentation-token-cccccccccccccccccccccccccccccccc';
+    const failedFixture = await startInProcessServerFixture({
+        presentationMailboxTtlMs: 25,
+    });
+    const failedCreate = await requestJson(failedFixture, '/runtime-generations', {
+        headers: { 'X-Risu-Runtime-Presentation-Token': token },
+        body: {
+            requestId: 'request-failed-presentation',
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'ordinary input', databaseRevision: 4 },
+        },
+    });
+    const failedClaim = await claimNext(failedFixture, 'resident-failed-presentation');
+    const failedId = failedCreate.body.commandId;
+    const failedCredentials = failedClaim.body.lease;
+    await requestJson(
+        failedFixture,
+        `/runtime-generations/${encodeURIComponent(failedId)}/presentation/action-failed`,
+        {
+            method: 'PUT',
+            body: {
+                executorId: failedCredentials.executorId,
+                fencingToken: failedCredentials.fencingToken,
+                action: {
+                    type: 'speak',
+                    characterId: 'character-1',
+                    text: 'must-never-play-after-failure',
+                },
+            },
+        },
+    );
+    await requestJson(
+        failedFixture,
+        `/runtime-generations/${encodeURIComponent(failedId)}/fail`,
+        {
+            body: {
+                executorId: failedCredentials.executorId,
+                fencingToken: failedCredentials.fencingToken,
+                error: 'provider failed',
+                details: { databaseRevision: 4, canonicalMutationPersisted: false },
+            },
+        },
+    );
+    const afterFailure = await requestJson(
+        failedFixture,
+        `/runtime-generations/${encodeURIComponent(failedId)}/presentation/consume`,
+        {
+            headers: { 'X-Risu-Runtime-Presentation-Token': token },
+            body: {},
+        },
+    );
+    assert.equal(afterFailure.response.status, 404);
+
+    const expiringCreate = await requestJson(failedFixture, '/runtime-generations', {
+        headers: { 'X-Risu-Runtime-Presentation-Token': token },
+        body: {
+            requestId: 'request-expiring-presentation',
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: 'ordinary input 2', databaseRevision: 4 },
+        },
+    });
+    const expiringClaim = await claimNext(failedFixture, 'resident-expiring-presentation');
+    await requestJson(
+        failedFixture,
+        `/runtime-generations/${encodeURIComponent(expiringCreate.body.commandId)}/complete`,
+        {
+            body: {
+                executorId: expiringClaim.body.lease.executorId,
+                fencingToken: expiringClaim.body.lease.fencingToken,
+                result: { databaseRevision: 4, canonicalMutationPersisted: false },
+            },
+        },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const afterExpiry = await requestJson(
+        failedFixture,
+        `/runtime-generations/${encodeURIComponent(expiringCreate.body.commandId)}`
+            + '/presentation/consume',
+        {
+            headers: { 'X-Risu-Runtime-Presentation-Token': token },
+            body: {},
+        },
+    );
+    assert.equal(afterExpiry.response.status, 404);
+
+    const directoryFixture = await createFixtureDirectory();
+    const firstServer = await startServerFixture(directoryFixture);
+    const restartSecret = 'restart-private-speech-DO-NOT-PERSIST';
+    const beforeRestart = await requestJson(firstServer, '/runtime-generations', {
+        headers: { 'X-Risu-Runtime-Presentation-Token': token },
+        body: {
+            requestId: 'request-restart-private-input',
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: {
+                input: `/speak ${restartSecret}`,
+                databaseRevision: 9,
+            },
+        },
+    });
+    await stopChild(firstServer.child);
+    const restarted = await startServerFixture(directoryFixture);
+    const restartedClaim = await claimNext(restarted, 'resident-after-private-restart');
+    assert.deepEqual(restartedClaim.body, { claimed: false });
+    const failedAfterRestart = await requestJson(
+        restarted,
+        `/runtime-generations/${encodeURIComponent(beforeRestart.body.commandId)}`,
+    );
+    assert.equal(failedAfterRestart.body.state, 'failed');
+    assert.equal(JSON.stringify(failedAfterRestart.body).includes(restartSecret), false);
+    assert.equal(firstServer.output.join('').includes(restartSecret), false);
+    assert.equal(restarted.output.join('').includes(restartSecret), false);
+    const restartedDurableFiles = await readDirectoryText(
+        path.join(directoryFixture.savePath, '__runtime_generations'),
+    );
+    assert.equal(restartedDurableFiles.includes(restartSecret), false);
+});
+
+test('assistant output snapshots are fenced, monotonic, active-only, and kept outside the event log', {
+    timeout: 30_000,
+}, async () => {
+    const directoryFixture = await createFixtureDirectory();
+    const fixture = await startServerFixture(directoryFixture);
+    const created = await createCommand(fixture, 'assistant-output');
+    const commandId = created.body.commandId;
+    const outputPath = `/runtime-generations/${encodeURIComponent(commandId)}/output`;
+
+    const unauthenticated = await fetch(`${fixture.baseUrl}${outputPath}`);
+    assert.ok([400, 401].includes(unauthenticated.status));
+    const empty = await requestJson(fixture, outputPath);
+    assert.equal(empty.response.status, 200);
+    assert.deepEqual(empty.body, { output: null });
+
+    const observer = await openCommandSocket(fixture, commandId, 'assistant-output-observer');
+    const claim = await claimNext(fixture, 'resident-assistant-output', 60_000);
+    const credentials = claim.body.lease;
+    await observer.waitFor((message) => message.eventType === 'running');
+
+    const forged = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody({
+            executorId: 'forged-resident',
+            fencingToken: credentials.fencingToken,
+        }, 1),
+    });
+    assert.equal(forged.response.status, 409);
+    assert.equal(forged.body.code, 'STALE_EXECUTOR_FENCE');
+
+    const firstBody = generationOutputBody(credentials, 1, {
+        messages: [
+            generationOutputMessage(1),
+            generationOutputMessage(1, {
+                messageId: 'assistant-message-2',
+                messageIndex: 2,
+                data: 'second assistant partial',
+                generationInfo: {
+                    generationId: 'generation-output-2',
+                    model: 'integration-model',
+                },
+            }),
+        ],
+    });
+    const first = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: firstBody,
+    });
+    assert.equal(first.response.status, 201);
+    assert.equal(first.body.reused, false);
+    assert.deepEqual(first.body.output, {
+        type: 'generation_output',
+        commandId,
+        version: firstBody.version,
+        messages: firstBody.messages,
+        timestamp: first.body.output.timestamp,
+    });
+    assert.ok(Number.isFinite(first.body.output.timestamp));
+    const observedFirst = await observer.waitFor(
+        (message) => message.type === 'generation_output' && message.version === 1,
+    );
+    assert.equal(observedFirst.sequence, undefined);
+    assert.deepEqual(observedFirst.messages, firstBody.messages);
+
+    const retry = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: firstBody,
+    });
+    assert.equal(retry.response.status, 200);
+    assert.equal(retry.body.reused, true);
+    assert.deepEqual(retry.body.output, first.body.output);
+
+    const conflict = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: {
+            ...firstBody,
+            messages: firstBody.messages.map((message, index) => index === 0
+                ? { ...message, data: 'same-version-conflict' }
+                : message),
+        },
+    });
+    assert.equal(conflict.response.status, 409);
+    assert.equal(conflict.body.code, 'OUTPUT_VERSION_CONFLICT');
+    assert.equal(conflict.body.version, 1);
+    assert.equal(conflict.body.currentVersion, 1);
+
+    const thirdBody = generationOutputBody(credentials, 3, {
+        data: 'assistant-version-three',
+        optimizationMode: 'strong',
+    });
+    const third = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: thirdBody,
+    });
+    assert.equal(third.response.status, 201);
+    const observedThird = await observer.waitFor(
+        (message) => message.type === 'generation_output' && message.version === 3,
+    );
+    assert.equal(observedThird.messages[0].data, thirdBody.messages[0].data);
+
+    const stale = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 2),
+    });
+    assert.equal(stale.response.status, 409);
+    assert.equal(stale.body.code, 'STALE_OUTPUT_VERSION');
+    assert.equal(stale.body.currentVersion, 3);
+
+    const oversized = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 4, {
+            data: 'x'.repeat((2 * 1024 * 1024) + 1),
+        }),
+    });
+    assert.equal(oversized.response.status, 413);
+
+    const loaded = await requestJson(fixture, outputPath);
+    assert.deepEqual(loaded.body.output, third.body.output);
+    const replay = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/events?afterSequence=0`,
+    );
+    assert.deepEqual(
+        replay.body.events.map((event) => event.eventType),
+        ['created', 'running'],
+    );
+    const persistedEvents = await fs.readFile(path.join(
+        fixture.savePath,
+        '__runtime_generations',
+        commandId,
+        'events.ndjson',
+    ), 'utf8');
+    assert.equal(persistedEvents.includes(thirdBody.messages[0].data), false);
+
+    const cancelRequested = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}`,
+        { method: 'DELETE' },
+    );
+    assert.notEqual(cancelRequested.body.command.cancelRequestedAt, null);
+    const afterCancel = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 4, { data: 'final-cancelled-partial' }),
+    });
+    assert.equal(afterCancel.response.status, 201);
+    const observedAfterCancel = await observer.waitFor(
+        (message) => message.type === 'generation_output' && message.version === 4,
+    );
+    assert.equal(observedAfterCancel.messages[0].data, 'final-cancelled-partial');
+    assert.deepEqual((await requestJson(fixture, outputPath)).body.output, afterCancel.body.output);
+    const cancelled = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/cancel-complete`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                result: { canonicalMutationPersisted: true },
+            },
+        },
+    );
+    assert.equal(cancelled.response.status, 200);
+    const afterTerminal = await requestJson(fixture, outputPath);
+    assert.deepEqual(afterTerminal.body, { output: null });
+    await assert.rejects(fs.stat(path.join(
+        fixture.savePath,
+        '__runtime_generations',
+        commandId,
+        'output.json',
+    )), { code: 'ENOENT' });
+    await closeSocket(observer.ws);
+
+    await stopChild(fixture.child);
+    const restarted = await startServerFixture(directoryFixture);
+    const recovered = await requestJson(restarted, outputPath);
+    assert.equal(recovered.response.status, 200);
+    assert.deepEqual(recovered.body, { output: null });
+    const replayConnection = await openCommandSocket(
+        restarted,
+        commandId,
+        'assistant-output-after-restart',
+    );
+    await replayConnection.waitFor((message) => message.eventType === 'cancelled');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(
+        replayConnection.messages.some((message) => message.type === 'generation_output'),
+        false,
+    );
+    assert.equal(replayConnection.messages[0].state, 'cancelled');
+    await closeSocket(replayConnection.ws);
+});
+
+test('WebSocket preparation keeps only the newest assistant output published during replay', {
+    timeout: 20_000,
+}, async () => {
+    const fixture = await startInProcessServerFixture();
+    const created = await createCommand(fixture, 'assistant-output-race');
+    const commandId = created.body.commandId;
+    const outputPath = `/runtime-generations/${encodeURIComponent(commandId)}/output`;
+    const claim = await claimNext(fixture, 'resident-output-race');
+    const credentials = claim.body.lease;
+    const initial = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 1),
+    });
+    assert.equal(initial.response.status, 201);
+
+    const originalGetOutput = fixture.store.getOutput.bind(fixture.store);
+    let releasePreparation;
+    const preparationBarrier = new Promise((resolve) => {
+        releasePreparation = resolve;
+    });
+    let markPreparationStarted;
+    const preparationStarted = new Promise((resolve) => {
+        markPreparationStarted = resolve;
+    });
+    let blockNextGetOutput = true;
+    fixture.store.getOutput = async (requestedCommandId) => {
+        const output = await originalGetOutput(requestedCommandId);
+        if (blockNextGetOutput) {
+            blockNextGetOutput = false;
+            markPreparationStarted();
+            await preparationBarrier;
+        }
+        return output;
+    };
+
+    const observer = await openCommandSocket(fixture, commandId, 'output-race-observer');
+    await preparationStarted;
+    const second = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 2),
+    });
+    assert.equal(second.response.status, 201);
+    const fifthBody = generationOutputBody(credentials, 5, {
+        messages: [
+            generationOutputMessage(5),
+            generationOutputMessage(5, {
+                messageId: 'assistant-message-2',
+                messageIndex: 2,
+                data: 'second replayed assistant',
+            }),
+        ],
+    });
+    const fifth = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: fifthBody,
+    });
+    assert.equal(fifth.response.status, 201);
+    releasePreparation();
+
+    const preparedOutput = await observer.waitFor(
+        (message) => message.type === 'generation_output',
+    );
+    assert.equal(preparedOutput.version, 5);
+    assert.deepEqual(preparedOutput.messages, fifthBody.messages);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(
+        observer.messages
+            .filter((message) => message.type === 'generation_output')
+            .map((message) => message.version),
+        [5],
+    );
+
+    const sixth = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 6),
+    });
+    assert.equal(sixth.response.status, 201);
+    const liveOutput = await observer.waitFor(
+        (message) => message.type === 'generation_output' && message.version === 6,
+    );
+    assert.equal(liveOutput.messages[0].data, 'assistant-partial-6');
+    await closeSocket(observer.ws);
+});
+
+test('a backpressured output socket closes and recovers from durable latest/terminal state', {
+    timeout: 20_000,
+}, async () => {
+    // Zero is a deterministic fault-injection threshold: the first live output
+    // is persisted, but the ready socket must be dropped instead of enqueueing
+    // a cumulative frame. Production uses a bounded positive high-water mark.
+    const fixture = await startInProcessServerFixture({
+        webSocketOutputBufferHighWaterBytes: 0,
+    });
+    const created = await createCommand(fixture, 'assistant-output-backpressure');
+    const commandId = created.body.commandId;
+    const outputPath = `/runtime-generations/${encodeURIComponent(commandId)}/output`;
+    const observer = await openCommandSocket(fixture, commandId, 'slow-output-observer');
+    const claim = await claimNext(fixture, 'resident-output-backpressure');
+    const credentials = claim.body.lease;
+    await observer.waitFor((message) => message.eventType === 'running');
+
+    const socketClosed = once(observer.ws, 'close');
+    const published = await requestJson(fixture, outputPath, {
+        method: 'PUT',
+        body: generationOutputBody(credentials, 1, {
+            messages: [
+                generationOutputMessage(1),
+                generationOutputMessage(1, {
+                    messageId: 'assistant-message-2',
+                    messageIndex: 2,
+                    data: 'second backpressured assistant',
+                }),
+            ],
+        }),
+    });
+    assert.equal(published.response.status, 201);
+    await socketClosed;
+    sockets.delete(observer.ws);
+
+    const hydrated = await requestJson(fixture, outputPath);
+    assert.deepEqual(hydrated.body.output, published.body.output);
+    assert.equal(hydrated.body.output.messages.length, 2);
+
+    const completed = await requestJson(
+        fixture,
+        `/runtime-generations/${encodeURIComponent(commandId)}/complete`,
+        {
+            body: {
+                executorId: credentials.executorId,
+                fencingToken: credentials.fencingToken,
+                result: { databaseRevision: 17, canonicalMutationPersisted: true },
+            },
+        },
+    );
+    assert.equal(completed.response.status, 200);
+    assert.deepEqual((await requestJson(fixture, outputPath)).body, { output: null });
+
+    const recovered = await openCommandSocket(
+        fixture,
+        commandId,
+        'backpressure-terminal-reconnect',
+    );
+    await recovered.waitFor((message) => message.eventType === 'completed');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(recovered.messages[0].state, 'completed');
+    assert.equal(
+        recovered.messages.some((message) => message.type === 'generation_output'),
+        false,
+    );
+    await closeSocket(recovered.ws);
 });
 
 test('restart retains completed commands, interrupts running work, and preserves fencing order', {

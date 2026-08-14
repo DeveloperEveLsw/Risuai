@@ -203,7 +203,11 @@ export async function readModule(buf:Buffer):Promise<RisuModule> {
                     if (!module.assets?.[task.index]) {
                         throw new Error(`Missing asset metadata for index ${task.index}`)
                     }
-                    module.assets[task.index][1] = await saveAsset(decoded)
+                    module.assets[task.index][1] = await saveAsset(
+                        decoded,
+                        '',
+                        module.assets[task.index][2],
+                    )
                     completed += 1
                 } catch (error) {
                     failed.push(task)

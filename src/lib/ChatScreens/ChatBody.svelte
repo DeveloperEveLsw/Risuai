@@ -3,7 +3,7 @@
     import { DBState } from 'src/ts/stores.svelte'
     import { sleep } from "src/ts/util"
     import { alertError } from "../../ts/alert"
-    import { addMetadataToElement, getDistance, ParseMarkdown, postTranslationParse, trimMarkdown, type CbsConditions, type simpleCharacterArgument } from "../../ts/parser/parser.svelte"
+    import { addMetadataToElement, getDistance, ParseMarkdown, ParseMarkdownReadOnlyPresentation, postTranslationParse, trimMarkdown, trimMarkdownReadOnlyPresentation, type CbsConditions, type simpleCharacterArgument } from "../../ts/parser/parser.svelte"
     import { getLLMCache, translateHTML } from "../../ts/translator/translator"
     import { getModuleAssets } from "src/ts/process/modules";
     import { getCurrentCharacter } from "src/ts/storage/database.svelte";
@@ -23,6 +23,7 @@
         modelShortName: string
         renderRawStreaming?: boolean
         rawStreamingText?: string
+        readOnlyPresentation?: boolean
     }
 
     let {
@@ -38,6 +39,7 @@
         modelShortName = '',
         renderRawStreaming = false,
         rawStreamingText = '',
+        readOnlyPresentation = false,
     }: Props =  $props()
 
     // svelte-ignore non_reactive_update
@@ -70,6 +72,15 @@
         let lastParsedQueue = ''
         let mode = 'notrim' as const
         try {
+            if(readOnlyPresentation){
+                // Runtime output is uncommitted presentation state. Keep its
+                // parser pure: no Lua/plugin/trigger/regex editdisplay, CBS
+                // state access, translation request, or translation cache.
+                const marked = await ParseMarkdownReadOnlyPresentation(data, charArg, mode, chatID)
+                lastParsedQueue = marked
+                lastCharArg = charArg
+                return marked
+            }
             if((!isEqual(lastCharArg, charArg)) || (chatID !== lastChatId)){
                 lastParsedQueue = ''
                 lastCharArg = charArg
@@ -247,6 +258,9 @@
     }
 
     let markParsingResult = $derived.by(() => markParsing(msgDisplay, character, idx))
+    let trimRenderedMarkdown = $derived(readOnlyPresentation
+        ? trimMarkdownReadOnlyPresentation
+        : trimMarkdown)
 
     $effect(() => {
         if(shouldRenderRawStreaming){
@@ -262,8 +276,8 @@
     <span class="whitespace-pre-wrap">{rawStreamingText}</span>
 {:else}
     {#await markParsingResult}
-        {@html addMetadataToElement(trimMarkdown(lastParsed), modelShortName)}
+        {@html addMetadataToElement(trimRenderedMarkdown(lastParsed), modelShortName)}
     {:then md}
-        {@html addMetadataToElement(trimMarkdown(md), modelShortName)}
+        {@html addMetadataToElement(trimRenderedMarkdown(md), modelShortName)}
     {/await}
 {/if}

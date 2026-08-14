@@ -7,6 +7,8 @@
     import { chatFoldedStateMessageIndex } from 'src/ts/globalApi.svelte';
     import { get } from 'svelte/store';
     import type { RuntimeChatPresentationOverlay } from 'src/ts/runtime/chatPresentationOverlay.svelte';
+    import type { RuntimeAssistantOutputPresentation } from 'src/ts/runtime/assistantOutputPresentation.svelte';
+    import { buildRuntimeChatDisplayEntries } from 'src/ts/runtime/chatPresentationEntries';
     
     const getCurrentChatRoomId = () => {
         const charId = get(selectedCharID);
@@ -26,6 +28,7 @@
         loadPages,
         userIconPortrait,
         presentationOverlays = [],
+        assistantOutputs = [],
         hasNewUnreadMessage = $bindable(false)
     }:{
         messages: Message[]
@@ -37,6 +40,7 @@
         loadPages: number
         userIconPortrait?: boolean
         presentationOverlays?: readonly RuntimeChatPresentationOverlay[]
+        assistantOutputs?: readonly RuntimeAssistantOutputPresentation[]
         hasNewUnreadMessage?: boolean
     } = $props();
 
@@ -75,30 +79,14 @@
         const charImage = getCharImage(currentCharacter.image, 'css')
         const userImage = getCharImage(userIcon, 'css')
         const simpleChar = createSimpleCharacter(currentCharacter);
-        const displayEntries = [
-            ...messages.map((message, canonicalIndex) => ({
-                message,
-                canonicalIndex,
-                overlay: null as RuntimeChatPresentationOverlay | null,
-            })),
-            ...[...presentationOverlays]
-                .sort((left, right) => (
-                    left.createdAt - right.createdAt
-                    || left.requestId.localeCompare(right.requestId)
-                ))
-                .map((overlay) => ({
-                message: {
-                    role: 'user',
-                    data: overlay.displayText,
-                    time: overlay.createdAt,
-                } as Message,
-                canonicalIndex: -1,
-                overlay,
-            })),
-        ]
+        const currentChat = currentCharacter.chats?.[currentCharacter.chatPage]
+        const displayEntries = buildRuntimeChatDisplayEntries(
+            messages,
+            presentationOverlays,
+            assistantOutputs,
+        )
         let loadStart = displayEntries.length - 1
         let loadEnd = displayEntries.length - loadPages
-        const currentChat = currentCharacter.chats?.[currentCharacter.chatPage]
         const configuredPerformanceMode = DBState.db.streamingDisplayOptimizationMode ?? 'off';
         const performanceMode = currentChat?.isStreaming
             ? currentChat.activeStreamingDisplayOptimizationMode ?? configuredPerformanceMode
@@ -119,13 +107,14 @@
             const entry = displayEntries[i];
             const message = entry.message;
             const canonicalIndex = entry.canonicalIndex;
-            const readOnlyPresentation = entry.overlay !== null;
+            const readOnlyPresentation = entry.overlay !== null || entry.assistantOutput !== null;
             const messageLargePortrait = message.role === 'user' ? (userIconPortrait ?? false) : ((currentCharacter as character).largePortrait ?? false);
             const reloadPointer = canonicalIndex >= 0 ? (reloadPointerMap[canonicalIndex] ?? 0) : 0;
-            const activeStreamingMessage = canonicalIndex === activeStreamingIndex && message.role === 'char';
+            const activeStreamingMessage = entry.assistantOutput !== null
+                || (canonicalIndex === activeStreamingIndex && message.role === 'char');
             const hashMessageData = activeStreamingMessage ? '' : message.data;
             let hashd = hashMessageData + (message.chatId ?? '')
-                + (entry.overlay?.requestId ?? canonicalIndex.toString())
+                + (entry.overlay?.requestId ?? entry.assistantOutput?.commandId ?? canonicalIndex.toString())
                 + messageLargePortrait.toString() + message.disabled?.toString()
                 + reloadPointer.toString();
             const currentHash = hashCode(hashd);
@@ -135,8 +124,16 @@
                 b.setAttribute('x-hashed', currentHash.toString());
                 b.classList.add('chat-message-container');
                 if(readOnlyPresentation){
-                    b.classList.add('runtime-chat-presentation-overlay', 'opacity-75');
-                    b.setAttribute('data-runtime-request-id', entry.overlay!.requestId);
+                    b.classList.add('runtime-chat-presentation-overlay');
+                    if(entry.overlay){
+                        b.classList.add('opacity-75')
+                        b.setAttribute('data-runtime-request-id', entry.overlay.requestId);
+                    }
+                    if(entry.assistantOutput){
+                        b.classList.add('runtime-assistant-output-presentation')
+                        b.setAttribute('data-runtime-command-id', entry.assistantOutput.commandId)
+                        b.setAttribute('data-runtime-output-version', entry.assistantOutput.version.toString())
+                    }
                 }
                 const inst = mount(Chat, {
                     target: b,
@@ -149,10 +146,11 @@
                         onReroll: onReroll,
                         unReroll: unReroll,
                         rerollIcon: 'dynamic',
-                        // Pending input must not run display triggers against a
-                        // live character object. The canonical replacement will
-                        // use the normal character pipeline after adoption.
-                        character: readOnlyPresentation ? null : simpleChar,
+                        // Runtime presentations use the character only for
+                        // read-only asset resolution. ChatBody deliberately
+                        // skips Lua/plugin/trigger/regex editdisplay until the
+                        // resident's canonical database revision is adopted.
+                        character: entry.overlay ? null : simpleChar,
                         largePortrait: message.role === 'user' ? (userIconPortrait ?? false) : ((currentCharacter as character).largePortrait ?? false),
                         messageGenerationInfo: message.generationInfo,
                         role: message.role,
@@ -160,7 +158,7 @@
                         isComment: message.isComment ?? false,
                         disabled: message.disabled ?? false,
                         isOptimizedStreamingMessage: activeStreamingMessage,
-                        streamingOptimizationMode: performanceMode,
+                        streamingOptimizationMode: entry.assistantOutput?.optimizationMode ?? performanceMode,
                         rawStreamingText: message.data,
                         readOnlyPresentation,
                     },
@@ -178,7 +176,7 @@
             else{
                 mountInstances.get(currentHash)?.updateStreamingDisplay?.({
                     isOptimizedStreamingMessage: activeStreamingMessage,
-                    streamingOptimizationMode: performanceMode,
+                    streamingOptimizationMode: entry.assistantOutput?.optimizationMode ?? performanceMode,
                     rawStreamingText: message.data,
                 })
             }
@@ -245,9 +243,11 @@
         const isSameChat = currentChatRoomId === previousChatRoomId;
         
         // Only auto-scroll if it's the same chat and new messages were added
-        const displayLength = messages.length + presentationOverlays.length;
+        const displayLength = messages.length + presentationOverlays.length + assistantOutputs.length;
         if(isSameChat && displayLength > previousLength){
-            const lastMsg = presentationOverlays.at(-1)
+            const lastMsg = assistantOutputs.at(-1)
+                ? { role: 'char' }
+                : presentationOverlays.at(-1)
                 ? { role: 'user' }
                 : messages[messages.length - 1];
             if(lastMsg && lastMsg.role === 'char' && DBState.db.autoScrollToNewMessage){

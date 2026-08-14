@@ -3,7 +3,11 @@ set -u
 
 state_file=/tmp/risu-runtime-health-failures
 
-if curl -fsS http://risuai:6001/runtime-generations/executor/health >/dev/null \
+# Container health is process liveness, not executor claim-readiness. During a
+# cold-start plugin permission the authenticated resident is intentionally not
+# polling claim-next yet, but its fenced startup heartbeat proves Chromium is
+# alive and lets a normal phone/PC answer the mailbox prompt.
+if curl -fsS http://risuai:6001/runtime-startup/liveness >/dev/null \
     && curl -fsS http://127.0.0.1:9222/json | grep -q 'risu-runtime=executor'
 then
     rm -f "$state_file"

@@ -151,4 +151,48 @@ describe('runtime AlertComp bridge', () => {
         expect(get(mocks.alertStore!)).toEqual({ type: 'none', msg: '' })
         dismissRuntimeAlertPrompt('prompt-local-secret')
     })
+
+    it('captures a synchronous answer even when another alert immediately replaces the store', async () => {
+        const pending = presentRuntimeAlertPrompt({
+            commandId: 'command-ephemeral',
+            promptId: 'prompt-ephemeral-answer',
+            prompt: { type: 'input', msg: 'Short-lived answer', defaultValue: '' },
+        })
+        await vi.waitFor(() => expect(get(mocks.alertStore!)).toMatchObject({ type: 'input' }))
+
+        mocks.alertStore!.set({ type: 'none', msg: 'captured-secret' })
+        mocks.alertStore!.set({ type: 'wait', msg: 'unrelated follow-up' })
+
+        await expect(pending).resolves.toBe('captured-secret')
+        expect(get(mocks.alertStore!)).toEqual({ type: 'none', msg: '' })
+        dismissRuntimeAlertPrompt('prompt-ephemeral-answer')
+    })
+
+    it('serializes a local plugin dialog with an arriving resident startup prompt', async () => {
+        const local = alertConfirm('Local plugin confirmation')
+        await vi.waitFor(() => expect(get(mocks.alertStore!)).toMatchObject({
+            type: 'ask',
+            msg: 'Local plugin confirmation',
+        }))
+        const remote = presentRuntimeAlertPrompt({
+            commandId: 'runtime-startup',
+            promptId: 'startup-prompt-queued',
+            prompt: { type: 'input', msg: 'Resident provider key', defaultValue: '' },
+        })
+
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        expect(get(mocks.alertStore!)).toMatchObject({
+            type: 'ask',
+            msg: 'Local plugin confirmation',
+        })
+        mocks.alertStore!.set({ type: 'none', msg: 'yes' })
+        await expect(local).resolves.toBe(true)
+        await vi.waitFor(() => expect(get(mocks.alertStore!)).toMatchObject({
+            type: 'input',
+            msg: 'Resident provider key',
+        }))
+        mocks.alertStore!.set({ type: 'none', msg: 'resident-secret' })
+        await expect(remote).resolves.toBe('resident-secret')
+        dismissRuntimeAlertPrompt('startup-prompt-queued')
+    })
 })

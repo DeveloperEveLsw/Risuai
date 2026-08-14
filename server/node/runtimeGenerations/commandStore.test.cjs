@@ -6,8 +6,10 @@ const { afterEach, describe, test } = require('node:test');
 
 const {
     IdempotencyConflictError,
+    OutputVersionConflictError,
     RuntimeGenerationStore,
     RuntimeGenerationStoreCorruptionError,
+    StaleOutputVersionError,
     StaleExecutorFenceError,
     canonicalJsonStringify,
     hashCanonicalRequest,
@@ -45,6 +47,7 @@ async function makeFixture(options = {}) {
         idFactory: options.idFactory ?? (() => `command-${++nextId}`),
         defaultLeaseDurationMs: options.defaultLeaseDurationMs ?? 1_000,
         maxLeaseDurationMs: options.maxLeaseDurationMs ?? 60_000,
+        onCleanupError: options.onCleanupError,
     });
     await store.open();
     return { clock, rootDir, store };
@@ -73,6 +76,32 @@ function commandInput(suffix, overrides = {}) {
 
 function permissions(stat) {
     return stat.mode & 0o777;
+}
+
+function outputMessage(overrides = {}) {
+    return {
+        messageId: 'assistant-message-1',
+        messageIndex: 4,
+        data: 'partial',
+        createdAt: 1_700_000_000_100,
+        generationInfo: {
+            generationId: 'generation-1',
+            model: 'test-model',
+        },
+        optimizationMode: 'balanced',
+        ...overrides,
+    };
+}
+
+function outputPayload(version, messageOverrides = {}, payloadOverrides = {}) {
+    return {
+        version,
+        messages: [outputMessage({
+            data: `partial-${version}`,
+            ...messageOverrides,
+        })],
+        ...payloadOverrides,
+    };
 }
 
 describe('RuntimeGenerationStore command persistence and idempotency', () => {
@@ -159,6 +188,43 @@ describe('RuntimeGenerationStore command persistence and idempotency', () => {
             (await store.replay(first.command.id)).events.map((event) => event.type),
             ['created', 'cancelled'],
         );
+    });
+
+    test('foreground creation preempts suggestions and suggestions cannot queue ahead of foreground work', async () => {
+        const { store } = await makeFixture();
+        const runningSuggestion = await store.create(commandInput('suggest-running', {
+            action: 'suggest',
+        }));
+        const suggestionLease = await store.claimNext({ executorId: 'resident-suggest' });
+        assert.equal(suggestionLease.command.id, runningSuggestion.command.id);
+        const queuedSuggestion = await store.create(commandInput('suggest-queued', {
+            action: 'suggest',
+            characterId: 'character-2',
+            chatId: 'chat-2',
+        }));
+
+        const foreground = await store.create(commandInput('foreground-send', {
+            action: 'send',
+        }));
+        assert.equal((await store.get(runningSuggestion.command.id)).state, 'running');
+        assert.notEqual((await store.get(runningSuggestion.command.id)).cancelRequestedAt, null);
+        assert.equal((await store.get(queuedSuggestion.command.id)).state, 'cancelled');
+        assert.equal(foreground.command.state, 'queued');
+
+        const rejectedBackground = await store.create(commandInput('suggest-after-send', {
+            action: 'suggest',
+        }));
+        assert.equal(rejectedBackground.command.state, 'cancelled');
+        assert.equal(rejectedBackground.command.attempt, 0);
+
+        await store.completeCancellation(
+            runningSuggestion.command.id,
+            suggestionLease.lease,
+            { canonicalMutationPersisted: false },
+        );
+        const next = await store.claimNext({ executorId: 'resident-send' });
+        assert.equal(next.command.id, foreground.command.id);
+        assert.equal(next.command.action, 'send');
     });
 
     test('materializes cancel-before-create as one unclaimable idempotent command', async () => {
@@ -700,6 +766,270 @@ describe('RuntimeGenerationStore global executor fencing', () => {
         await store.completeCancellation(first.command.id, claim.lease, { databaseRevision: 4 });
         const nextClaim = await store.claimNext({ executorId: 'replacement' });
         assert.equal(nextClaim.command.id, second.command.id);
+    });
+});
+
+describe('RuntimeGenerationStore assistant output snapshots', () => {
+    test('atomically persists monotonic snapshots, reuses exact retries, and clears them on restart interruption', async () => {
+        const { clock, rootDir, store } = await makeFixture();
+        const created = await store.create(commandInput('output-restart'));
+        const claimed = await store.claimNext({ executorId: 'resident-output' });
+        const credentials = claimed.lease;
+        const commandId = created.command.id;
+        const initialLastSequence = (await store.get(commandId)).lastSequence;
+
+        const firstPayload = {
+            version: 1,
+            messages: [
+                outputMessage({ data: 'first assistant partial' }),
+                outputMessage({
+                    messageId: 'assistant-message-2',
+                    messageIndex: 5,
+                    data: 'second assistant partial',
+                    generationInfo: {
+                        generationId: 'generation-2',
+                        model: 'test-model',
+                    },
+                }),
+            ],
+        };
+        const first = await store.publishOutput(commandId, credentials, firstPayload);
+        assert.equal(first.created, true);
+        assert.deepEqual(first.output, {
+            type: 'generation_output',
+            commandId,
+            ...firstPayload,
+            timestamp: clock.now(),
+        });
+        assert.deepEqual(await store.getOutput(commandId), first.output);
+        assert.equal(
+            permissions(await fs.stat(path.join(rootDir, commandId, 'output.json'))),
+            0o600,
+        );
+
+        const retry = await store.publishOutput(commandId, credentials, {
+            ...firstPayload,
+            messages: firstPayload.messages.map((message) => ({
+                ...message,
+                generationInfo: {
+                    model: message.generationInfo.model,
+                    generationId: message.generationInfo.generationId,
+                },
+            })),
+        });
+        assert.equal(retry.created, false);
+        assert.deepEqual(retry.output, first.output);
+
+        await assert.rejects(
+            store.publishOutput(commandId, credentials, {
+                ...firstPayload,
+                messages: firstPayload.messages.map((message, index) => index === 0
+                    ? { ...message, data: 'conflicting-version-one' }
+                    : message),
+            }),
+            (error) => {
+                assert.equal(error instanceof OutputVersionConflictError, true);
+                assert.equal(error.code, 'OUTPUT_VERSION_CONFLICT');
+                assert.equal(error.version, 1);
+                assert.equal(error.currentVersion, 1);
+                return true;
+            },
+        );
+
+        clock.advance(25);
+        const thirdPayload = outputPayload(3, {
+            data: 'gap-to-version-three',
+            optimizationMode: 'strong',
+        });
+        const third = await store.publishOutput(commandId, credentials, thirdPayload);
+        assert.equal(third.created, true);
+        assert.equal(third.output.version, 3);
+        assert.equal(third.output.timestamp, clock.now());
+
+        await assert.rejects(
+            store.publishOutput(commandId, credentials, outputPayload(2)),
+            (error) => {
+                assert.equal(error instanceof StaleOutputVersionError, true);
+                assert.equal(error.code, 'STALE_OUTPUT_VERSION');
+                assert.equal(error.version, 2);
+                assert.equal(error.currentVersion, 3);
+                return true;
+            },
+        );
+        assert.equal((await store.get(commandId)).lastSequence, initialLastSequence);
+        assert.deepEqual(
+            (await store.replay(commandId)).events.map((event) => event.type),
+            ['created', 'running'],
+        );
+
+        const crashTemporary = path.join(
+            rootDir,
+            commandId,
+            '.output.123.0123456789abcdef.tmp',
+        );
+        await fs.writeFile(crashTemporary, JSON.stringify(third.output));
+
+        const reopened = new RuntimeGenerationStore({
+            rootDir,
+            now: clock.now,
+            idFactory: () => 'unused-after-restart',
+            defaultLeaseDurationMs: 1_000,
+            maxLeaseDurationMs: 60_000,
+        });
+        const recovery = await reopened.open();
+        assert.equal(recovery.recoveredInterrupted, 1);
+        assert.equal((await reopened.get(commandId)).state, 'interrupted');
+        assert.equal(await reopened.getOutput(commandId), null);
+        await assert.rejects(
+            fs.stat(path.join(rootDir, commandId, 'output.json')),
+            { code: 'ENOENT' },
+        );
+        await assert.rejects(fs.stat(crashTemporary), { code: 'ENOENT' });
+        assert.deepEqual(
+            (await reopened.replay(commandId)).events.map((event) => event.type),
+            ['created', 'running', 'interrupted'],
+        );
+    });
+
+    test('allows the current lease to flush after cancel_requested and deletes output on cancellation completion', async () => {
+        const { rootDir, store } = await makeFixture();
+        const created = await store.create(commandInput('output-fence'));
+        const claimed = await store.claimNext({ executorId: 'resident-output-fence' });
+        const commandId = created.command.id;
+
+        await assert.rejects(
+            store.publishOutput(commandId, {
+                executorId: 'forged-output-executor',
+                fencingToken: claimed.lease.fencingToken,
+            }, outputPayload(1)),
+            (error) => error instanceof StaleExecutorFenceError,
+        );
+
+        await store.publishOutput(commandId, claimed.lease, outputPayload(1));
+        await store.cancel(commandId, { reason: 'user_cancel' });
+        const finalFlush = await store.publishOutput(
+            commandId,
+            claimed.lease,
+            outputPayload(2, { data: 'final-cancelled-partial' }),
+        );
+        assert.equal(finalFlush.created, true);
+        assert.deepEqual(await store.getOutput(commandId), finalFlush.output);
+        await store.completeCancellation(commandId, claimed.lease, {
+            canonicalMutationPersisted: true,
+        });
+        assert.equal(await store.getOutput(commandId), null);
+        await assert.rejects(
+            fs.stat(path.join(rootDir, commandId, 'output.json')),
+            { code: 'ENOENT' },
+        );
+
+        const pruned = await store.prune({ maxTerminalCount: 0 });
+        assert.equal(pruned.prunedCount, 1);
+        await assert.rejects(store.getOutput(commandId), { code: 'COMMAND_NOT_FOUND' });
+        await assert.rejects(fs.stat(path.join(rootDir, commandId)), { code: 'ENOENT' });
+    });
+
+    test('deletes presentation output on completed and failed terminal transitions', async () => {
+        const { rootDir, store } = await makeFixture();
+        for (const terminal of ['completed', 'failed']) {
+            const created = await store.create(commandInput(`output-${terminal}`));
+            const claimed = await store.claimNext({ executorId: `resident-output-${terminal}` });
+            await store.publishOutput(created.command.id, claimed.lease, outputPayload(1, {
+                messageId: `assistant-${terminal}`,
+            }));
+            const outputPath = path.join(rootDir, created.command.id, 'output.json');
+            assert.equal(permissions(await fs.stat(outputPath)), 0o600);
+
+            if (terminal === 'completed') {
+                await store.complete(created.command.id, claimed.lease, { databaseRevision: 8 });
+            }
+            else {
+                await store.fail(created.command.id, claimed.lease, new Error('provider failed'), {
+                    databaseRevision: 9,
+                });
+            }
+            assert.equal((await store.get(created.command.id)).state, terminal);
+            assert.equal(await store.getOutput(created.command.id), null);
+            await assert.rejects(fs.stat(outputPath), { code: 'ENOENT' });
+        }
+    });
+
+    test('releases the durable lease even when terminal output cleanup fails', async () => {
+        const cleanupErrors = [];
+        const { rootDir, store } = await makeFixture({
+            onCleanupError: (error, context) => cleanupErrors.push({ error, context }),
+        });
+        const first = await store.create(commandInput('cleanup-failure-first'));
+        const second = await store.create(commandInput('cleanup-failure-second'));
+        const claimed = await store.claimNext({ executorId: 'resident-cleanup-failure' });
+        assert.equal(claimed.command.id, first.command.id);
+        await store.publishOutput(first.command.id, claimed.lease, outputPayload(1));
+
+        // Atomic output writers only create regular files, but a directory with
+        // the crash-temporary name deterministically fault-injects unlink(2)
+        // after the terminal event and lease release have reached disk.
+        const unremovableTemporary = path.join(
+            rootDir,
+            first.command.id,
+            '.output.999.0123456789abcdef.tmp',
+        );
+        await fs.mkdir(unremovableTemporary);
+
+        const completed = await store.complete(first.command.id, claimed.lease, {
+            databaseRevision: 12,
+        });
+        assert.equal(completed.state, 'completed');
+        assert.equal(cleanupErrors.length, 1);
+        assert.equal(cleanupErrors[0].error.code, 'EISDIR');
+        assert.equal(cleanupErrors[0].context.commandId, first.command.id);
+        assert.equal(await store.getOutput(first.command.id), null);
+        await assert.rejects(
+            fs.stat(path.join(rootDir, first.command.id, 'output.json')),
+            { code: 'ENOENT' },
+        );
+        assert.equal(
+            JSON.parse(await fs.readFile(path.join(rootDir, 'store.json'), 'utf8')).lease,
+            null,
+        );
+
+        const nextClaim = await store.claimNext({ executorId: 'resident-after-cleanup-failure' });
+        assert.equal(nextClaim.command.id, second.command.id);
+    });
+
+    test('validates the canonical snapshot shape before writing', async () => {
+        const { store } = await makeFixture();
+        const created = await store.create(commandInput('output-validation'));
+        const claimed = await store.claimNext({ executorId: 'resident-output-validation' });
+        const publish = (messageOverrides = {}, payloadOverrides = {}) => store.publishOutput(
+            created.command.id,
+            claimed.lease,
+            outputPayload(1, messageOverrides, payloadOverrides),
+        );
+
+        await assert.rejects(
+            publish({}, { version: 0 }),
+            /version must be a positive safe integer/,
+        );
+        await assert.rejects(publish({ messageId: '' }), /messageId must be a non-empty string/);
+        await assert.rejects(publish({ messageIndex: -1 }), /messageIndex must be a non-negative/);
+        await assert.rejects(publish({ data: 5 }), /data must be a string/);
+        await assert.rejects(publish({ createdAt: -1 }), /createdAt must be a non-negative/);
+        await assert.rejects(publish({ generationInfo: [] }), /generationInfo must be a JSON object/);
+        await assert.rejects(publish({ optimizationMode: 'turbo' }), /optimizationMode must be/);
+        await assert.rejects(publish({}, { messages: [] }), /messages must be a non-empty array/);
+        await assert.rejects(publish({}, {
+            messages: [
+                outputMessage(),
+                outputMessage({ messageIndex: 5 }),
+            ],
+        }), /unique messageId/);
+        await assert.rejects(publish({}, {
+            messages: [
+                outputMessage({ messageId: 'later', messageIndex: 5 }),
+                outputMessage({ messageId: 'earlier', messageIndex: 4 }),
+            ],
+        }), /strictly increasing messageIndex/);
+        assert.equal(await store.getOutput(created.command.id), null);
     });
 });
 

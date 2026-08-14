@@ -12,6 +12,7 @@ import {
     RuntimeGenerationHttpError,
     type RuntimeGenerationCreateInput,
     type RuntimeGenerationEvent,
+    type RuntimeGenerationOutputInput,
 } from './generationClient'
 
 function command(overrides: Record<string, unknown> = {}) {
@@ -34,6 +35,24 @@ function command(overrides: Record<string, unknown> = {}) {
         result: null,
         error: null,
         lastSequence: 1,
+        ...overrides,
+    }
+}
+
+function generationOutput(overrides: Record<string, unknown> = {}) {
+    return {
+        type: 'generation_output',
+        commandId: 'command-1',
+        version: 1,
+        messages: [{
+            messageId: 'message-1',
+            messageIndex: 2,
+            data: 'partial response',
+            createdAt: 100,
+            generationInfo: { generationId: 'generation-1', model: 'model-1' },
+            optimizationMode: 'off',
+        }],
+        timestamp: 200,
         ...overrides,
     }
 }
@@ -156,6 +175,118 @@ describe('RuntimeGenerationClient', () => {
         })
     })
 
+    it('keeps a presentation capability out of the command body and gives effects to one local waiter', async () => {
+        const requestId = '00000000-0000-4000-8000-000000000021'
+        const presentationToken = '00000000-0000-4000-8000-000000000022'
+        let releaseConsume!: () => void
+        const consumeBarrier = new Promise<void>((resolve) => {
+            releaseConsume = resolve
+        })
+        const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const path = String(input)
+            if (path === '/runtime-generations') {
+                return jsonResponse(command({
+                    requestId,
+                    presentationChannel: true,
+                    reused: false,
+                }), 201)
+            }
+            if (path.endsWith('/presentation/consume') && init?.method === 'POST') {
+                await consumeBarrier
+                return jsonResponse({
+                    actions: [{
+                        type: 'speak',
+                        characterId: 'character-1',
+                        text: 'speak exactly once',
+                    }],
+                })
+            }
+            if (path.endsWith('/presentation/consume') && init?.method === 'DELETE') {
+                return jsonResponse({ acknowledged: true })
+            }
+            throw new Error(`Unexpected request: ${path}`)
+        })
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'signed-auth',
+            cryptoImpl: { randomUUID: () => presentationToken },
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+        const created = await client.create({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            localPresentation: true,
+            payload: { input: '/speak private text' },
+        })
+
+        const createInit = fetchImpl.mock.calls[0][1]
+        expect(createInit?.headers).toMatchObject({
+            'X-Risu-Runtime-Presentation-Token': presentationToken,
+        })
+        expect(JSON.parse(createInit?.body as string)).not.toHaveProperty('localPresentation')
+
+        const first = client.consumePresentationActions(created.commandId)
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2))
+        await expect(client.consumePresentationActions(created.commandId)).resolves.toEqual([])
+        releaseConsume()
+        await expect(first).resolves.toEqual([{
+            type: 'speak',
+            characterId: 'character-1',
+            text: 'speak exactly once',
+        }])
+        await expect(client.consumePresentationActions(created.commandId)).resolves.toEqual([])
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(3))
+    })
+
+    it('validates and restores a redacted private slash payload on cancel-by-request', async () => {
+        const inputText = '/speak cancel-private-text'
+        const encoded = new TextEncoder().encode(inputText)
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoded))
+        const sha256 = [...digest]
+            .map((value) => value.toString(16).padStart(2, '0'))
+            .join('')
+        const requestId = '00000000-0000-4000-8000-000000000023'
+        const fetchImpl = vi.fn(async () => jsonResponse({
+            success: true,
+            created: true,
+            command: command({
+                requestId,
+                state: 'cancelled',
+                cancelRequestedAt: 2,
+                finishedAt: 2,
+                payload: {
+                    input: '',
+                    databaseRevision: 7,
+                    __runtimePrivateInput: {
+                        sha256,
+                        byteLength: encoded.byteLength,
+                    },
+                },
+            }),
+        }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            cryptoImpl: {
+                randomUUID: () => requestId,
+                subtle: crypto.subtle,
+            },
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        const cancelled = await client.cancelByRequest({
+            requestId,
+            action: 'send',
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            payload: { input: inputText, databaseRevision: 7 },
+        })
+
+        expect(cancelled.payload).toEqual({ input: inputText, databaseRevision: 7 })
+    })
+
     it('omits keepalive when a long command exceeds the browser request quota', async () => {
         const requestId = '00000000-0000-4000-8000-000000000011'
         const fetchImpl = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -199,6 +330,101 @@ describe('RuntimeGenerationClient', () => {
             fencingToken: 7,
             expiresAt: 20_000,
         })
+    })
+
+    it('retries an ambiguous output publish with the identical fenced version body', async () => {
+        const input: RuntimeGenerationOutputInput = {
+            version: 3,
+            messages: [{
+                messageId: 'message-1',
+                messageIndex: 2,
+                data: 'cumulative partial response',
+                createdAt: 100,
+                generationInfo: { generationId: 'generation-1', model: 'model-1' },
+                optimizationMode: 'balanced',
+            }],
+        }
+        const output = generationOutput({
+            ...input,
+            timestamp: 250,
+        })
+        const fetchImpl = vi.fn()
+            .mockRejectedValueOnce(new TypeError('response lost after commit'))
+            .mockResolvedValueOnce(jsonResponse({ output, reused: true }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            reconnectDelayMs: 0,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.publishOutput(
+            'command-1',
+            { executorId: 'resident-1', fencingToken: 7, expiresAt: 20_000 },
+            input,
+        )).resolves.toEqual(output)
+
+        expect(fetchImpl).toHaveBeenCalledTimes(2)
+        expect(fetchImpl.mock.calls[0][0]).toBe('/runtime-generations/command-1/output')
+        expect(fetchImpl.mock.calls[0][1]?.method).toBe('PUT')
+        expect(fetchImpl.mock.calls[0][1]?.body).toBe(fetchImpl.mock.calls[1][1]?.body)
+        expect(JSON.parse(fetchImpl.mock.calls[0][1]?.body as string)).toEqual({
+            executorId: 'resident-1',
+            fencingToken: 7,
+            ...input,
+        })
+    })
+
+    it('gets null or the latest validated cumulative output', async () => {
+        const output = generationOutput({
+            version: 4,
+            messages: [{
+                messageId: 'message-1',
+                messageIndex: 2,
+                data: 'partial response',
+                createdAt: 100,
+                generationInfo: null,
+                optimizationMode: 'strong',
+            }],
+        })
+        const fetchImpl = vi.fn()
+            .mockResolvedValueOnce(jsonResponse({ output: null }))
+            .mockResolvedValueOnce(jsonResponse({ output }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.getOutput('command-1')).resolves.toBeNull()
+        await expect(client.getOutput('command-1')).resolves.toEqual(output)
+        expect(fetchImpl.mock.calls.map(([path]) => path)).toEqual([
+            '/runtime-generations/command-1/output',
+            '/runtime-generations/command-1/output',
+        ])
+    })
+
+    it('rejects malformed output endpoint data', async () => {
+        const fetchImpl = vi.fn(async () => jsonResponse({
+            output: generationOutput({
+                messages: [{
+                    messageId: 'message-1',
+                    messageIndex: 2,
+                    data: 'partial response',
+                    createdAt: 100,
+                    generationInfo: null,
+                    optimizationMode: 'turbo',
+                }],
+            }),
+        }))
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        await expect(client.getOutput('command-1'))
+            .rejects.toThrow('Malformed runtime generation output response')
     })
 
     it('posts cancellation completion with the original executor fence', async () => {
@@ -793,6 +1019,141 @@ describe('RuntimeGenerationClient', () => {
             'interrupted',
             'terminal',
         ])
+    })
+
+    it('tracks initial, live, gapped, and reconnected output independently from event sequence', async () => {
+        let ticket = 0
+        const fetchImpl = vi.fn(async () => jsonResponse({
+            ticket: `ticket-${++ticket}`,
+            path: '/runtime-generations/command-1/ws',
+        }))
+        const sockets: FakeWebSocket[] = []
+        const socketUrls: string[] = []
+        const outputs: Array<{version: number, data: string}> = []
+        const eventSequences: number[] = []
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            webSocketFactory: (url) => {
+                socketUrls.push(url)
+                const socket = new FakeWebSocket()
+                sockets.push(socket)
+                return socket
+            },
+            reconnectDelayMs: 0,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        const stop = client.watch('command-1', {
+            onOutput: (output) => outputs.push({
+                version: output.version,
+                data: output.messages[0].data,
+            }),
+            onEvent: (event) => eventSequences.push(event.sequence),
+        })
+        await vi.waitFor(() => expect(sockets).toHaveLength(1))
+
+        sockets[0].message(generationOutput({
+            version: 2,
+            messages: [{
+                messageId: 'message-1', messageIndex: 2, data: 'initial replay',
+                createdAt: 100, generationInfo: null, optimizationMode: 'off',
+            }],
+        }))
+        sockets[0].message({
+            type: 'generation_event',
+            commandId: 'command-1',
+            sequence: 1,
+            eventType: 'running',
+            timestamp: 201,
+            payload: {},
+        })
+        sockets[0].message(generationOutput({
+            version: 2,
+            messages: [{
+                messageId: 'message-1', messageIndex: 2, data: 'duplicate is ignored',
+                createdAt: 100, generationInfo: null, optimizationMode: 'off',
+            }],
+        }))
+        sockets[0].message(generationOutput({
+            version: 5,
+            messages: [{
+                messageId: 'message-1', messageIndex: 2, data: 'valid version gap',
+                createdAt: 100, generationInfo: null, optimizationMode: 'off',
+            }, {
+                messageId: 'message-2', messageIndex: 3, data: 'second message',
+                createdAt: 101, generationInfo: null, optimizationMode: 'off',
+            }],
+        }))
+        sockets[0].message({
+            type: 'generation_event',
+            commandId: 'command-1',
+            sequence: 2,
+            eventType: 'chat_stage',
+            timestamp: 202,
+            payload: {},
+        })
+
+        expect(outputs).toEqual([
+            { version: 2, data: 'initial replay' },
+            { version: 5, data: 'valid version gap' },
+        ])
+        expect(eventSequences).toEqual([1, 2])
+        expect(sockets[0].closes).toHaveLength(0)
+
+        sockets[0].serverClose()
+        await vi.waitFor(() => expect(sockets).toHaveLength(2))
+        expect(new URL(socketUrls[1]).searchParams.get('afterSequence')).toBe('2')
+
+        sockets[1].message(generationOutput({
+            version: 5,
+            messages: [{
+                messageId: 'message-1', messageIndex: 2, data: 'replayed duplicate',
+                createdAt: 100, generationInfo: null, optimizationMode: 'off',
+            }],
+        }))
+        sockets[1].message(generationOutput({
+            version: 7,
+            messages: [{
+                messageId: 'message-1', messageIndex: 2, data: 'latest reconnect replay',
+                createdAt: 100, generationInfo: null, optimizationMode: 'off',
+            }],
+        }))
+        expect(outputs).toEqual([
+            { version: 2, data: 'initial replay' },
+            { version: 5, data: 'valid version gap' },
+            { version: 7, data: 'latest reconnect replay' },
+        ])
+        expect(eventSequences).toEqual([1, 2])
+        stop()
+    })
+
+    it('closes a watch that receives a malformed generation output', async () => {
+        const fetchImpl = vi.fn(async () => jsonResponse({
+            ticket: 'ticket-1',
+            path: '/runtime-generations/command-1/ws',
+        }))
+        const socket = new FakeWebSocket()
+        const onOutput = vi.fn()
+        const client = new RuntimeGenerationClient({
+            fetchImpl: fetchImpl as typeof fetch,
+            getAuth: async () => 'auth',
+            webSocketFactory: () => socket,
+            location: { protocol: 'https:', host: 'risu.example' },
+        })
+
+        const stop = client.watch('command-1', { onOutput })
+        await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce())
+        socket.message(generationOutput({
+            messages: [{
+                messageId: 'message-1', messageIndex: 2, data: 'bad', createdAt: 100,
+                generationInfo: [], optimizationMode: 'off',
+            }],
+        }))
+
+        expect(onOutput).not.toHaveBeenCalled()
+        expect(socket.closes).toContainEqual([1002, 'invalid output'])
+        stop()
     })
 
     it('keeps watching and retries the terminal GET with fresh auth after a transient failure', async () => {

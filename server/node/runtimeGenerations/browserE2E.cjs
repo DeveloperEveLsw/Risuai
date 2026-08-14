@@ -47,7 +47,12 @@ const CANCEL_INPUT = 'cancel safely from phone';
 const NORMAL_PARTIAL = 'E2E partial';
 const NORMAL_PROVIDER_FINAL = 'E2E complete';
 const NORMAL_FINAL = 'E2E_FINAL_OK';
+const NORMAL_STREAM_FILLERS = ['a', 'b', 'c'];
+const NORMAL_STREAM_DELTA_INTERVAL_MS = 75;
 const CANCEL_PARTIAL = 'E2E cancel partial';
+const SUGGESTION_ONE = 'E2E suggestion one';
+const SUGGESTION_TWO = 'E2E suggestion two';
+const SUGGESTION_RESPONSE = `- ${SUGGESTION_ONE}\n- ${SUGGESTION_TWO}`;
 const LUA_SUFFIX = '::LUA_OK';
 const V21_SUFFIX = '::V21_OK';
 const MODULE_ID = 'e2e-compat-module';
@@ -236,7 +241,7 @@ function createSeedDatabase(providerPort) {
             regex: [{
                 comment: 'Require both Lua and V2.1 markers before producing the final E2E marker',
                 type: 'editoutput',
-                in: `^${NORMAL_PARTIAL} ${NORMAL_PROVIDER_FINAL}${LUA_SUFFIX}${V21_SUFFIX}$`,
+                in: `^${NORMAL_PARTIAL}[${NORMAL_STREAM_FILLERS.join('')}]* ${NORMAL_PROVIDER_FINAL}${LUA_SUFFIX}${V21_SUFFIX}$`,
                 out: NORMAL_FINAL,
                 ableFlag: true,
                 flag: 'u',
@@ -452,11 +457,33 @@ async function startMockStreamingProvider() {
         const record = {
             body,
             lastUserContent,
+            kind: body.stream === true ? 'foreground' : 'suggestion',
             aborted: false,
             completed: false,
+            normalStreamingDeltaCount: 0,
             releaseCompletion,
         };
         requests.push(record);
+        if (record.kind === 'suggestion') {
+            await completionGate;
+            if (!response.destroyed) {
+                response.writeHead(200, {
+                    'content-type': 'application/json; charset=utf-8',
+                    'cache-control': 'no-cache',
+                });
+                response.end(JSON.stringify({
+                    id: 'e2e-suggestion',
+                    object: 'chat.completion',
+                    choices: [{
+                        index: 0,
+                        message: { role: 'assistant', content: SUGGESTION_RESPONSE },
+                        finish_reason: 'stop',
+                    }],
+                }));
+                record.completed = true;
+            }
+            return;
+        }
         response.writeHead(200, {
             'content-type': 'text/event-stream; charset=utf-8',
             'cache-control': 'no-cache',
@@ -486,12 +513,29 @@ async function startMockStreamingProvider() {
         await sleep(250);
         if (!response.destroyed) {
             writeSse(response, NORMAL_PARTIAL);
+            record.normalStreamingDeltaCount += 1;
         }
-        // Keep the first provider stream deterministically open while the
-        // independent phone performs its observer and navigation assertions.
-        // The scenario releases this gate only after same/other-chat routing
-        // has been proven; cleanup also releases it after a failed assertion.
-        await completionGate;
+        // Keep a real, changing provider stream flowing faster than the
+        // resident's 125 ms output publisher cadence while the independent
+        // phone performs observer and navigation assertions. Repeated
+        // cumulative snapshots must therefore reach a follower before this
+        // completion gate is released, rather than a single lucky partial.
+        let fillerIndex = 0;
+        const changingStream = setInterval(() => {
+            if (!response.destroyed) {
+                writeSse(response, NORMAL_STREAM_FILLERS[fillerIndex % NORMAL_STREAM_FILLERS.length]);
+                fillerIndex += 1;
+                record.normalStreamingDeltaCount += 1;
+            }
+        }, NORMAL_STREAM_DELTA_INTERVAL_MS);
+        try {
+            // The scenario releases this gate only after same/other-chat
+            // routing has been proven; cleanup also releases it after failure.
+            await completionGate;
+        }
+        finally {
+            clearInterval(changingStream);
+        }
         if (!response.destroyed) {
             writeSse(response, ` ${NORMAL_PROVIDER_FINAL}`);
         }
@@ -685,6 +729,7 @@ class CdpPage {
         this.connection = connection;
         Object.assign(this, options);
         this.diagnostics = [];
+        this.runtimeOutputFrames = [];
         this.closed = false;
     }
 
@@ -701,6 +746,40 @@ class CdpPage {
         }
         else if (method === 'Runtime.consoleAPICalled' && params.type === 'error') {
             this.diagnostics.push(`console: ${(params.args ?? []).map((value) => value.value ?? value.description).join(' ')}`);
+        }
+        else if (method === 'Network.webSocketFrameReceived') {
+            try {
+                const message = JSON.parse(params.response?.payloadData ?? '');
+                if (
+                    message?.type === 'generation_output'
+                    && typeof message.commandId === 'string'
+                    && Number.isSafeInteger(message.version)
+                    && Array.isArray(message.messages)
+                    && message.messages.length > 0
+                    && message.messages.every((outputMessage) => (
+                        typeof outputMessage?.messageId === 'string'
+                        && Number.isSafeInteger(outputMessage.messageIndex)
+                        && typeof outputMessage.data === 'string'
+                    ))
+                ) {
+                    this.runtimeOutputFrames.push({
+                        commandId: message.commandId,
+                        version: message.version,
+                        messages: message.messages.map((outputMessage) => ({
+                            messageId: outputMessage.messageId,
+                            messageIndex: outputMessage.messageIndex,
+                            data: outputMessage.data,
+                        })),
+                    });
+                    if (this.runtimeOutputFrames.length > 100) {
+                        this.runtimeOutputFrames.shift();
+                    }
+                }
+            }
+            catch {
+                // Runtime generation sockets also carry snapshots and events;
+                // non-JSON/binary frames are irrelevant to this observation.
+            }
         }
         if (this.diagnostics.length > 100) {
             this.diagnostics.shift();
@@ -1249,6 +1328,7 @@ async function runScenario() {
     const resident = await cdp.createPage({ width: 1280, height: 900, name: 'resident' });
     const desktop = await cdp.createPage({ width: 1280, height: 900, name: 'desktop A' });
     const phone = await cdp.createPage({ width: 390, height: 844, mobile: true, name: 'phone B' });
+    let suggestionDesktop = null;
 
     try {
         await waitForResident(server, resident);
@@ -1364,8 +1444,59 @@ async function runScenario() {
             false,
             'phone B must observe the original running UI before the provider completes',
         );
+        await phone.waitFor(
+            `(document.body?.innerText ?? '').includes(${JSON.stringify(NORMAL_PARTIAL)})`,
+            { timeoutMs: 15_000, intervalMs: 50 },
+        );
         const phoneObservedPartialBeforeCompletion = await phone.evaluate(
             `(document.body?.innerText ?? '').includes(${JSON.stringify(NORMAL_PARTIAL)})`,
+        );
+        assert.equal(
+            phoneObservedPartialBeforeCompletion,
+            true,
+            'phone B must render resident output before provider completion',
+        );
+        const phoneObservedOutputs = await eventually(() => {
+            const increasing = [];
+            for (const output of phone.runtimeOutputFrames.filter(
+                (candidate) => candidate.commandId === completedCommand.commandId,
+            )) {
+                const previous = increasing.at(-1);
+                if (!previous || output.version > previous.version) {
+                    increasing.push(output);
+                }
+            }
+            return increasing.length >= 2
+                && new Set(increasing.map((output) => output.messages.at(-1)?.data)).size >= 2
+                ? increasing
+                : false;
+        }, { timeoutMs: 15_000, intervalMs: 50 });
+        assert.ok(
+            phoneObservedOutputs[1].version > phoneObservedOutputs[0].version,
+            'phone B must receive increasing resident output versions',
+        );
+        assert.notEqual(
+            phoneObservedOutputs[1].messages.at(-1)?.data,
+            phoneObservedOutputs[0].messages.at(-1)?.data,
+            'phone B must receive changing resident output text',
+        );
+        const phoneObservedDomTextValues = [];
+        await eventually(async () => {
+            const text = await phone.evaluate(`document.querySelector(${JSON.stringify(
+                `.runtime-assistant-output-presentation[data-runtime-command-id="${completedCommand.commandId}"]`,
+            )})?.innerText?.trim() ?? ''`);
+            if (text && phoneObservedDomTextValues.at(-1) !== text) {
+                phoneObservedDomTextValues.push(text);
+            }
+            return new Set(phoneObservedDomTextValues).size >= 2;
+        }, { timeoutMs: 5_000, intervalMs: 50 });
+        assert.ok(
+            new Set(phoneObservedDomTextValues).size >= 2,
+            'phone B DOM must render at least two changing partial output values',
+        );
+        assert.ok(
+            mockProvider.requests[0].normalStreamingDeltaCount >= 3,
+            'the provider must emit multiple changing deltas before completion',
         );
 
         // Navigation must remain independent from the resident generation.
@@ -1432,7 +1563,9 @@ async function runScenario() {
 
         const completedTerminal = await waitForTerminal(server.baseUrl, completedCommand.commandId);
         assert.equal(completedTerminal.state, 'completed', completedTerminal.error ?? 'generation failed');
-        await phone.waitFor(`(document.body?.innerText ?? '').includes(${JSON.stringify(NORMAL_FINAL)})`, {
+        await phone.waitFor(`(document.body?.innerText ?? '').includes(${JSON.stringify(NORMAL_FINAL)})
+            && document.querySelector('.runtime-chat-presentation') === null
+            && document.querySelector('.runtime-assistant-output-presentation') === null`, {
             timeoutMs: 15_000,
         });
         assert.equal(mockProvider.requests.length, 1, 'desktop hand-off must not duplicate the upstream generation');
@@ -1519,12 +1652,125 @@ async function runScenario() {
             'presentation rendering and in-flight navigation must not produce a stale canonical database save',
         );
 
+        // Enable suggestions only after the foreground hand-off/cancel checks
+        // so this independent background plane can be measured exactly. Phone
+        // starts the automatic request, then a fresh desktop partition joins
+        // the same revision-derived command while the provider is gated.
+        const suggestionKnownIds = new Set(
+            (await listCommands(server.baseUrl)).map((command) => command.commandId),
+        );
+        suggestionDesktop = await cdp.createPage({
+            width: 1024,
+            height: 768,
+            name: 'desktop suggestion joiner',
+        });
+        await authenticateAndOpenCharacter(suggestionDesktop, server.baseUrl);
+        const openedMenu = await phone.evaluate(`(() => {
+            const input = document.querySelector('textarea.text-input-area');
+            const buttons = input?.parentElement
+                ? [...input.parentElement.querySelectorAll(':scope > button')]
+                : [];
+            const menuButton = buttons.at(-1);
+            if (!menuButton) return false;
+            menuButton.click();
+            return true;
+        })()`);
+        assert.equal(openedMenu, true, 'phone must open the additional chat menu');
+        await phone.waitFor(`[
+            ...document.querySelectorAll('div.flex.items-center.cursor-pointer')
+        ].some((element) => ['Auto Suggest', '자동 제안'].includes(element.textContent.trim()))`, {
+            timeoutMs: 5_000,
+        });
+        const enabledSuggestions = await phone.evaluate(`(() => {
+            const option = [...document.querySelectorAll('div.flex.items-center.cursor-pointer')]
+                .find((element) => ['Auto Suggest', '자동 제안'].includes(element.textContent.trim()));
+            if (!option) return false;
+            option.click();
+            return true;
+        })()`);
+        assert.equal(enabledSuggestions, true, 'phone must enable automatic suggestions');
+        await eventually(async () => {
+            const snapshot = await loadCanonicalDatabase(server.baseUrl);
+            return snapshot.database.useAutoSuggestions === true ? snapshot : false;
+        }, { timeoutMs: 15_000, intervalMs: 125 });
+        await eventually(
+            () => mockProvider.requests.filter((request) => request.kind === 'suggestion').length === 1,
+            { timeoutMs: 15_000, intervalMs: 50 },
+        );
+        const suggestionCommand = await waitForNewCommand(server.baseUrl, suggestionKnownIds);
+        assert.equal(suggestionCommand.action, 'suggest');
+        assert.ok(['queued', 'running'].includes(suggestionCommand.state));
+        await phone.waitFor(
+            `(document.body?.innerText ?? '').includes('Creating Suggestions')
+                || (document.body?.innerText ?? '').includes('응답 제안 작성 중')`,
+            { timeoutMs: 10_000 },
+        );
+        assert.equal(
+            await phone.evaluate(`document.querySelector('button[aria-labelledby="cancel"]') === null
+                && document.querySelector('.button-icon-send:not(:disabled)') !== null`),
+            true,
+            'background suggestions must not show the green foreground loader or disable Send',
+        );
+
+        await suggestionDesktop.waitFor(
+            `(document.body?.innerText ?? '').includes('Creating Suggestions')
+                || (document.body?.innerText ?? '').includes('응답 제안 작성 중')`,
+            { timeoutMs: 15_000 },
+        );
+        assert.equal(
+            mockProvider.requests.filter((request) => request.kind === 'suggestion').length,
+            1,
+            'two browser partitions must join one resident suggestion provider request',
+        );
+        const suggestionProviderRequest = mockProvider.requests.find(
+            (request) => request.kind === 'suggestion',
+        );
+        suggestionProviderRequest.releaseCompletion();
+        const suggestionTerminal = await waitForTerminal(server.baseUrl, suggestionCommand.commandId);
+        assert.equal(suggestionTerminal.state, 'completed', suggestionTerminal.error ?? 'suggestion failed');
+        assert.equal(suggestionTerminal.result.suggestionsUpdated, true);
+        assert.equal(suggestionTerminal.result.suggestionCount, 2);
+        assert.equal(JSON.stringify(suggestionTerminal.result).includes(SUGGESTION_ONE), false);
+        const suggestionSnapshot = await eventually(async () => {
+            const snapshot = await loadCanonicalDatabase(server.baseUrl);
+            const character = snapshot.database.characters.find(
+                (candidate) => candidate.chaId === CHARACTER_ID,
+            );
+            const chat = character?.chats.find((candidate) => candidate.id === CHAT_ID);
+            return JSON.stringify(chat?.suggestMessages) === JSON.stringify([
+                SUGGESTION_ONE,
+                SUGGESTION_TWO,
+            ]) ? snapshot : false;
+        }, { timeoutMs: 15_000, intervalMs: 125 });
+        for (const page of [phone, suggestionDesktop]) {
+            await page.waitFor(
+                `(document.body?.innerText ?? '').includes(${JSON.stringify(SUGGESTION_ONE)})
+                    && (document.body?.innerText ?? '').includes(${JSON.stringify(SUGGESTION_TWO)})`,
+                { timeoutMs: 15_000 },
+            );
+        }
+        const conflictsAfterSuggestions = await listDatabaseConflicts(server.baseUrl);
+        assert.deepEqual(
+            conflictsAfterSuggestions.filter(
+                (conflict) => !initialConflictIds.has(conflict.conflictId),
+            ),
+            [],
+            'two-device suggestion adoption must not create a stale database save',
+        );
+        await suggestionDesktop.closePage();
+
         const allCommands = await listCommands(server.baseUrl);
         const scenarioCommands = allCommands.filter((command) => !initialIds.has(command.commandId));
-        assert.equal(scenarioCommands.length, 2);
+        assert.equal(scenarioCommands.length, 3);
         assert.deepEqual(
-            scenarioCommands.map((command) => command.state).sort(),
+            scenarioCommands.filter((command) => command.action !== 'suggest')
+                .map((command) => command.state).sort(),
             ['cancelled', 'completed'],
+        );
+        assert.deepEqual(
+            scenarioCommands.filter((command) => command.action === 'suggest')
+                .map((command) => command.state),
+            ['completed'],
         );
         assert.equal(
             scenarioCommands.filter((command) => command.state === 'queued' || command.state === 'running').length,
@@ -1555,6 +1801,11 @@ async function runScenario() {
             revisionAfterUndiscoveredSelection,
             phoneObservedRunningBeforeCompletion: true,
             phoneObservedPartialBeforeCompletion,
+            phoneObservedIncreasingOutputVersions: phoneObservedOutputs.map((output) => output.version),
+            phoneObservedDistinctOutputTexts: new Set(phoneObservedOutputs.map(
+                (output) => output.messages.at(-1)?.data,
+            )).size,
+            phoneObservedDistinctDomTexts: new Set(phoneObservedDomTextValues).size,
             phoneReenteredSameChatBeforeCompletion: true,
             otherChatStopControlScoped: true,
             compatibilityPipeline: ['module-lua', 'plugin-v2.1', 'module-regex'],
@@ -1563,6 +1814,11 @@ async function runScenario() {
             canonicalDatabaseBytes: finalSnapshot.encodedBytes,
             canonicalMessageCount: finalMessages.length,
             providerRequests: mockProvider.requests.length,
+            suggestionProviderRequests: mockProvider.requests.filter(
+                (request) => request.kind === 'suggestion',
+            ).length,
+            suggestionCanonicalRevision: suggestionSnapshot.revision,
+            suggestionCount: suggestionTerminal.result.suggestionCount,
             commandStates: scenarioCommands.map((command) => command.state).sort(),
             stopAbortedProvider: mockProvider.requests[1].aborted,
             directClientStorage: {
@@ -1581,7 +1837,7 @@ async function runScenario() {
         }, null, 2));
     }
     catch (error) {
-        const diagnostics = [resident, desktop, phone]
+        const diagnostics = [resident, desktop, phone, suggestionDesktop].filter(Boolean)
             .flatMap((page) => page.diagnostics.map((line) => `[${page.name}] ${line}`));
         throw new Error([
             error.stack ?? String(error),

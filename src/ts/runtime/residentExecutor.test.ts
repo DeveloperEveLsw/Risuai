@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     executeCanonicalGenerate: vi.fn(),
     executeCanonicalManualTrigger: vi.fn(),
     executeCanonicalLuaButton: vi.fn(),
+    executeCanonicalSuggestion: vi.fn(),
     setFence: vi.fn(),
     clearFence: vi.fn(),
     alertBridge: null as null | {
@@ -21,6 +22,12 @@ const mocks = vi.hoisted(() => ({
         notice: (data: Record<string, unknown>) => void | Promise<void>
     },
     alertBridgeCleanup: vi.fn(),
+    ttsBridge: null as null | ((action: {
+        type: 'speak'
+        characterId: string
+        text: string
+    }) => Promise<void> | void),
+    ttsBridgeCleanup: vi.fn(),
     RuntimeGenerationHttpError: class RuntimeGenerationHttpError extends Error {
         readonly status: number
         readonly body: unknown
@@ -47,6 +54,13 @@ vi.mock('../process/index.svelte', async () => {
     return { chatProcessStage: writable(0) }
 })
 
+vi.mock('../process/tts', () => ({
+    installRuntimeTTSBridge: vi.fn((bridge) => {
+        mocks.ttsBridge = bridge
+        return mocks.ttsBridgeCleanup
+    }),
+}))
+
 vi.mock('./canonicalGeneration.svelte', () => ({
     executeCanonicalSend: mocks.executeCanonicalSend,
     executeCanonicalReroll: mocks.executeCanonicalReroll,
@@ -55,6 +69,7 @@ vi.mock('./canonicalGeneration.svelte', () => ({
     executeCanonicalGenerate: mocks.executeCanonicalGenerate,
     executeCanonicalManualTrigger: mocks.executeCanonicalManualTrigger,
     executeCanonicalLuaButton: mocks.executeCanonicalLuaButton,
+    executeCanonicalSuggestion: mocks.executeCanonicalSuggestion,
 }))
 
 vi.mock('./executionContext', () => ({
@@ -69,6 +84,7 @@ vi.mock('./generationClient', () => ({
 
 import { RuntimeGenerationHttpError } from './generationClient'
 import { startResidentGenerationExecutor } from './residentExecutor'
+import { emitRuntimeStreamingOutput } from './runtimeStreamingOutput.svelte'
 
 function deferred<T>() {
     let resolve!: (value: T) => void
@@ -116,6 +132,26 @@ function lease(overrides: Partial<RuntimeExecutorLease> = {}): RuntimeExecutorLe
     }
 }
 
+function emitMessageOutput(
+    messageId: string,
+    messageIndex: number,
+    data: string,
+    optimizationMode: 'off' | 'balanced' | 'strong' = 'balanced',
+) {
+    emitRuntimeStreamingOutput({
+        messageId,
+        messageIndex,
+        data,
+        createdAt: 123,
+        generationInfo: { generationId: messageId },
+        optimizationMode,
+    })
+}
+
+function emitOutput(data: string, optimizationMode: 'off' | 'balanced' | 'strong' = 'balanced') {
+    emitMessageOutput('generation-1', 2, data, optimizationMode)
+}
+
 function makeClient(
     claimedCommand: RuntimeGenerationCommand,
     initialLease = lease(),
@@ -133,6 +169,8 @@ function makeClient(
         getUiPromptResponse: vi.fn().mockResolvedValue('from phone'),
         heartbeat: vi.fn().mockResolvedValue(lease({ fencingToken: 5 })),
         get: vi.fn().mockResolvedValue(claimedCommand),
+        publishOutput: vi.fn().mockResolvedValue(undefined),
+        publishPresentationAction: vi.fn().mockResolvedValue({ accepted: true, reused: false }),
         complete: vi.fn().mockResolvedValue(undefined),
         completeCancellation: vi.fn().mockResolvedValue(undefined),
         fail: vi.fn().mockResolvedValue(undefined),
@@ -199,10 +237,19 @@ describe('resident generation executor', () => {
             previousLength: 2,
             currentLength: 3,
         })
+        mocks.executeCanonicalSuggestion.mockReset().mockResolvedValue({
+            generated: false,
+            suggestionsUpdated: true,
+            suggestionCount: 2,
+            previousLength: 2,
+            currentLength: 2,
+        })
         mocks.setFence.mockReset()
         mocks.clearFence.mockReset()
         mocks.alertBridge = null
         mocks.alertBridgeCleanup.mockReset()
+        mocks.ttsBridge = null
+        mocks.ttsBridgeCleanup.mockReset()
     })
 
     afterEach(() => {
@@ -298,6 +345,470 @@ describe('resident generation executor', () => {
         )
     })
 
+    it('publishes TTS through the command mailbox and never plays it in the resident', async () => {
+        mocks.executeCanonicalSend.mockImplementation(async () => {
+            expect(mocks.ttsBridge).not.toBeNull()
+            await mocks.ttsBridge!({
+                type: 'speak',
+                characterId: 'character-1',
+                text: 'resolved pipeline speech',
+            })
+            return { generated: false, previousLength: 0, currentLength: 0 }
+        })
+        const claimed = command('send', {
+            input: '/pass resolved pipeline speech | /speak',
+            databaseRevision: 4,
+        })
+        claimed.presentationChannel = true
+        const { client } = makeClient(claimed)
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+        expect(client.publishPresentationAction).toHaveBeenCalledOnce()
+        expect(client.publishPresentationAction).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ executorId: 'resident-1' }),
+            expect.any(String),
+            {
+                type: 'speak',
+                characterId: 'character-1',
+                text: 'resolved pipeline speech',
+            },
+            expect.any(AbortSignal),
+        )
+        expect(client.publishPresentationAction.mock.invocationCallOrder[0])
+            .toBeLessThan(client.complete.mock.invocationCallOrder[0])
+        expect(mocks.ttsBridgeCleanup).toHaveBeenCalledOnce()
+    })
+
+    it('silences nested/automatic TTS when an ephemeral channel is unavailable', async () => {
+        mocks.executeCanonicalSend.mockImplementation(async () => {
+            // All sayTTS call sites, including nested trigger effects and
+            // ttsAutoSpeech, enter this installed bridge while the command runs.
+            await mocks.ttsBridge!({
+                type: 'speak',
+                characterId: 'character-1',
+                text: 'must not play in hidden Chromium',
+            })
+            return { generated: true, previousLength: 1, currentLength: 2 }
+        })
+        const { client } = makeClient(command('send', {
+            input: 'ordinary input',
+            databaseRevision: 4,
+        }))
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+        expect(client.publishPresentationAction).not.toHaveBeenCalled()
+        expect(mocks.ttsBridgeCleanup).toHaveBeenCalledOnce()
+    })
+
+    it('drops a stalled presentation publish without blocking canonical completion', async () => {
+        mocks.executeCanonicalSend.mockImplementation(async () => {
+            await mocks.ttsBridge!({
+                type: 'speak',
+                characterId: 'character-1',
+                text: 'drop after bounded timeout',
+            })
+            return { generated: false, previousLength: 0, currentLength: 0 }
+        })
+        const claimed = command('send', {
+            input: '/speak drop after bounded timeout',
+            databaseRevision: 4,
+        })
+        claimed.presentationChannel = true
+        const { client } = makeClient(claimed)
+        client.publishPresentationAction.mockImplementation(() => new Promise(() => {}))
+        const onError = vi.fn()
+
+        start(
+            client,
+            vi.fn(async () => ({ revision: 4 })),
+            { presentationPublishTimeoutMs: 10, onError },
+        )
+
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+        expect(onError).toHaveBeenCalledWith(expect.objectContaining({ name: 'TimeoutError' }))
+        expect(client.fail).not.toHaveBeenCalled()
+    })
+
+    it('publishes continuous strong-mode snapshots on a leading 125 ms cadence with the current lease', async () => {
+        vi.useFakeTimers()
+        try {
+            const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
+            mocks.executeCanonicalSend.mockImplementation(async () => await execution.promise)
+            const { client } = makeClient(command('send', { input: 'hello' }))
+
+            start(
+                client,
+                vi.fn(async () => ({ revision: 4 })),
+                { heartbeatIntervalMs: 100 },
+            )
+            await vi.advanceTimersByTimeAsync(0)
+            expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce()
+
+            emitOutput('first', 'strong')
+            expect(client.publishOutput).toHaveBeenCalledOnce()
+            expect(client.publishOutput.mock.calls[0][2]).toEqual(expect.objectContaining({
+                version: 1,
+                messages: [expect.objectContaining({
+                    data: 'first',
+                    optimizationMode: 'strong',
+                })],
+            }))
+
+            await vi.advanceTimersByTimeAsync(50)
+            emitOutput('second', 'strong')
+            await vi.advanceTimersByTimeAsync(50)
+            emitOutput('third', 'strong')
+            await vi.advanceTimersByTimeAsync(24)
+            expect(client.publishOutput).toHaveBeenCalledOnce()
+
+            await vi.advanceTimersByTimeAsync(1)
+            expect(client.publishOutput).toHaveBeenCalledTimes(2)
+            expect(client.publishOutput.mock.calls[1][1]).toEqual(expect.objectContaining({
+                fencingToken: 5,
+            }))
+            expect(client.publishOutput.mock.calls[1][2]).toEqual(expect.objectContaining({
+                version: 2,
+                messages: [expect.objectContaining({
+                    data: 'third',
+                    optimizationMode: 'strong',
+                })],
+            }))
+
+            emitOutput('fourth', 'strong')
+            await vi.advanceTimersByTimeAsync(125)
+            expect(client.publishOutput).toHaveBeenCalledTimes(3)
+            expect(client.publishOutput.mock.calls[2][2]).toEqual(expect.objectContaining({
+                version: 3,
+                messages: [expect.objectContaining({ data: 'fourth' })],
+            }))
+
+            execution.resolve({ generated: true, previousLength: 1, currentLength: 2 })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(client.complete).toHaveBeenCalledOnce()
+        }
+        finally {
+            handle?.stop()
+            handle = null
+            vi.useRealTimers()
+        }
+    })
+
+    it('coalesces while transport is slow and flushes the latest output before success', async () => {
+        const firstPublish = deferred<unknown>()
+        const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
+        mocks.executeCanonicalSend.mockImplementation(async () => await execution.promise)
+        const { client } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput
+            .mockImplementationOnce(async () => await firstPublish.promise)
+            .mockResolvedValue(undefined)
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+        await vi.waitFor(() => expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce())
+
+        emitOutput('first')
+        emitOutput('superseded')
+        emitOutput('latest')
+        execution.resolve({ generated: true, previousLength: 1, currentLength: 2 })
+        await Promise.resolve()
+        expect(client.publishOutput).toHaveBeenCalledOnce()
+        expect(client.complete).not.toHaveBeenCalled()
+
+        firstPublish.resolve(undefined)
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(client.publishOutput).toHaveBeenCalledTimes(2)
+        expect(client.publishOutput.mock.calls.map((call) => call[2])).toEqual([
+            expect.objectContaining({
+                version: 1,
+                messages: [expect.objectContaining({ data: 'first' })],
+            }),
+            expect.objectContaining({
+                version: 2,
+                messages: [expect.objectContaining({ data: 'latest' })],
+            }),
+        ])
+        expect(client.publishOutput.mock.invocationCallOrder[1]).toBeLessThan(
+            client.complete.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('publishes an ordered latest snapshot for every assistant message in one command', async () => {
+        const firstPublish = deferred<unknown>()
+        const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
+        mocks.executeCanonicalSend.mockImplementation(async () => await execution.promise)
+        const { client } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput
+            .mockImplementationOnce(async () => await firstPublish.promise)
+            .mockResolvedValue(undefined)
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+        await vi.waitFor(() => expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce())
+
+        emitMessageOutput('generation-1', 2, 'first bubble partial')
+        await vi.waitFor(() => expect(client.publishOutput).toHaveBeenCalledOnce())
+        emitMessageOutput('generation-2', 3, 'second bubble partial')
+        emitMessageOutput('generation-1', 2, 'first bubble final')
+        emitMessageOutput('generation-2', 3, 'second bubble final')
+        execution.resolve({ generated: true, previousLength: 1, currentLength: 3 })
+
+        expect(client.complete).not.toHaveBeenCalled()
+        firstPublish.resolve(undefined)
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(client.publishOutput).toHaveBeenCalledTimes(2)
+        expect(client.publishOutput.mock.calls[0][2]).toEqual({
+            version: 1,
+            messages: [expect.objectContaining({
+                messageId: 'generation-1',
+                messageIndex: 2,
+                data: 'first bubble partial',
+            })],
+        })
+        expect(client.publishOutput.mock.calls[1][2]).toEqual({
+            version: 2,
+            messages: [
+                expect.objectContaining({
+                    messageId: 'generation-1',
+                    messageIndex: 2,
+                    data: 'first bubble final',
+                }),
+                expect.objectContaining({
+                    messageId: 'generation-2',
+                    messageIndex: 3,
+                    data: 'second bubble final',
+                }),
+            ],
+        })
+        expect(client.publishOutput.mock.invocationCallOrder[1]).toBeLessThan(
+            client.complete.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('removes the stale message suffix when a resend replaces an earlier index', async () => {
+        const firstPublish = deferred<unknown>()
+        const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
+        mocks.executeCanonicalSend.mockImplementation(async () => await execution.promise)
+        const { client } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput
+            .mockImplementationOnce(async () => await firstPublish.promise)
+            .mockResolvedValue(undefined)
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+        await vi.waitFor(() => expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce())
+
+        emitMessageOutput('generation-old', 2, 'old first bubble')
+        await vi.waitFor(() => expect(client.publishOutput).toHaveBeenCalledOnce())
+        emitMessageOutput('generation-old-suffix', 3, 'old later bubble')
+        emitMessageOutput('generation-replacement', 2, 'replacement bubble')
+        execution.resolve({ generated: true, previousLength: 1, currentLength: 2 })
+
+        firstPublish.resolve(undefined)
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(client.publishOutput).toHaveBeenCalledTimes(2)
+        expect(client.publishOutput.mock.calls[1][2]).toEqual({
+            version: 2,
+            messages: [expect.objectContaining({
+                messageId: 'generation-replacement',
+                messageIndex: 2,
+                data: 'replacement bubble',
+            })],
+        })
+    })
+
+    it('flushes the post-IGP final message instead of leaving the pre-IGP overlay', async () => {
+        mocks.executeCanonicalSend.mockImplementation(async () => {
+            emitOutput('processed provider final')
+            emitRuntimeStreamingOutput({
+                messageId: 'generation-1',
+                messageIndex: 2,
+                data: 'processed provider final::IGP',
+                createdAt: 123,
+                generationInfo: {
+                    generationId: 'generation-1',
+                    stageTiming: { stage4: 25 },
+                },
+                optimizationMode: 'balanced',
+            })
+            return { generated: true, previousLength: 1, currentLength: 2 }
+        })
+        const { client } = makeClient(command('send', { input: 'hello' }))
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        const finalPublish = client.publishOutput.mock.calls.at(-1)
+        expect(finalPublish?.[2]).toEqual(expect.objectContaining({
+            messages: [expect.objectContaining({
+                data: 'processed provider final::IGP',
+                generationInfo: expect.objectContaining({
+                    stageTiming: { stage4: 25 },
+                }),
+            })],
+        }))
+        expect(client.publishOutput.mock.invocationCallOrder.at(-1)).toBeLessThan(
+            client.complete.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('flushes the latest output before completing cancellation', async () => {
+        const firstPublish = deferred<unknown>()
+        const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
+        mocks.executeCanonicalSend.mockImplementation(async () => await execution.promise)
+        const { client, watchHandlers } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput
+            .mockImplementationOnce(async () => await firstPublish.promise)
+            .mockResolvedValue(undefined)
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+        await vi.waitFor(() => expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce())
+        emitOutput('first')
+        emitOutput('cancelled latest')
+        watchHandlers[0].onEvent?.({
+            type: 'generation_event',
+            commandId: 'command-1',
+            sequence: 3,
+            eventType: 'cancel_requested',
+            timestamp: Date.now(),
+            payload: { reason: 'user_cancel' },
+        })
+        execution.resolve({ generated: true, previousLength: 1, currentLength: 2 })
+        await Promise.resolve()
+        expect(client.completeCancellation).not.toHaveBeenCalled()
+
+        firstPublish.resolve(undefined)
+        await vi.waitFor(() => expect(client.completeCancellation).toHaveBeenCalledOnce())
+
+        expect(client.publishOutput).toHaveBeenCalledTimes(2)
+        expect(client.publishOutput.mock.calls[1][2]).toEqual(expect.objectContaining({
+            version: 2,
+            messages: [expect.objectContaining({ data: 'cancelled latest' })],
+        }))
+        expect(client.publishOutput.mock.invocationCallOrder[1]).toBeLessThan(
+            client.completeCancellation.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('flushes the latest output before reporting canonical execution failure', async () => {
+        const firstPublish = deferred<unknown>()
+        const execution = deferred<never>()
+        mocks.executeCanonicalSend.mockImplementation(async () => await execution.promise)
+        const { client } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput
+            .mockImplementationOnce(async () => await firstPublish.promise)
+            .mockResolvedValue(undefined)
+
+        start(client, vi.fn(async () => ({ revision: 4 })))
+        await vi.waitFor(() => expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce())
+        emitOutput('first')
+        emitOutput('failed latest')
+        execution.reject(new Error('provider failed'))
+        await Promise.resolve()
+        expect(client.fail).not.toHaveBeenCalled()
+
+        firstPublish.resolve(undefined)
+        await vi.waitFor(() => expect(client.fail).toHaveBeenCalledOnce())
+
+        expect(client.publishOutput).toHaveBeenCalledTimes(2)
+        expect(client.publishOutput.mock.calls[1][2]).toEqual(expect.objectContaining({
+            version: 2,
+            messages: [expect.objectContaining({ data: 'failed latest' })],
+        }))
+        expect(client.publishOutput.mock.invocationCallOrder[1]).toBeLessThan(
+            client.fail.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('reports non-fence output rejection without aborting or failing canonical completion', async () => {
+        const outputError = new RuntimeGenerationHttpError(413, {
+            code: 'OUTPUT_TOO_LARGE',
+        })
+        let processSignalAborted = false
+        mocks.executeCanonicalSend.mockImplementation(async ({ signal }) => {
+            emitOutput('processed by plugin')
+            await Promise.resolve()
+            processSignalAborted = signal.aborted
+            return { generated: true, previousLength: 1, currentLength: 2 }
+        })
+        const { client } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput.mockRejectedValue(outputError)
+        const onError = vi.fn()
+
+        start(client, vi.fn(async () => ({ revision: 4 })), { onError })
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(processSignalAborted).toBe(false)
+        expect(onError).toHaveBeenCalledWith(outputError)
+        expect(client.fail).not.toHaveBeenCalled()
+    })
+
+    it('aborts canonical execution when output publishing loses the executor fence', async () => {
+        let processSignalAborted = false
+        mocks.executeCanonicalSend.mockImplementation(async ({ signal }) => {
+            emitOutput('fenced output')
+            if (!signal.aborted) {
+                await new Promise<void>((resolve) => {
+                    signal.addEventListener('abort', () => resolve(), { once: true })
+                })
+            }
+            processSignalAborted = signal.aborted
+            return { generated: true, previousLength: 1, currentLength: 2 }
+        })
+        const { client } = makeClient(command('send', { input: 'hello' }))
+        client.publishOutput.mockRejectedValue(new RuntimeGenerationHttpError(409, {
+            code: 'STALE_EXECUTOR_FENCE',
+        }))
+        const onError = vi.fn()
+
+        start(client, vi.fn(async () => ({ revision: 4 })), { onError })
+        await vi.waitFor(() => expect(client.claimNext).toHaveBeenCalledTimes(2))
+
+        expect(processSignalAborted).toBe(true)
+        expect(onError).not.toHaveBeenCalled()
+        expect(client.complete).not.toHaveBeenCalled()
+        expect(client.completeCancellation).not.toHaveBeenCalled()
+        expect(client.fail).not.toHaveBeenCalled()
+    })
+
+    it('bounds a retrying output transport before canonical completion', async () => {
+        vi.useFakeTimers()
+        try {
+            mocks.executeCanonicalSend.mockImplementation(async () => {
+                emitOutput('processed output')
+                return { generated: true, previousLength: 1, currentLength: 2 }
+            })
+            const { client } = makeClient(command('send', { input: 'hello' }))
+            // Model a transport/auth step that ignores AbortSignal entirely;
+            // the resident timeout must still keep terminal completion bounded.
+            client.publishOutput.mockImplementation(async () => await new Promise(() => {}))
+            const onError = vi.fn()
+
+            start(client, vi.fn(async () => ({ revision: 4 })), { onError })
+            await vi.advanceTimersByTimeAsync(0)
+            expect(client.publishOutput).toHaveBeenCalledOnce()
+            expect(client.complete).not.toHaveBeenCalled()
+
+            await vi.advanceTimersByTimeAsync(4_999)
+            expect(client.complete).not.toHaveBeenCalled()
+            await vi.advanceTimersByTimeAsync(1)
+            expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+                name: 'TimeoutError',
+            }))
+            expect(client.complete).toHaveBeenCalledOnce()
+            expect(client.fail).not.toHaveBeenCalled()
+        }
+        finally {
+            handle?.stop()
+            handle = null
+            vi.useRealTimers()
+        }
+    })
+
     it('keeps the fence until cancellation persistence completes, then records cancelled', async () => {
         const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
         const cancellationPersistence = deferred<{ revision: number } | null>()
@@ -350,6 +861,50 @@ describe('resident generation executor', () => {
         )
         expect(client.heartbeat.mock.invocationCallOrder[0]).toBeLessThan(
             client.completeCancellation.mock.invocationCallOrder[0],
+        )
+    })
+
+    it('does not restore a slash draft after its earlier canonical mutation persists', async () => {
+        const execution = deferred<{ generated: boolean, previousLength: number, currentLength: number }>()
+        const cancellationPersistence = deferred<{ revision: number } | null>()
+        mocks.executeCanonicalSend.mockImplementation(async (input) => {
+            input.onCanonicalMutation()
+            return await execution.promise
+        })
+        let persistenceCall = 0
+        const waitForPersistence = vi.fn(() => {
+            persistenceCall += 1
+            return persistenceCall <= 2
+                ? Promise.resolve({ revision: 4 })
+                : cancellationPersistence.promise
+        })
+        const { client, watchHandlers } = makeClient(command('send', {
+            input: '/send hello | /input wait',
+            databaseRevision: 4,
+        }))
+
+        start(client, waitForPersistence)
+        await vi.waitFor(() => expect(mocks.executeCanonicalSend).toHaveBeenCalledOnce())
+        watchHandlers[0].onEvent?.({
+            type: 'generation_event',
+            commandId: 'command-1',
+            sequence: 3,
+            eventType: 'cancel_requested',
+            timestamp: Date.now(),
+            payload: { reason: 'user_cancel' },
+        })
+        execution.resolve({ generated: false, previousLength: 0, currentLength: 1 })
+
+        await vi.waitFor(() => expect(waitForPersistence).toHaveBeenCalledTimes(3))
+        cancellationPersistence.resolve({ revision: 5 })
+        await vi.waitFor(() => expect(client.completeCancellation).toHaveBeenCalledOnce())
+        expect(client.completeCancellation).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ fencingToken: 5 }),
+            {
+                databaseRevision: 5,
+                canonicalMutationPersisted: true,
+            },
         )
     })
 
@@ -557,6 +1112,37 @@ describe('resident generation executor', () => {
                 databaseRevision: 13,
             }),
         )
+    })
+
+    it('dispatches suggestion generation without putting suggestion text in the result', async () => {
+        const { client } = makeClient(command('suggest', {
+            databaseRevision: 14,
+            force: false,
+        }))
+
+        const waitForPersistence = vi.fn()
+            .mockResolvedValueOnce({ revision: 14 })
+            .mockResolvedValueOnce({ revision: 14 })
+            .mockResolvedValue({ revision: 15 })
+        start(client, waitForPersistence)
+        await vi.waitFor(() => expect(client.complete).toHaveBeenCalledOnce())
+
+        expect(mocks.executeCanonicalSuggestion).toHaveBeenCalledWith({
+            characterId: 'character-1',
+            chatId: 'chat-1',
+            signal: expect.any(AbortSignal),
+        })
+        expect(client.complete).toHaveBeenCalledWith(
+            'command-1',
+            expect.objectContaining({ fencingToken: 5 }),
+            expect.objectContaining({
+                generated: false,
+                suggestionsUpdated: true,
+                suggestionCount: 2,
+                databaseRevision: 15,
+            }),
+        )
+        expect(JSON.stringify(client.complete.mock.calls[0][2])).not.toContain('suggestion text')
     })
 
     it('relays a blocking alert and resumes canonical execution with the observer response', async () => {

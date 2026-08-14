@@ -43,8 +43,11 @@ describe('runHookPipeline', () => {
         expect(b).not.toHaveBeenCalled();
     });
 
-    it('isolates a hook that throws — continues with next hook, keeps original ctx for the throwing one', async () => {
-        const a: TTSHookFn<BeforeTTSContext, BeforeTTSResult> = async () => { throw new Error('boom'); };
+    it('isolates a hook that throws without logging its private error payload', async () => {
+        const privateCanary = 'private-utterance-canary';
+        const a: TTSHookFn<BeforeTTSContext, BeforeTTSResult> = async () => {
+            throw new Error(privateCanary);
+        };
         const b: TTSHookFn<BeforeTTSContext, BeforeTTSResult> = async (c) => ({ text: c.text + ' B' });
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         try {
@@ -52,6 +55,7 @@ describe('runHookPipeline', () => {
             expect(result.skip).toBe(false);
             expect(result.ctx.text).toBe('hello B');
             expect(errSpy).toHaveBeenCalled();
+            expect(JSON.stringify(errSpy.mock.calls)).not.toContain(privateCanary);
         } finally {
             errSpy.mockRestore();
         }

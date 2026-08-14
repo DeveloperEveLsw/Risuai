@@ -17,15 +17,16 @@ This deployment has two views of the same upstream RisuAI build:
   administrative/compatibility view, not the normal public UI.
 
 The public reverse proxy must preserve the same origin and WebSocket upgrades
-for `/api/sync/database/ws`, `/runtime-generations/*/ws`, and
-`/proxy-stream-jobs/*/ws`. Do not publish the Node application's port 6001
-directly to the LAN; Compose binds it to host loopback.
+for `/api/sync/database/ws`, `/runtime-generations/*/ws`,
+`/runtime-startup/ws`, and `/proxy-stream-jobs/*/ws`. Do not publish the Node
+application's port 6001 directly to the LAN; Compose binds it to host loopback.
 
 ## Persistent state
 
 - `risuai-save` contains the canonical opaque RisuSave, assets, database
   revision/conflict metadata, durable generation commands/events, raw proxy
-  jobs, the Node password, and trusted device public keys.
+  jobs, shared V3 plugin permission grants, the Node password, and trusted
+  device public keys.
 - `risuai-runtime-profile` contains Chromium's profile, its Node authentication
   key, resident-only browser/plugin storage, and UI preferences.
 
@@ -51,6 +52,59 @@ Store a copy of `.env`, the deployed Git commit, and the application/browser
 image identifiers with the archives. Protect the archive because it contains
 provider credentials, chats, and authentication material.
 
+## Streaming and canonical reconciliation
+
+Generation uses three deliberately separate data planes:
+
+1. The durable command/event plane owns admission, cancellation, executor
+   fencing, and terminal state.
+2. While a command is running, the resident publishes a throttled cumulative
+   `generation_output` snapshot after the normal edit-output pipeline. Each
+   version contains the ordered latest state of every assistant message created
+   by that command, so group and auto generations do not lose an earlier
+   bubble. Public browsers keep only the newest aggregate in memory and render
+   its messages as read-only presentation bubbles. WebSocket reconnect and an
+   authenticated HTTP GET both recover the latest active snapshot; skipped
+   versions are expected. Interim bubbles resolve core markdown and
+   character/module assets only. They do not execute Lua, plugin, trigger,
+   regex `editdisplay`, CBS state, or translation-cache work on follower
+   devices. The adopted canonical messages then render through the complete
+   upstream display pipeline once the terminal database revision arrives.
+3. The opaque RisuSave remains the sole canonical chat database. The resident
+   persists the final message under its database fence, and each public browser
+   removes the presentation snapshot only after adopting the terminal database
+   revision. This prevents a blank or duplicated bubble at handoff.
+
+Output snapshots are not appended to the command event log and are not browser
+storage. The server atomically keeps at most one snapshot for the active global
+generation (2 MiB maximum by default), then deletes it on complete, failure,
+cancellation, interruption, or restart. Failure of this presentation channel
+is non-fatal: generation and the final canonical database commit continue.
+This avoids encoding and writing the full RisuSave for every provider token
+while preserving server-owned prompt execution and post-processing.
+
+Presentation-only TTS uses a fourth, strictly ephemeral channel. Before a
+direct browser admits a command it supplies an unlogged random capability; the
+server provisions the mailbox before the durable create becomes claimable.
+The resident's command-scoped TTS bridge captures `/speak`, nested trigger/Lua
+TTS, and automatic TTS without playing audio in hidden Chromium. Resolved text
+is kept only in the in-memory mailbox. After the terminal database revision is
+adopted, only the admitting browser can consume the actions and run its normal
+TTS preprocessor/provider/postprocessor pipeline. Concurrent or late local
+waiters receive no actions, and failed, cancelled, or interrupted commands
+discard them.
+
+Slash-command input is also memory-only, even when an old client supplies no
+presentation capability. The durable command stores an empty input plus a
+SHA-256/byte-length integrity marker; only the fenced executor claim is
+rehydrated with the original. This keeps `/speak` text out of command metadata,
+events, WebSocket snapshots, and logs. A Node restart or mailbox expiry cannot
+reconstruct that private input, so the server fails the command closed instead
+of executing an empty command. Presentation publish and consume each have a
+short timeout and are non-fatal to canonical generation. Completed mailboxes
+are one-shot/acknowledged and TTL bounded; all other terminal states delete
+them immediately.
+
 ## Start and access
 
 1. Copy `.env.example` to `.env`. Set a long random
@@ -66,8 +120,35 @@ provider credentials, chats, and authentication material.
    enrolls its device key automatically through an executor-IP-only endpoint;
    it does not receive a hidden first-launch password dialog. A V3 plugin whose
    permission store is absent can still ask during plugin startup before the
-   command prompt bridge exists; resolve that startup permission from port
-   6002 if health does not become ready.
+   command prompt bridge exists. Any authenticated normal public page (or port
+   6002 compatibility view) can answer the one shared startup prompt.
+
+## Shared plugin consent
+
+On Node deployments, V3 plugin consent is coordinated by the server rather
+than by each browser's IndexedDB. The exact plugin name, SHA-256 script hash,
+capability, and reconfirmation policy form the permission identity. A script
+change therefore asks again, and `periodically` grants expire after three
+days. `always` grants are never cached. A denial is shared by all browsers only
+for the current Node server process and is deliberately not persisted.
+
+Concurrent resident and public plugin loads join one in-memory permission
+request. The startup WebSocket publishes only the consent prompt and identity
+metadata; opaque requester poll tokens and the yes/no result are neither
+broadcast nor written to the RisuSave, generation command log, or event
+journal. Only the first exact `yes` or `no` response wins. An allow becomes
+visible to requesters only after `save/__runtime_plugin_permissions/grants.json`
+has been atomically written and fsynced (directory mode 0700, file mode 0600).
+Pending decisions disappear on a Node restart and must be answered again,
+while a completed durable allow remains valid according to its policy.
+
+The first authenticated requester may supply localized display copy, but it
+cannot change the separately validated permission identity shown in the prompt
+source metadata. Existing grants created by the earlier NodeJson
+`plugin-permissions/` storage are migrated server-side on first exact use and
+left in place for rollback compatibility. Device-local pre-Node grants that
+were never copied to the server are not trusted globally and require fresh
+consent.
 
 The application and browser use fixed addresses configured by
 `RISU_APP_IPV4` and `RISU_BROWSER_IPV4` inside `RISU_RUNTIME_SUBNET`. The fixed
@@ -128,7 +209,8 @@ per job and 2 GiB in total. Age, count, and byte overrides are listed in
 Regular flat NodeStorage files are atomically replaced and subject to an 8 GiB
 default accounting cap plus a 1 GiB filesystem free-space reserve. The
 accounting includes database/auth files and flat assets, inlays, MCP payloads,
-V3 permissions, and backups; durable generation/proxy subdirectories have
+legacy V3 permission entries, and backups; the shared permission grant file
+and durable generation/proxy subdirectories have
 their own policies above. A rejected flat write returns HTTP 507 and must be
 treated as a storage-capacity failure, not retried indefinitely.
 

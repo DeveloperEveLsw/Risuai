@@ -1,4 +1,5 @@
 import { get } from 'svelte/store'
+import { v4, v5 } from 'uuid'
 import {
     alertError,
     dismissRuntimeAlertPrompt,
@@ -22,6 +23,8 @@ import {
     type RuntimeCanonicalInputCommit,
     type RuntimeGenerationCommand,
     type RuntimeGenerationCreateInput,
+    type RuntimeGenerationOutput,
+    type RuntimePresentationAction,
 } from './generationClient'
 import {
     ensureRuntimeChatPresentationOverlay,
@@ -31,8 +34,13 @@ import {
     settleRuntimeChatOverlay,
 } from './chatPresentationOverlay.svelte'
 import {
+    removeRuntimeAssistantOutputPresentation,
+    upsertRuntimeAssistantOutputPresentation,
+} from './assistantOutputPresentation.svelte'
+import {
     compareActiveRuntimeGenerations,
     isActiveRuntimeGeneration,
+    isForegroundRuntimeGeneration,
     publishRuntimeGenerationCommands,
     runtimeGenerationActive,
     type RuntimeGenerationTargetFilter,
@@ -74,6 +82,7 @@ let terminalDiscoveryWatermark = Date.now() - 10 * 60_000
 let runtimeGenerationAdmissions = 0
 const INTERRUPTED_CANONICAL_INPUT_GRACE_MS = 10_000
 const RESOLVED_TERMINAL_COMMAND_LIMIT = 256
+const RUNTIME_PRESENTATION_CONSUME_TIMEOUT_MS = 5_000
 
 export function shouldDelegateGeneration() {
     return isNodeServer && !isServerResidentExecutor
@@ -84,7 +93,7 @@ function publishCommands() {
         .map((entry) => entry.command)
         .sort((left, right) => left.createdAt - right.createdAt)
     publishRuntimeGenerationCommands(commands)
-    doingChat.set(commands.some(isActiveRuntimeGeneration))
+    doingChat.set(commands.some(isForegroundRuntimeGeneration))
 }
 
 function completedDatabaseRevision(command: RuntimeGenerationCommand) {
@@ -310,6 +319,9 @@ async function finishObservedCommand(command: RuntimeGenerationCommand) {
         terminalRevision,
         canonicalMutationPersisted,
     })
+    // The terminal revision barrier above guarantees that the canonical chat
+    // is visible before its in-memory assistant snapshot disappears.
+    removeRuntimeAssistantOutputPresentation(command.commandId)
     removeRuntimeChatPresentationOverlay(command.commandId)
     removeRuntimeChatPresentationOverlay(command.requestId)
     resolvedTerminalCommands.set(command.commandId, command)
@@ -336,6 +348,7 @@ async function finishObservedCommand(command: RuntimeGenerationCommand) {
         && selectedChat?.id === command.chatId
     if (
         (existing.createdHere || isVisibleHere)
+        && command.action !== 'suggest'
         && (command.state === 'failed' || command.state === 'interrupted')
     ) {
         alertError(
@@ -343,6 +356,35 @@ async function finishObservedCommand(command: RuntimeGenerationCommand) {
                 ? `Server generation ${command.state}: ${command.error}`
                 : `Server generation ${command.state}. It was not reported as complete.`,
         )
+    }
+}
+
+function observeRuntimeAssistantOutput(
+    entry: ObservedRuntimeCommand,
+    output: RuntimeGenerationOutput,
+) {
+    if (observedCommands.get(entry.command.commandId) !== entry) {
+        return
+    }
+    upsertRuntimeAssistantOutputPresentation({
+        commandId: entry.command.commandId,
+        requestId: entry.command.requestId,
+        characterId: entry.command.characterId,
+        chatId: entry.command.chatId,
+    }, output)
+}
+
+async function hydrateRuntimeAssistantOutput(entry: ObservedRuntimeCommand) {
+    try {
+        const output = await runtimeClient.getOutput(entry.command.commandId)
+        if (output) {
+            observeRuntimeAssistantOutput(entry, output)
+        }
+    }
+    catch (error) {
+        // Output is a presentation optimization. A transient/rolling-version
+        // failure must not block command discovery or terminal DB adoption.
+        console.error('[Runtime Generation Output Hydration]', error)
     }
 }
 
@@ -485,6 +527,14 @@ function observeCommand(command: RuntimeGenerationCommand, createdHere = false) 
             }
             handleRuntimeUiEvent(command.commandId, event.eventType, event.payload)
         },
+        onOutput: (output) => {
+            try {
+                observeRuntimeAssistantOutput(entry, output)
+            }
+            catch (error) {
+                console.error('[Runtime Generation Output]', error)
+            }
+        },
         onTerminal: (terminal) => void finishObservedCommand(terminal),
         onError: (error) => console.error('[Runtime Generation Observer]', error),
     })
@@ -514,6 +564,10 @@ async function discoverCommands() {
                     ? await runtimeClient.get(discovered.commandId)
                     : discovered
                 observeCommand(command)
+                const entry = observedCommands.get(command.commandId)
+                if (entry) {
+                    await hydrateRuntimeAssistantOutput(entry)
+                }
             }
             for (const discovered of recent) {
                 const command = (
@@ -561,16 +615,19 @@ export async function queueRuntimeGeneration(
     if (!shouldDelegateGeneration()) {
         throw new Error('Runtime generation delegation is not active in this browser')
     }
-    if (
+    const foreground = input.action !== 'suggest'
+    if (foreground && (
         runtimeGenerationAdmissions > 0
         || get(runtimeGenerationActive)
         || get(localGenerationExecutionActive)
-    ) {
+    )) {
         throw new Error('A server generation is already in progress')
     }
     startRuntimeGenerationFollower()
-    doingChat.set(true)
-    runtimeGenerationAdmissions += 1
+    if (foreground) {
+        doingChat.set(true)
+        runtimeGenerationAdmissions += 1
+    }
     try {
         const command = signal
             ? await runtimeClient.create(input, signal)
@@ -583,7 +640,87 @@ export async function queueRuntimeGeneration(
         throw error
     }
     finally {
-        runtimeGenerationAdmissions -= 1
+        if (foreground) {
+            runtimeGenerationAdmissions -= 1
+        }
+    }
+}
+
+const RUNTIME_SUGGESTION_REQUEST_NAMESPACE = v5.URL
+
+export interface RuntimeSuggestionRequest extends RuntimeGenerationTargetFilter {
+    characterId: string
+    chatId: string
+    force?: boolean
+}
+
+export interface RuntimeSuggestionOutcome {
+    state: 'completed' | 'cancelled'
+    suggestionsUpdated: boolean
+    suggestionCount: number
+}
+
+export function deterministicRuntimeSuggestionRequestId(input: {
+    characterId: string
+    chatId: string
+    databaseRevision: number
+}) {
+    if (!Number.isSafeInteger(input.databaseRevision) || input.databaseRevision < 0) {
+        throw new TypeError('Suggestion databaseRevision must be a non-negative safe integer')
+    }
+    return v5(
+        `risu-runtime-suggest\u0000${input.characterId}\u0000${input.chatId}\u0000${input.databaseRevision}`,
+        RUNTIME_SUGGESTION_REQUEST_NAMESPACE,
+    )
+}
+
+/** Queue a background resident suggestion request. Automatic calls use a
+ * revision-derived idempotency key so PC and phone converge on one command;
+ * an explicit refresh receives a fresh key but still uses canonical input. */
+export async function requestRuntimeSuggestions(
+    input: RuntimeSuggestionRequest,
+): Promise<RuntimeSuggestionOutcome> {
+    if (!shouldDelegateGeneration() || !waitForRuntimePersistence) {
+        throw new Error('Runtime suggestion delegation is not active in this browser')
+    }
+    const persisted = await waitForRuntimePersistence()
+    if (!persisted || !Number.isSafeInteger(persisted.revision) || persisted.revision < 0) {
+        throw new Error('Canonical database revision is unavailable for suggestions')
+    }
+    const requestId = input.force
+        ? v4()
+        : deterministicRuntimeSuggestionRequestId({
+            characterId: input.characterId,
+            chatId: input.chatId,
+            databaseRevision: persisted.revision,
+        })
+    const command = await queueRuntimeGeneration({
+        action: 'suggest',
+        requestId,
+        characterId: input.characterId,
+        chatId: input.chatId,
+        payload: {
+            databaseRevision: persisted.revision,
+            force: input.force === true,
+        },
+    })
+    const terminal = await waitForRuntimeGenerationTerminal(command)
+    await waitForCompletedRevision(terminal)
+    if (terminal.state === 'cancelled') {
+        return { state: 'cancelled', suggestionsUpdated: false, suggestionCount: 0 }
+    }
+    if (terminal.state !== 'completed') {
+        throw new Error('Server suggestion request did not complete')
+    }
+    const suggestionsUpdated = terminal.result?.suggestionsUpdated === true
+    const rawCount = terminal.result?.suggestionCount
+    const suggestionCount = Number.isSafeInteger(rawCount) && (rawCount as number) >= 0
+        ? rawCount as number
+        : 0
+    return {
+        state: 'completed',
+        suggestionsUpdated,
+        suggestionCount,
     }
 }
 
@@ -626,9 +763,11 @@ export async function delegateRuntimeChatInteraction(
         action: input.action,
         characterId: input.characterId,
         chatId: input.chatId,
+        localPresentation: true,
         payload,
     })
     const terminal = await waitForRuntimeGenerationTerminal(command)
+    await playRuntimeGenerationPresentations(terminal)
     await waitForCompletedRevision(terminal)
     if (terminal.state === 'completed') {
         return true
@@ -781,6 +920,7 @@ async function delegateUpstreamSendChat(
             action: 'generate',
             characterId: character.chaId,
             chatId: chat.id,
+            localPresentation: true,
             payload: {
                 chatProcessIndex,
                 chatAdditonalTokens: options.chatAdditonalTokens,
@@ -790,6 +930,7 @@ async function delegateUpstreamSendChat(
             },
         })
         const terminal = await waitForRuntimeGenerationTerminal(command, options.signal)
+        await playRuntimeGenerationPresentations(terminal)
         await waitForCompletedRevision(terminal)
         if (terminal.state === 'completed') {
             return terminal.result?.generated === true
@@ -838,6 +979,68 @@ export function shouldRestoreRuntimeDraft(command: RuntimeGenerationCommand) {
     }
     return command.state !== 'completed'
         && command.result?.canonicalMutationPersisted !== true
+}
+
+/**
+ * Perform presentation-only effects in the browser that admitted the command.
+ * Followers have no mailbox capability and therefore observe an empty list;
+ * failed/cancelled/interrupted commands explicitly discard local ownership.
+ */
+export async function playRuntimeGenerationPresentations(
+    command: RuntimeGenerationCommand,
+) {
+    if (command.state !== 'completed') {
+        runtimeClient.discardPresentationActions(command.commandId)
+        return
+    }
+    try {
+        // Keep this barrier inside the presentation primitive so reroll/auto,
+        // low-level generate, manual/Lua actions, and late terminal callers all
+        // adopt canonical scriptstate/character/TTS configuration before the
+        // visible browser runs preprocessors or starts audio.
+        await waitForCompletedRevision(command)
+        const consumeAbort = new AbortController()
+        const timeoutError = new Error(
+            `Runtime presentation consume exceeded `
+            + `${RUNTIME_PRESENTATION_CONSUME_TIMEOUT_MS} ms`,
+        )
+        timeoutError.name = 'TimeoutError'
+        const consumeTimeout = setTimeout(() => {
+            consumeAbort.abort(timeoutError)
+        }, RUNTIME_PRESENTATION_CONSUME_TIMEOUT_MS)
+        let actions: RuntimePresentationAction[]
+        try {
+            actions = await runtimeClient.consumePresentationActions(
+                command.commandId,
+                consumeAbort.signal,
+            )
+        }
+        finally {
+            clearTimeout(consumeTimeout)
+        }
+        if (actions.length === 0) {
+            return
+        }
+        const { sayTTS } = await import('../process/tts')
+        for (const action of actions) {
+            if (action.type !== 'speak') {
+                continue
+            }
+            const character = DBState.db.characters.find(
+                (candidate) => candidate.chaId === action.characterId,
+            )
+            if (character?.type === 'character') {
+                await sayTTS(character, action.text)
+            }
+        }
+    }
+    catch {
+        runtimeClient.discardPresentationActions(command.commandId)
+        // Presentation is best-effort and must never turn a successfully
+        // persisted generation into a failed/retried canonical operation. Do
+        // not log arbitrary provider/plugin errors: they may echo utterances.
+        console.error('[Runtime Generation Presentation] Failed')
+    }
 }
 
 export async function cancelActiveRuntimeGeneration(

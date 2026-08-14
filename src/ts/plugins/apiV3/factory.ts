@@ -443,8 +443,14 @@ export class SandboxHost {
     private abortControllers = new Map<string, AbortController>();
     private messageHandlerRef: ((event: MessageEvent) => void) | null = null;
     private callbackWrapperCache = new Map<string, Function>();
+    private terminated = false;
 
     private pendingCallbacks = new Map<string, { resolve: Function, reject: Function }>();
+    private pendingExecutions = new Map<string, {
+        handler: (event: MessageEvent) => void;
+        reject: (error: Error) => void;
+    }>();
+    private rejectReady: ((error: Error) => void) | null = null;
 
     // Teardown hooks for streams bridged over MessagePort. MessagePort has no
     // 'close' event in stable browsers, so without these the other side of an
@@ -455,7 +461,14 @@ export class SandboxHost {
         this.apiFactory = apiFactory;
     }
 
+    private terminationError() {
+        return new Error('Sandbox terminated');
+    }
+
     public executeInIframe(code: string): Promise<any> {
+        if (this.terminated) {
+            return Promise.reject(this.terminationError());
+        }
         return new Promise((resolve, reject) => {
             const reqId = 'exec_' + Math.random().toString(36).substring(2);
 
@@ -465,6 +478,7 @@ export class SandboxHost {
 
                 if (data.type === 'EXEC_RESULT' && data.reqId === reqId) {
                     window.removeEventListener('message', handler);
+                    this.pendingExecutions.delete(reqId);
                     if (data.error) {
                         reject(new Error(data.error));
                     } else {
@@ -473,13 +487,25 @@ export class SandboxHost {
                 }
             };
 
+            this.pendingExecutions.set(reqId, { handler, reject });
             window.addEventListener('message', handler);
 
-            this.iframe.contentWindow?.postMessage({
-                type: 'EXECUTE_CODE',
-                reqId,
-                code
-            }, '*');
+            try {
+                const target = this.iframe?.contentWindow;
+                if (!target) {
+                    throw this.terminationError();
+                }
+                target.postMessage({
+                    type: 'EXECUTE_CODE',
+                    reqId,
+                    code
+                }, '*');
+            }
+            catch (error) {
+                window.removeEventListener('message', handler);
+                this.pendingExecutions.delete(reqId);
+                reject(error instanceof Error ? error : new Error(String(error)));
+            }
         });
     }
 
@@ -488,7 +514,7 @@ export class SandboxHost {
 
         if (obj instanceof ArrayBuffer ||
             obj instanceof MessagePort ||
-            obj instanceof ImageBitmap ||
+            (typeof ImageBitmap !== 'undefined' && obj instanceof ImageBitmap) ||
             obj instanceof WritableStream ||
             obj instanceof TransformStream ||
             (typeof OffscreenCanvas !== 'undefined' && obj instanceof OffscreenCanvas)) {
@@ -559,7 +585,14 @@ export class SandboxHost {
                 if (cached) return cached;
 
                 const wrapper = async (...innerArgs: any[]) => {
+                    if (this.terminated) {
+                        throw this.terminationError();
+                    }
                     return new Promise((resolve, reject) => {
+                        if (this.terminated) {
+                            reject(this.terminationError());
+                            return;
+                        }
                         const reqId = 'cb_req_' + Math.random().toString(36).substring(2);
                         this.pendingCallbacks.set(reqId, { resolve, reject });
 
@@ -595,8 +628,18 @@ export class SandboxHost {
                             reqId,
                             args: sanitizedArgs
                         };
-                        const transferables = this.collectTransferables(message);
-                        this.iframe.contentWindow?.postMessage(message, '*', transferables);
+                        try {
+                            const transferables = this.collectTransferables(message);
+                            const target = this.iframe?.contentWindow;
+                            if (!target) {
+                                throw this.terminationError();
+                            }
+                            target.postMessage(message, '*', transferables);
+                        }
+                        catch (error) {
+                            this.pendingCallbacks.delete(reqId);
+                            reject(error instanceof Error ? error : new Error(String(error)));
+                        }
                     });
                 };
                 this.callbackWrapperCache.set(cbRef.id, wrapper);
@@ -769,6 +812,9 @@ export class SandboxHost {
     }
 
     public async run(container: HTMLElement|HTMLIFrameElement, userCode: string) {
+        if (this.terminated) {
+            throw this.terminationError();
+        }
         if(container instanceof HTMLIFrameElement) {
             this.iframe = container;
         } else {
@@ -794,6 +840,7 @@ export class SandboxHost {
         const ready = new Promise<void>((resolve, reject) => {
             resolveReady = resolve;
             rejectReady = reject;
+            this.rejectReady = reject;
         });
         const messageHandler = async (event: MessageEvent) => {
             if (event.source !== this.iframe.contentWindow) return;
@@ -886,8 +933,6 @@ export class SandboxHost {
                     for (const id of usedAbortIds) this.abortControllers.delete(id);
                 }
 
-                console.log("Original request:", data);
-                console.log('Original response:', response, transferables);
                 try {
                     this.iframe.contentWindow?.postMessage(response, '*', transferables);
                 } catch (error) {
@@ -956,6 +1001,9 @@ export class SandboxHost {
             await Promise.race([ready, timeout]);
         }
         finally {
+            if (this.rejectReady === rejectReady) {
+                this.rejectReady = null;
+            }
             if (timeoutId !== null) {
                 clearTimeout(timeoutId);
             }
@@ -967,6 +1015,13 @@ export class SandboxHost {
     }
 
     public terminate() {
+        if (this.terminated) {
+            return;
+        }
+        this.terminated = true;
+        const terminationError = this.terminationError();
+        this.rejectReady?.(terminationError);
+        this.rejectReady = null;
         if (this.messageHandlerRef) {
             window.removeEventListener('message', this.messageHandlerRef);
             this.messageHandlerRef = null;
@@ -976,7 +1031,18 @@ export class SandboxHost {
         }
         this.closeActiveStreams();
         this.instanceRegistry.clear();
+        for (const pending of this.pendingCallbacks.values()) {
+            pending.reject(terminationError);
+        }
         this.pendingCallbacks.clear();
+        for (const pending of this.pendingExecutions.values()) {
+            window.removeEventListener('message', pending.handler);
+            pending.reject(terminationError);
+        }
+        this.pendingExecutions.clear();
+        for (const controller of this.abortControllers.values()) {
+            controller.abort(terminationError);
+        }
         this.abortControllers.clear();
         this.callbackWrapperCache.clear();
     }

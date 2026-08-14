@@ -48,7 +48,7 @@ import {
     initializeNodeDatabaseRuntime,
     waitForNodeDatabasePersistence,
 } from "./globalApi.svelte";
-import { isNodeServer, isTauri } from "./platform";
+import { isNodeServer, isServerResidentExecutor, isTauri } from "./platform";
 import { registerModelDynamic } from "./model/modellist";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
@@ -57,6 +57,11 @@ import {
     installRuntimeGenerationDelegation,
     startRuntimeGenerationFollower,
 } from "./runtime/generationDelegation.svelte";
+import {
+    startResidentRuntimeStartupBroker,
+    startRuntimeStartupFollower,
+    type ResidentRuntimeStartupBrokerHandle,
+} from "./runtime/startupPromptBroker";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -66,6 +71,7 @@ const appWindow = isTauri ? getCurrentWebviewWindow() : null
 export async function loadData() {
     const loaded = get(loadedStore)
     if (!loaded) {
+        let residentStartupBroker: ResidentRuntimeStartupBrokerHandle | null = null
         try {
             if (isTauri) {
                 LoadingStatusState.text = "Checking Files..."
@@ -132,6 +138,12 @@ export async function loadData() {
             }
             else {
                 await forageStorage.Init()
+                if (isServerResidentExecutor) {
+                    // Establish an authenticated, fenced liveness session and
+                    // the out-of-command alert bridge before a large database
+                    // decode or plugin top-level await can stall first claim.
+                    residentStartupBroker = await startResidentRuntimeStartupBroker()
+                }
 
                 LoadingStatusState.text = "Loading Local Save File..."
                 let gotStorage: Uint8Array = await forageStorage.getItem('database/database.bin') as unknown as Uint8Array
@@ -228,7 +240,15 @@ export async function loadData() {
                     characterURLImport()
                 }
             }
+            if (isNodeServer && !isServerResidentExecutor) {
+                // Authentication has completed while reading the canonical
+                // Node database. Subscribe before local plugin initialization
+                // so a resident cold-start permission can be answered while
+                // this page still displays its loading screen.
+                startRuntimeStartupFollower()
+            }
             LoadingStatusState.text = "Loading Plugins..."
+            await residentStartupBroker?.setPhase('loading_plugins')
             try {
                 await loadPlugins()
             } catch (error) { }
@@ -288,6 +308,7 @@ export async function loadData() {
             }
             saveDb()
             installRuntimeGenerationDelegation(waitForNodeDatabasePersistence)
+            await residentStartupBroker?.setPhase('starting_executor')
             startResidentGenerationExecutor({
                 waitForPersistence: waitForNodeDatabasePersistence,
             })
@@ -301,7 +322,16 @@ export async function loadData() {
             })
             
         } catch (error) {
-            alertError(error)
+            try {
+                alertError(error)
+            }
+            finally {
+                // A startup heartbeat means the resident is alive, not that a
+                // fatal bootstrap failure is healthy. Stop it so the browser
+                // health check can restart Chromium instead of leaving a
+                // permanently green, non-claiming executor.
+                residentStartupBroker?.stop()
+            }
         }
     }
 }

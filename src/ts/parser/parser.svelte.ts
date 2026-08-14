@@ -20,6 +20,7 @@ import katex from 'katex'
 import { getModelInfo } from '../model/modellist';
 import { registerCBS, type matcherArg, type RegisterCallback } from '../cbs';
 import cssSelectorParser from 'postcss-selector-parser'
+import { applyAssetMimeTypeHint, inferAssetMimeType } from '../media/assetMime';
 
 const markdownItOptions = {
     html: true,
@@ -447,6 +448,16 @@ type AssetPaths = {[key:string]:{
 
 let assetsCache: AssetPaths | null = null
 let emoAssetsCache: AssetPaths | null = null
+const emptyAssetList: string[][] = []
+
+type AssetCacheOwner = {
+    characterId: string
+    characterAssets: string[][]
+    emotionAssets: string[][]
+    modules: ReturnType<typeof getModules>
+}
+
+let assetsCacheOwner: AssetCacheOwner | null = null
 
 export function resetAssetsCache(charAssets: string[][], emoAssets: string[][], moduleAssets: string[][]) {
     const assetPaths: AssetPaths = {}
@@ -458,6 +469,40 @@ export function resetAssetsCache(charAssets: string[][], emoAssets: string[][], 
 
     assetsCache = assetPaths
     emoAssetsCache = charEmoPaths
+    // Callers which do not provide the current render context intentionally
+    // invalidate ownership. The next parse rebinds the cache to its character
+    // and active module set instead of trusting potentially stale global data.
+    assetsCacheOwner = null
+}
+
+function resetAssetsCacheForCharacter(
+    char: simpleCharacterArgument | character,
+    modules: ReturnType<typeof getModules>,
+) {
+    const characterAssets = char.additionalAssets ?? emptyAssetList
+    const emotionAssets = char.emotionImages ?? emptyAssetList
+    resetAssetsCache(characterAssets, emotionAssets, getModuleAssets())
+    assetsCacheOwner = {
+        characterId: char.chaId,
+        characterAssets,
+        emotionAssets,
+        modules,
+    }
+}
+
+function isAssetsCacheCurrent(
+    char: simpleCharacterArgument | character,
+    modules: ReturnType<typeof getModules>,
+) {
+    return Boolean(
+        assetsCache
+        && emoAssetsCache
+        && assetsCacheOwner
+        && assetsCacheOwner.characterId === char.chaId
+        && assetsCacheOwner.characterAssets === (char.additionalAssets ?? emptyAssetList)
+        && assetsCacheOwner.emotionAssets === (char.emotionImages ?? emptyAssetList)
+        && assetsCacheOwner.modules === modules
+    )
 }
 
 $effect.root(() => {
@@ -468,11 +513,7 @@ $effect.root(() => {
             return
         }
 
-        const charAssets = char.additionalAssets ?? []
-        const emoAssets = char.emotionImages ?? []
-        const moduleAssets = getModuleAssets()
-
-        resetAssetsCache(charAssets, emoAssets, moduleAssets)
+        resetAssetsCacheForCharacter(char, getModules())
     })
 })
 
@@ -482,8 +523,9 @@ const videoExtensions = ['mp4', 'webm', 'avi', 'm4p', 'm4v']
 async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|character, mode:'normal'|'back', arg:{ch:number}){
     const assetWidthString = (DBState.db.assetWidth && DBState.db.assetWidth !== -1 || DBState.db.assetWidth === 0) ? `max-width:${DBState.db.assetWidth}rem;` : ''
 
-    if (char.type === 'character' && (!assetsCache || !emoAssetsCache)) {
-        resetAssetsCache(char.additionalAssets ?? [], char.emotionImages, getModuleAssets())
+    const modules = getModules()
+    if (!isAssetsCacheCurrent(char, modules)) {
+        resetAssetsCacheForCharacter(char, modules)
     }
 
     const assetPaths = assetsCache ?? {}
@@ -549,7 +591,17 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
             pSrc = match.srcPaths[selIndex]
         }
 
-        const p = await getFileSrcCached(pSrc)
+        // Legacy .risum imports stored every payload under a .png key. The
+        // tuple's extension remains authoritative, including for raw CSS/font
+        // URLs which cannot be recovered reliably through byte sniffing.
+        const p = applyAssetMimeTypeHint(
+            await getFileSrcCached(pSrc),
+            match.ext ?? '',
+        )
+        const sourceMimeType = (fallback: string) => inferAssetMimeType(
+            match.ext ?? '',
+            inferAssetMimeType(pSrc, fallback),
+        )
         switch(type){
             case 'raw':
             case 'path':
@@ -559,11 +611,11 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
             case 'image':
                 return `<div class="risu-inlay-image"><img src="${p}" alt="${p}" style="${assetWidthString}"/></div>\n`
             case 'video':
-                return `<video controls autoplay loop><source src="${p}" type="video/mp4"></video>\n`
+                return `<video controls autoplay loop><source src="${p}" type="${sourceMimeType('video/mp4')}"></video>\n`
             case 'video-img':
-                return `<video autoplay muted loop><source src="${p}" type="video/mp4"></video>\n`
+                return `<video autoplay muted loop><source src="${p}" type="${sourceMimeType('video/mp4')}"></video>\n`
             case 'audio':
-                return `<audio controls autoplay loop><source src="${p}" type="audio/mpeg"></audio>\n`
+                return `<audio controls autoplay loop><source src="${p}" type="${sourceMimeType('audio/mpeg')}"></audio>\n`
             case 'bg':
                 if(mode === 'back'){
                     return `<div style="width:100%;height:100%;background: linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8)),url(${p}); background-size: cover;"></div>`
@@ -571,7 +623,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
                 break
             case 'asset':{
                 if(match.ext && videoExtensions.includes(match.ext)){
-                    return `<video autoplay muted loop><source src="${p}" type="video/mp4"></video>\n`
+                    return `<video autoplay muted loop><source src="${p}" type="${sourceMimeType('video/mp4')}"></video>\n`
                 }
                 return `<img src="${p}" alt="${p}" style="${assetWidthString} "/>\n`
             }
@@ -688,10 +740,10 @@ async function parseInlayAssets(data:string){
                     data = data.replace(inlay, `${prefix}<img src="${url}"/>${postfix}`)
                     break
                 case 'video':
-                    data = data.replace(inlay, `${prefix}<video controls><source src="${url}" type="video/mp4"></video>${postfix}`)
+                    data = data.replace(inlay, `${prefix}<video controls><source src="${url}" type="${inferAssetMimeType(asset.ext, 'video/mp4')}"></video>${postfix}`)
                     break
                 case 'audio':
-                    data = data.replace(inlay, `${prefix}<audio controls><source src="${url}" type="audio/mpeg"></audio>${postfix}`)
+                    data = data.replace(inlay, `${prefix}<audio controls><source src="${url}" type="${inferAssetMimeType(asset.ext, 'audio/mpeg')}"></audio>${postfix}`)
                     break
             }
             
@@ -733,12 +785,28 @@ function parseThoughtsAndTools(data:string){
     })
 }
 
-export async function ParseMarkdown(
+type ParseMarkdownPolicy = {
+    runDisplayExtensions: boolean
+    resolveStyleTemplates: boolean
+}
+
+const canonicalMarkdownPolicy: ParseMarkdownPolicy = {
+    runDisplayExtensions: true,
+    resolveStyleTemplates: true,
+}
+
+const readOnlyPresentationMarkdownPolicy: ParseMarkdownPolicy = {
+    runDisplayExtensions: false,
+    resolveStyleTemplates: false,
+}
+
+async function parseMarkdownWithPolicy(
     data:string,
     charArg:(character|simpleCharacterArgument | groupChat | string) = null,
     mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
     chatID=-1,
-    cbsConditions:CbsConditions = {}
+    cbsConditions:CbsConditions = {},
+    policy:ParseMarkdownPolicy,
 ) {
     let firstParsed = ''
     const additionalAssetMode = (mode === 'back') ? 'back' : 'normal'
@@ -751,7 +819,7 @@ export async function ParseMarkdown(
         firstParsed = data
     }
 
-    if(char){
+    if(policy.runDisplayExtensions && char){
         data = (await processScriptFull(char, data, 'editdisplay', chatID, cbsConditions)).data
     }
 
@@ -773,22 +841,79 @@ export async function ParseMarkdown(
             return data
         }
     }
-    return trimMarkdown(data)
+    return trimMarkdown(data, {
+        resolveStyleTemplates: policy.resolveStyleTemplates,
+    })
 }
 
-export function trimMarkdown(data:string){
-    let sant = DOMPurify.sanitize(data, {
-        ADD_TAGS: ["iframe", "style", "risu-style", "x-em", 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt'],
-        ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling", "risu-ctrl" ,"risu-btn", 'risu-trigger', 'risu-mark', 'risu-id', 'x-hl-lang', 'x-hl-text'],
-    })
+/** Render a canonical chat message with the complete upstream display
+ * extension pipeline, including Lua, plugins, triggers and regex scripts. */
+export async function ParseMarkdown(
+    data:string,
+    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
+    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
+    chatID=-1,
+    cbsConditions:CbsConditions = {}
+) {
+    return parseMarkdownWithPolicy(
+        data,
+        charArg,
+        mode,
+        chatID,
+        cbsConditions,
+        canonicalMarkdownPolicy,
+    )
+}
 
-    const decoded = decodeStyle(sant)
+/** Render an uncommitted runtime presentation without invoking any extension
+ * code or CBS evaluation. Asset resolution and core markdown remain enabled;
+ * the canonical message receives the full display pipeline after adoption. */
+export async function ParseMarkdownReadOnlyPresentation(
+    data:string,
+    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
+    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
+    chatID=-1,
+) {
+    return parseMarkdownWithPolicy(
+        data,
+        charArg,
+        mode,
+        chatID,
+        {},
+        readOnlyPresentationMarkdownPolicy,
+    )
+}
+
+export function trimMarkdown(data:string, options:{
+    resolveStyleTemplates?: boolean
+    allowPresentationSideEffects?: boolean
+} = {}){
+    const allowPresentationSideEffects = options.allowPresentationSideEffects ?? true
+    const sanitizeOptions = {
+        ADD_TAGS: [
+            ...(allowPresentationSideEffects ? ['iframe'] : []),
+            'style', 'risu-style', 'x-em', 'annotation', 'semantics', 'mrow', 'mi',
+            'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt',
+        ],
+        ADD_ATTR: [
+            ...(allowPresentationSideEffects
+                ? ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'risu-ctrl', 'risu-btn', 'risu-trigger']
+                : []),
+            'risu-mark', 'risu-id', 'x-hl-lang', 'x-hl-text',
+        ],
+        ...(allowPresentationSideEffects ? {} : {
+            FORBID_TAGS: ['iframe'],
+            FORBID_ATTR: ['risu-ctrl', 'risu-btn', 'risu-trigger', 'autoplay'],
+        }),
+    }
+    let sant = DOMPurify.sanitize(data, sanitizeOptions)
+
+    const decoded = decodeStyle(sant, options.resolveStyleTemplates ?? true)
 
     if(decoded !== sant){
         sant = DOMPurify.sanitize(decoded, {
-            ADD_TAGS: ["iframe", "style", "risu-style", "x-em", 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt'],
-            ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling", "risu-ctrl" ,"risu-btn", 'risu-trigger', 'risu-mark', 'risu-id', 'x-hl-lang', 'x-hl-text'],
-            FORCE_BODY: true
+            ...sanitizeOptions,
+            FORCE_BODY: true,
         })
     }
     else{
@@ -796,6 +921,29 @@ export function trimMarkdown(data:string){
     }
 
     return sant
+}
+
+/** Final sanitization for runtime presentation HTML. Unlike the canonical
+ * helper this never evaluates CBS embedded in streamed style blocks. */
+export function trimMarkdownReadOnlyPresentation(data:string){
+    // The global DOM observer treats risu-ctrl as an imperative command (for
+    // example, starting BGM). A failed/cancelled partial must not execute that
+    // command, expose runtime buttons, load an iframe, or autoplay media before
+    // it becomes canonical. The final adopted message uses trimMarkdown and
+    // therefore retains the complete upstream behavior.
+    const inertData = data
+        // Neutralize the tag name before DOMPurify parses the fragment so a
+        // browser cannot begin an iframe navigation merely while sanitizing.
+        .replace(/<\s*(\/?)\s*iframe\b/gi, '<$1x-runtime-iframe')
+        // Neutralize imperative attributes before DOM insertion. DOMPurify is
+        // still applied below; this early pass prevents observers/autoplay even
+        // in DOM implementations that preserve custom attributes by default.
+        .replace(/\s(?:risu-ctrl|risu-btn|risu-trigger)(?=\s*=)/gi, ' data-runtime-disabled')
+        .replace(/\sautoplay(?=\s|=|\/?>)/gi, ' data-runtime-disabled')
+    return trimMarkdown(inertData, {
+        resolveStyleTemplates: false,
+        allowPresentationSideEffects: false,
+    })
 }
 
 const metaCodes = [
@@ -940,11 +1088,13 @@ function decodeStyleRule(rule:CssAtRuleAST){
     return rule
 }
 
-function decodeStyle(text:string){
+function decodeStyle(text:string, resolveStyleTemplates = true){
     return text.replaceAll(styleDecodeRegex, (full, txt:string) => {
         try {
             let text = Buffer.from(txt, 'hex').toString('utf-8')
-            text = risuChatParser(text)
+            if(resolveStyleTemplates){
+                text = risuChatParser(text)
+            }
             const ast = css.parse(text)
             const rules = ast?.stylesheet?.rules
             if(rules){
@@ -1726,7 +1876,6 @@ export function risuChatParser(da:string, arg:{
                             break
                         }
                         if(blockType.type === 'function'){
-                            console.log(matchResult)
                             functions.set(blockType.funcArg[0], {
                                 data: matchResult,
                                 arg: blockType.funcArg.slice(1)
@@ -1757,7 +1906,6 @@ export function risuChatParser(da:string, arg:{
                     const argData = dat.split('::').slice(1)
                     const funcName = argData[0]
                     const func = functions.get(funcName)
-                    console.log(func)
                     if(func){
                         let data = func.data
                         for(let i = 0;i < argData.length;i++){

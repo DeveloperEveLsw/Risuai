@@ -194,7 +194,12 @@
     }
 
     function displaya(message:string){
-        msgDisplay = risuChatParser(message, {chara: name, chatID: idx, rmVar: true, visualize: true, cbsConditions: getCbsCondition()})
+        // An active runtime snapshot is not a canonical chat message. Running
+        // CBS here could read or initialize canonical script state before the
+        // resident's final database revision arrives.
+        msgDisplay = readOnlyPresentation
+            ? message
+            : risuChatParser(message, {chara: name, chatID: idx, rmVar: true, visualize: true, cbsConditions: getCbsCondition()})
     }
 
     const setStatusMessage = (message:string, timeout:number = 0)=>{
@@ -398,8 +403,8 @@
             <button class="text-sm p-1 text-textcolor2 border-darkborderc float-end mr-2 my-1
                     hover:ring-darkbutton hover:ring-3 rounded-md hover:text-textcolor transition-all flex justify-center items-center" 
                     onclick={() => {
-                        const currentGenerationInfo = idx >= 0 ? 
-                            DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message[idx].generationInfo :
+                        const currentGenerationInfo = !readOnlyPresentation && idx >= 0 ?
+                            DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message[idx]?.generationInfo :
                             messageGenerationInfo
 
                         alertRequestData({
@@ -512,7 +517,8 @@
                     bind:translating={translating}
                     bind:retranslate={retranslate}
                     {renderRawStreaming}
-                    {rawStreamingText} />
+                    {rawStreamingText}
+                    {readOnlyPresentation} />
             {/key}
             {#if !readOnlyPresentation && idx >= 0 && !editMode && !isOptimizedStreamingMessage && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
                 <PartialEditController
@@ -1183,13 +1189,13 @@
                     {@render iconButtons({applyTextColors: false})}
                 </div>
             </div>
-        {:else if DBState.db.theme === 'customHTML' && !blankMessage}
+        {:else if DBState.db.theme === 'customHTML' && !blankMessage && !readOnlyPresentation}
             {@render renderGuiHtmlPart(RenderGUIHtml(DBState.db.guiHTML))}
         {:else}
             {@render senderIcon({rounded: DBState.db.roundIcons})}
             <span class="flex flex-col ml-4 w-full max-w-full min-w-0 text-black">
                 <div class="flexium items-center chat-width">
-                    {#if DBState.db.characters[selIdState.selId]?.chaId === "§playground" && !blankMessage && DBState.db.characters[selIdState.selId]?.chats?.[DBState.db.characters[selIdState.selId]?.chatPage]?.message?.[idx]}
+                    {#if !readOnlyPresentation && DBState.db.characters[selIdState.selId]?.chaId === "§playground" && !blankMessage && DBState.db.characters[selIdState.selId]?.chats?.[DBState.db.characters[selIdState.selId]?.chatPage]?.message?.[idx]}
                         <span class="chat-width text-xl border-darkborderc flex items-center text-textcolor">
                             <span>{DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].role === 'char' ? 'Assistant' : 'User'}</span>
                             <button class="ml-2 text-textcolor2 hover:text-textcolor" onclick={() => {
