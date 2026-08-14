@@ -31,8 +31,24 @@
     import ChatBody from './ChatBody.svelte'
     import PopupButton from "../UI/PopupButton.svelte";
     import PartialEditController from './PartialEditController.svelte';
-    import { getLLMCache, setLLMCache } from "../../ts/translator/translator"
+    import {
+        getLLMCache,
+        resolveTranslationContext,
+        setLLMCache,
+        subscribeTranslationCacheMutations,
+        type TranslationCacheMutationEvent,
+    } from "../../ts/translator/translator"
+    import { isAbortError, type TranslationContext, type TranslationSourceFormat } from '../../ts/translator/translationPlan'
     import { shouldShowChatTtsControl } from './chatTtsControl'
+    import { delegateChatMarkupInteraction, resolveChatMarkupInteraction } from './chatMarkupInteraction'
+    import {
+        createChatTranslationIdentityKey,
+        createChatTranslationScopeKey,
+        snapshotChatTranslationSettings,
+        type ChatTranslationCharacter,
+        type ManualTranslationPreparedTarget,
+        type ManualTranslationPresentationHandoff,
+    } from './chatTranslationRun'
 
     let translating = $state(false)
     let editMode = $state(false)
@@ -41,6 +57,8 @@
     let editTranslationMode = $state(false)
     let editTranslationText = $state('')
     let bodyRoot:HTMLElement|null = $state(null)
+    let manualTranslationPresentation: ManualTranslationPresentationHandoff | null = $state(null)
+    let manualTranslationPresentationRevision = 0
     interface Props {
         message?: string;
         name?: string;
@@ -55,6 +73,7 @@
         onReroll?: () => void;
         unReroll?: () => void;
         character?: simpleCharacterArgument|string|null;
+        translationCharacter?: simpleCharacterArgument|string|null;
         firstMessage?: boolean;
         altGreeting?: boolean;
         currentPage?: number;
@@ -81,6 +100,7 @@
         onReroll = () => {},
         unReroll = () => {},
         character = null,
+        translationCharacter = undefined,
         firstMessage = false,
         altGreeting = false,
         currentPage = 1,
@@ -96,6 +116,44 @@
     let msgDisplay = $state('')
     let translated = $state(false)
     let partialEditEnabled = $state(true)
+    let canonicalTranslationCharacter = $derived(
+        translationCharacter === undefined ? character : translationCharacter
+    )
+
+    interface ManualTranslationSnapshot {
+        identityKey: string
+        scopeKey: string
+        source: string
+        displayCharacter: ChatTranslationCharacter
+        translationCharacter: ChatTranslationCharacter
+        chatId: number
+        context: TranslationContext
+        sourceFormat: TranslationSourceFormat
+        translateBeforeFormatting: boolean
+        legacyTranslation: boolean
+        cbsConditions: CbsConditions
+    }
+
+    interface ManualTranslationSession {
+        snapshot: ManualTranslationSnapshot
+        target: ManualTranslationPreparedTarget
+    }
+
+    let activeManualTranslation: {
+        identityKey: string
+        controller: AbortController
+    } | null = null
+    let manualTranslationSession: ManualTranslationSession | null = null
+    let manualTranslationPreparedTarget: ManualTranslationPreparedTarget | null = null
+
+    interface ManualTranslationTargetWaiter {
+        identityKey: string
+        resolve: (target: ManualTranslationPreparedTarget) => void
+        reject: (error: DOMException) => void
+        signal: AbortSignal
+        onAbort: () => void
+    }
+    const manualTranslationTargetWaiters = new Set<ManualTranslationTargetWaiter>()
 
     export function updateStreamingDisplay(state: {
         isOptimizedStreamingMessage: boolean
@@ -170,27 +228,232 @@
         }
     }
 
-    async function getTranslationCacheKey(): Promise<string> {
-        if(DBState.db.translateBeforeHTMLFormatting){
-            return msgDisplay
+    function createManualTranslationSnapshot(): ManualTranslationSnapshot {
+        const translateBeforeFormatting = !!DBState.db.translateBeforeHTMLFormatting
+        const legacyTranslation = !!DBState.db.legacyTranslation
+        const context = resolveTranslationContext(canonicalTranslationCharacter, idx)
+        const cbsConditions = getCbsCondition()
+        const currentCharacter = getCurrentCharacter()
+        const settings = snapshotChatTranslationSettings(
+            DBState.db as unknown as Record<string, any>,
+            {
+                userName: getUserName(),
+                currentCharacterName: currentCharacter?.nickname || currentCharacter?.name,
+            },
+        )
+        const sourceFormat: TranslationSourceFormat = translateBeforeFormatting
+            ? 'plain'
+            : 'html-segments-v1'
+        const identityInput = {
+                source: msgDisplay,
+                manualSource: message,
+                displayCharacter: character,
+                translationCharacter: canonicalTranslationCharacter,
+                chatId: idx,
+                firstMessage: !!firstMessage,
+                role: role ?? null,
+                context,
+                settings,
         }
-        if(!DBState.db.legacyTranslation){
-            return await ParseMarkdown(msgDisplay, character, 'pretranslate', idx, getCbsCondition())
+        return {
+            identityKey: createChatTranslationIdentityKey({
+                ...identityInput,
+                cacheRevision: 0,
+            }),
+            scopeKey: createChatTranslationScopeKey({
+                ...identityInput,
+                cacheRevision: 0,
+            }),
+            source: msgDisplay,
+            displayCharacter: character,
+            translationCharacter: canonicalTranslationCharacter,
+            chatId: idx,
+            context,
+            sourceFormat,
+            translateBeforeFormatting,
+            legacyTranslation,
+            cbsConditions,
         }
-        return await ParseMarkdown(msgDisplay, character, 'notrim', idx, getCbsCondition())
+    }
+
+    let manualTranslationIdentityKey = $derived.by(
+        () => createManualTranslationSnapshot().identityKey
+    )
+
+    function cacheMutationTouchesManualTarget(
+        mutation: TranslationCacheMutationEvent,
+        target: ManualTranslationPreparedTarget,
+    ): boolean {
+        const targetKeys = [target.manualKey, target.planKey, target.legacyKey]
+            .filter((key): key is string => typeof key === 'string')
+        return mutation.touchedKeys.some((key) => targetKeys.includes(key))
+    }
+
+    const unsubscribeTranslationCacheMutations = subscribeTranslationCacheMutations((mutation) => {
+        if (mutation.reason === 'clear') {
+            manualTranslationPresentation = null
+            translated = false
+            return
+        }
+        const target = manualTranslationPresentation?.target
+        if (target && cacheMutationTouchesManualTarget(mutation, target)) {
+            // The child performs the exact-key cache-only adoption. Drop the
+            // parent-local one-shot so a later remount cannot resurrect the
+            // value that this mutation superseded.
+            manualTranslationPresentation = null
+        }
+    })
+    onDestroy(unsubscribeTranslationCacheMutations)
+
+    $effect(() => {
+        const identityKey = manualTranslationIdentityKey
+        if (
+            activeManualTranslation
+            && activeManualTranslation.identityKey !== identityKey
+            && !activeManualTranslation.controller.signal.aborted
+        ) {
+            activeManualTranslation.controller.abort()
+        }
+        if (manualTranslationSession?.snapshot.identityKey !== identityKey) {
+            manualTranslationSession = null
+            editTranslationMode = false
+        }
+        if (manualTranslationPresentation?.identityKey !== identityKey) {
+            manualTranslationPresentation = null
+        }
+        if (manualTranslationPreparedTarget?.identityKey !== identityKey) {
+            manualTranslationPreparedTarget = null
+        }
+    })
+
+    function acceptManualTranslationPreparedTarget(
+        target: ManualTranslationPreparedTarget,
+    ): void {
+        if (target.identityKey !== manualTranslationIdentityKey) return
+        manualTranslationPreparedTarget = target
+        for (const waiter of [...manualTranslationTargetWaiters]) {
+            if (waiter.identityKey !== target.identityKey || waiter.signal.aborted) continue
+            waiter.signal.removeEventListener('abort', waiter.onAbort)
+            manualTranslationTargetWaiters.delete(waiter)
+            waiter.resolve(target)
+        }
+    }
+
+    function waitForManualTranslationPreparedTarget(
+        snapshot: ManualTranslationSnapshot,
+        signal: AbortSignal,
+    ): Promise<ManualTranslationPreparedTarget> {
+        const current = manualTranslationPreparedTarget
+        if (current?.identityKey === snapshot.identityKey) return Promise.resolve(current)
+        return new Promise((resolve, reject) => {
+            const waiter = {} as ManualTranslationTargetWaiter
+            const onAbort = () => {
+                manualTranslationTargetWaiters.delete(waiter)
+                reject(new DOMException('Superseded manual translation preparation.', 'AbortError'))
+            }
+            Object.assign(waiter, {
+                identityKey: snapshot.identityKey,
+                resolve,
+                reject,
+                signal,
+                onAbort,
+            })
+            manualTranslationTargetWaiters.add(waiter)
+            signal.addEventListener('abort', onAbort, { once: true })
+            if (signal.aborted) onAbort()
+        })
+    }
+
+    function beginManualTranslationOperation(snapshot: ManualTranslationSnapshot): AbortController {
+        activeManualTranslation?.controller.abort()
+        const controller = new AbortController()
+        activeManualTranslation = {
+            identityKey: snapshot.identityKey,
+            controller,
+        }
+        return controller
+    }
+
+    function assertManualTranslationCurrent(
+        snapshot: ManualTranslationSnapshot,
+        signal: AbortSignal,
+    ): void {
+        if (
+            signal.aborted
+            || manualTranslationIdentityKey !== snapshot.identityKey
+        ) {
+            throw new DOMException('Superseded manual translation edit.', 'AbortError')
+        }
     }
 
     async function loadTranslationForEdit() {
-        const key = await getTranslationCacheKey()
-        const cached = await getLLMCache(key)
-        editTranslationText = cached ?? ''
-        editTranslationMode = true
+        const snapshot = createManualTranslationSnapshot()
+        const controller = beginManualTranslationOperation(snapshot)
+        try {
+            const target = await waitForManualTranslationPreparedTarget(
+                snapshot,
+                controller.signal,
+            )
+            assertManualTranslationCurrent(snapshot, controller.signal)
+            const cached = await getLLMCache(target.translationInput, {
+                signal: controller.signal,
+                context: target.context,
+                sourceFormat: target.sourceFormat,
+                manualSource: target.manualSource,
+            })
+            assertManualTranslationCurrent(snapshot, controller.signal)
+            manualTranslationSession = { snapshot, target }
+            editTranslationText = cached ?? ''
+            editTranslationMode = true
+        }
+        catch (error) {
+            if (!isAbortError(error)) throw error
+        }
+        finally {
+            if (activeManualTranslation?.controller === controller) {
+                activeManualTranslation = null
+            }
+        }
     }
 
     async function saveTranslationEdit() {
-        const key = await getTranslationCacheKey()
-        await setLLMCache(key, editTranslationText)
-        editTranslationMode = false
+        const session = manualTranslationSession
+        const snapshot = session?.snapshot ?? createManualTranslationSnapshot()
+        const value = editTranslationText
+        const controller = beginManualTranslationOperation(snapshot)
+        try {
+            assertManualTranslationCurrent(snapshot, controller.signal)
+            const target = session?.target ?? await waitForManualTranslationPreparedTarget(
+                snapshot,
+                controller.signal,
+            )
+            await setLLMCache(target.translationInput, value, {
+                signal: controller.signal,
+                context: target.context,
+                sourceFormat: target.sourceFormat,
+                manualSource: target.manualSource,
+            })
+            assertManualTranslationCurrent(snapshot, controller.signal)
+            manualTranslationPresentationRevision += 1
+            manualTranslationPresentation = {
+                identityKey: snapshot.identityKey,
+                scopeKey: snapshot.scopeKey,
+                revision: manualTranslationPresentationRevision,
+                core: value,
+                target,
+            }
+            manualTranslationSession = null
+            editTranslationMode = false
+            translated = true
+        }
+        catch (error) {
+            if (!isAbortError(error)) throw error
+        }
+        finally {
+            if (activeManualTranslation?.controller === controller) {
+                activeManualTranslation = null
+            }
+        }
     }
 
     function displaya(message:string){
@@ -235,6 +498,12 @@
     })
 
     onDestroy(()=>{
+        activeManualTranslation?.controller.abort()
+        for (const waiter of [...manualTranslationTargetWaiters]) {
+            waiter.signal.removeEventListener('abort', waiter.onAbort)
+            manualTranslationTargetWaiters.delete(waiter)
+            waiter.reject(new DOMException('Manual translation view destroyed.', 'AbortError'))
+        }
         unsubscribers.forEach(u => u())
     })
 
@@ -256,13 +525,17 @@
             return
         }
         const currentChar = getCurrentCharacter()
-        if(!currentChar || currentChar.type === 'group'){
+        if(!currentChar){
             return
         }
 
         const target = event.target as HTMLElement
         const origin = target.closest('[risu-trigger], [risu-btn]')
         if (!origin) {
+            return
+        }
+        const interaction = resolveChatMarkupInteraction(currentChar.type, origin)
+        if (!interaction) {
             return
         }
         const admission = admitRuntimeChatInteraction({
@@ -278,47 +551,34 @@
             return
         }
 
-        const triggerName = origin.getAttribute('risu-trigger')
-        const triggerId = origin.getAttribute('risu-id')
-        const btnEvent = origin.getAttribute('risu-btn')
-
         let triggerResult = null
         let handledByResident = false
         if (shouldDelegateGeneration()) {
-            if (triggerName) {
+            if (interaction.action === 'manual-trigger') {
                 // Preserve {{trigger_id}} rendering in the direct viewer while
                 // the actual trigger and its parser run in the resident.
-                CurrentTriggerIdStore.set(triggerId || null)
+                CurrentTriggerIdStore.set(interaction.triggerId || null)
             }
             const chat = getCurrentChat()
-            const delegated = triggerName
-                ? await delegateRuntimeChatInteraction({
-                    action: 'manual-trigger',
-                    characterId: currentChar.chaId,
-                    chatId: chat.id,
-                    manualName: triggerName,
-                    triggerId: triggerId || undefined,
-                })
-                : btnEvent
-                    ? await delegateRuntimeChatInteraction({
-                        action: 'lua-button',
-                        characterId: currentChar.chaId,
-                        chatId: chat.id,
-                        data: btnEvent,
-                    })
-                    : null
-            handledByResident = delegated !== null
+            handledByResident = await delegateChatMarkupInteraction(interaction, {
+                characterId: currentChar.chaId,
+                chatId: chat.id,
+            }, delegateRuntimeChatInteraction)
         }
         else {
-            triggerResult = triggerName
-                ? await runTrigger(currentChar, 'manual', {
+            if (interaction.action === 'manual-trigger') {
+                if (currentChar.type !== 'character') {
+                    return
+                }
+                triggerResult = await runTrigger(currentChar, 'manual', {
                     chat: getCurrentChat(),
-                    manualName: triggerName,
-                    triggerId: triggerId || undefined,
+                    manualName: interaction.manualName,
+                    triggerId: interaction.triggerId,
                 })
-                : btnEvent
-                    ? await runLuaButtonTrigger(currentChar, btnEvent)
-                    : null
+            }
+            else {
+                triggerResult = await runLuaButtonTrigger(currentChar, interaction.data)
+            }
         }
 
         if(triggerResult) {
@@ -331,7 +591,7 @@
             })
         }
 
-        if(triggerName && triggerId) {
+        if(interaction.action === 'manual-trigger' && interaction.triggerId) {
             setTimeout(() => {
                 CurrentTriggerIdStore.set(null)
             }, 100) // Small delay to allow display mode to complete
@@ -504,9 +764,13 @@
             {#key `${totalLengthPointer}|${chatReloadPointer}`}
                 <ChatBody
                     {character}
+                    translationCharacter={canonicalTranslationCharacter}
+                    {manualTranslationPresentation}
+                    onManualTranslationTargetPrepared={acceptManualTranslationPreparedTarget}
                     {firstMessage}
                     {idx}
                     {msgDisplay}
+                    translationManualSource={message}
                     {name}
                     {bodyRoot}
                     modelShortName={

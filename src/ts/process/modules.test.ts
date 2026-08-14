@@ -9,6 +9,11 @@ const fixture = vi.hoisted(() => ({
     },
     alertClear: vi.fn(),
     alertWait: vi.fn(),
+    currentCharacter: null as null | Record<string, unknown>,
+    currentChat: null as null | Record<string, unknown>,
+    moduleBackgroundEmbeddingSet: vi.fn(),
+    hideIconSet: vi.fn(),
+    reloadValue: 0,
     saveAsset: vi.fn(async (_data: Uint8Array, _customId = '', extension = '') => (
         `assets/imported.${extension || 'png'}`
     )),
@@ -20,8 +25,8 @@ vi.mock('../alert', () => ({
     alertWait: fixture.alertWait,
 }))
 vi.mock('../storage/database.svelte', () => ({
-    getCurrentCharacter: vi.fn(() => null),
-    getCurrentChat: vi.fn(() => null),
+    getCurrentCharacter: vi.fn(() => fixture.currentCharacter),
+    getCurrentChat: vi.fn(() => fixture.currentChat),
     getDatabase: vi.fn(() => fixture.database),
 }))
 vi.mock('../globalApi.svelte', () => ({ saveAsset: fixture.saveAsset }))
@@ -34,11 +39,33 @@ vi.mock('../media', () => ({}))
 vi.mock('../rpack/rpack_js', () => ({
     decodeRPack: vi.fn(async (data: Uint8Array) => data),
 }))
-vi.mock('../stores.svelte', () => ({}))
+vi.mock('../stores.svelte', () => ({
+    moduleBackgroundEmbedding: {
+        set: fixture.moduleBackgroundEmbeddingSet,
+    },
+    HideIconStore: {
+        set: fixture.hideIconSet,
+    },
+    ReloadGUIPointer: {
+        subscribe(run: (value: number) => void) {
+            run(fixture.reloadValue)
+            return () => undefined
+        },
+        set(value: number) {
+            fixture.reloadValue = value
+        },
+    },
+}))
 vi.mock('../interchangeability', () => ({}))
 vi.mock('../characterCards', () => ({}))
 
-import { getModuleTriggers, readModule, withTriggerLowLevelAccess } from './modules'
+import {
+    getModuleTriggers,
+    moduleUpdate,
+    readModule,
+    refreshModules,
+    withTriggerLowLevelAccess,
+} from './modules'
 
 function uint32(value: number) {
     const result = Buffer.alloc(4)
@@ -120,4 +147,32 @@ test('legacy module import stores new assets with their metadata extensions', as
         ['clip', 'assets/imported.mp4', 'mp4'],
     ])
     expect(fixture.alertClear).toHaveBeenCalledOnce()
+})
+
+test('clears module background HTML when the active chat disables its module', () => {
+    fixture.moduleBackgroundEmbeddingSet.mockClear()
+    fixture.database.modules = [{
+        id: 'background-module',
+        name: 'Background module',
+        description: '',
+        backgroundEmbedding: '<div data-module-background="active"></div>',
+    }]
+    fixture.database.enabledModules = []
+    fixture.currentCharacter = {
+        type: 'character',
+        hideChatIcon: false,
+    }
+    fixture.currentChat = {
+        modules: ['background-module'],
+    }
+    refreshModules()
+
+    moduleUpdate()
+    fixture.currentChat.modules = []
+    moduleUpdate()
+
+    expect(fixture.moduleBackgroundEmbeddingSet.mock.calls.map(([value]) => value)).toEqual([
+        '\n<div data-module-background="active"></div>\n',
+        '',
+    ])
 })

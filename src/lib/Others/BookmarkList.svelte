@@ -188,6 +188,7 @@
                                         rerollIcon={false}
                                         largePortrait={msg.speaker?.largePortrait}
                                         character={msg.saying}
+                                        translationCharacter={chara.chaId}
                                         isLastMemory={false}
                                     />
                                 {:else}

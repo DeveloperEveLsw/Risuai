@@ -13,7 +13,7 @@ import { sleep } from '../util';
 import { alertNormal, alertSelect, alertConfirm, alertError, alertWait } from '../alert';
 import { downloadFile } from '../globalApi.svelte';
 import { selectFileByDom } from '../util';
-import { exportLLMCacheAsJSON, importLLMCacheFromJSON, clearLLMCache } from '../translator/translator';
+import { exportLLMCacheAsJSON, importLLMCacheFromJSON, clearLLMCache, isTranslationCacheExportV2 } from '../translator/translator';
 
 export const langState = $state({ changed: false });
 
@@ -279,7 +279,7 @@ export const languageSettingsItems: SettingItem[] = [
                 alertWait(language.loading);
                 try {
                     const cache = await exportLLMCacheAsJSON();
-                    const entries = Object.keys(cache).length;
+                    const entries = Object.keys(cache.entries).length;
                     if (entries === 0) {
                         alertNormal(language.exportTranslationCacheEmpty);
                         return;
@@ -311,22 +311,18 @@ export const languageSettingsItems: SettingItem[] = [
                     }
                     const text = await files[0].text();
                     const data = JSON.parse(text);
-                    if (typeof data !== 'object' || Array.isArray(data)) {
+                    const legacyCache = data
+                        && typeof data === 'object'
+                        && !Array.isArray(data)
+                        && Object.values(data).every((value) => typeof value === 'string');
+                    if (!isTranslationCacheExportV2(data) && !legacyCache) {
                         alertError('Invalid JSON format');
                         return;
-                    }
-                    for (const [key, value] of Object.entries(data)) {
-                        if (typeof key !== 'string' || typeof value !== 'string') {
-                            alertError('Invalid JSON format');
-                            return;
-                        }
                     }
                     const confirmed = await alertConfirm(language.importTranslationCacheConfirm);
                     if (!confirmed) return;
                     alertWait(language.loading);
-                    const { count, failed } = await importLLMCacheFromJSON(
-                        data as Record<string, string>,
-                    );
+                    const { count, failed } = await importLLMCacheFromJSON(data);
                     if (failed > 0) {
                         alertError(
                             language.importTranslationCacheFailed

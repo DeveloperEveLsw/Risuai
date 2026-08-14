@@ -329,7 +329,7 @@ async function buildResponsesBody(arg:RequestDataArgumentExtended):Promise<Recor
             parameters: simplifySchema(tool.inputSchema),
         })))
     }
-    if(db.modelTools.includes('search')){
+    if(!arg.blockModelTools && db.modelTools.includes('search')){
         tools.push({ type: 'web_search_preview' })
     }
 

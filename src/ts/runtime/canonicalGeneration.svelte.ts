@@ -231,6 +231,35 @@ function reconcileLiveGeneratedSlice(
     return liveTarget
 }
 
+function discardUnstartedGenerationPlaceholders(
+    input: CanonicalGenerationTarget,
+    generationBase: CanonicalMessageAnchor[],
+) {
+    const liveTarget = findTarget(input)
+    if (!liveTarget) {
+        return null
+    }
+    const messages = liveTarget.character.chats[liveTarget.chatIndex].message
+    const boundary = resolveGenerationBoundary(messages, generationBase)
+    if (boundary === null) {
+        return liveTarget
+    }
+    for (let index = messages.length - 1; index >= boundary; index -= 1) {
+        const message = messages[index]
+        const generationId = message.generationInfo?.generationId
+        if (
+            message.role === 'char'
+            && message.data === ''
+            && typeof generationId === 'string'
+            && generationId !== ''
+            && message.chatId === generationId
+        ) {
+            messages.splice(index, 1)
+        }
+    }
+    return liveTarget
+}
+
 function currentRerollEntryStart(messages: Message[], history: CanonicalRerollHistory) {
     const appliedEntry = history.entries[history.index]
     if (
@@ -633,6 +662,7 @@ export async function executeCanonicalManualTrigger(input: CanonicalGenerationTa
     if (result) {
         target.character.chats[target.chatIndex] = result.chat
     }
+    ensureCanonicalMessageIds(target.character.chats[target.chatIndex].message)
     if (input.triggerId) {
         setTimeout(() => CurrentTriggerIdStore.set(null), 100)
     }
@@ -661,6 +691,7 @@ export async function executeCanonicalLuaButton(input: CanonicalGenerationTarget
     if (result?.chat) {
         target.character.chats[target.chatIndex] = result.chat
     }
+    ensureCanonicalMessageIds(target.character.chats[target.chatIndex].message)
     return {
         generated: false,
         previousLength,
@@ -975,8 +1006,14 @@ export async function executeCanonicalAuto(
             result = await runGenerationOnly(target, { signal: input.signal })
         }
         catch (error) {
+            if (input.signal.aborted) {
+                discardUnstartedGenerationPlaceholders(input, generationBase)
+            }
             reconcileLiveGeneratedSlice(input, generationBase, { reset: true })
             throw error
+        }
+        if (input.signal.aborted) {
+            discardUnstartedGenerationPlaceholders(input, generationBase)
         }
         const liveAfterIteration = reconcileLiveGeneratedSlice(
             input,

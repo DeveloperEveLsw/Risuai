@@ -757,6 +757,7 @@ export interface simpleCharacterArgument{
     additionalAssets?: [string, string, string][]
     customscript: customscript[]
     chaId: string,
+    translatorNote?: string
     virtualscript?: string
     emotionImages?: [string, string][]
     triggerscript?: triggerscript[]
@@ -800,16 +801,20 @@ const readOnlyPresentationMarkdownPolicy: ParseMarkdownPolicy = {
     resolveStyleTemplates: false,
 }
 
-async function parseMarkdownWithPolicy(
+export interface PreparedMarkdownDisplay {
+    data: string
+    resolveStyleTemplates: boolean
+}
+
+async function prepareMarkdownWithPolicy(
     data:string,
     charArg:(character|simpleCharacterArgument | groupChat | string) = null,
-    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
     chatID=-1,
     cbsConditions:CbsConditions = {},
     policy:ParseMarkdownPolicy,
-) {
+    additionalAssetMode: 'normal' | 'back' = 'normal',
+): Promise<PreparedMarkdownDisplay> {
     let firstParsed = ''
-    const additionalAssetMode = (mode === 'back') ? 'back' : 'normal'
     let char = (typeof(charArg) === 'string') ? (findCharacterbyId(charArg)) : (charArg)
 
     if(char && char.type !== 'group'){
@@ -834,6 +839,17 @@ async function parseMarkdownWithPolicy(
     data = parseThoughtsAndTools(data)
 
     data = encodeStyle(data)
+    return {
+        data,
+        resolveStyleTemplates: policy.resolveStyleTemplates,
+    }
+}
+
+export async function finalizePreparedMarkdown(
+    prepared: PreparedMarkdownDisplay,
+    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
+) {
+    let data = prepared.data
     if(mode === 'normal' || mode === 'notrim'){
         data = await renderHighlightableMarkdown(data)
 
@@ -842,8 +858,44 @@ async function parseMarkdownWithPolicy(
         }
     }
     return trimMarkdown(data, {
-        resolveStyleTemplates: policy.resolveStyleTemplates,
+        resolveStyleTemplates: prepared.resolveStyleTemplates,
     })
+}
+
+async function parseMarkdownWithPolicy(
+    data:string,
+    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
+    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
+    chatID=-1,
+    cbsConditions:CbsConditions = {},
+    policy:ParseMarkdownPolicy,
+) {
+    const prepared = await prepareMarkdownWithPolicy(
+        data,
+        charArg,
+        chatID,
+        cbsConditions,
+        policy,
+        mode === 'back' ? 'back' : 'normal',
+    )
+    return finalizePreparedMarkdown(prepared, mode)
+}
+
+/** Runs the canonical asset/editdisplay pipeline once so cache probing and
+ * final rendering can safely derive different representations from it. */
+export async function prepareMarkdownDisplay(
+    data:string,
+    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
+    chatID=-1,
+    cbsConditions:CbsConditions = {},
+) {
+    return prepareMarkdownWithPolicy(
+        data,
+        charArg,
+        chatID,
+        cbsConditions,
+        canonicalMarkdownPolicy,
+    )
 }
 
 /** Render a canonical chat message with the complete upstream display

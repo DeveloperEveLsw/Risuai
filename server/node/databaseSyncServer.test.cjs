@@ -473,9 +473,11 @@ test('hub proxy requires device authentication and rejects caller-selected targe
     assert.equal(resourceStyleRequest.status, 400);
     assert.equal((await resourceStyleRequest.json()).code, 'HUB_PROXY_POLICY_REJECTED');
 
+    const [cookieName, cookieValue] = cookiePair.split('=', 2);
+    const tamperedCookie = `${cookieName}=${cookieValue.startsWith('x') ? 'y' : 'x'}${cookieValue.slice(1)}`;
     const tamperedCookieRequest = await fetch(`${fixture.baseUrl}/hub-proxy/x`, {
         headers: {
-            cookie: cookiePair.slice(0, -1) + (cookiePair.endsWith('x') ? 'y' : 'x'),
+            cookie: tamperedCookie,
             'x-risu-node-path': maliciousTarget,
         },
     });

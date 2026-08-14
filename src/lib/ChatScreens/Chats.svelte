@@ -151,6 +151,12 @@
                         // skips Lua/plugin/trigger/regex editdisplay until the
                         // resident's canonical database revision is adopted.
                         character: entry.overlay ? null : simpleChar,
+                        // Group display parsing resolves the per-message
+                        // speaker from chat state, while translation must keep
+                        // the selected group as its room/script owner.
+                        translationCharacter: currentCharacter.type === 'group'
+                            ? currentCharacter.chaId
+                            : simpleChar,
                         largePortrait: message.role === 'user' ? (userIconPortrait ?? false) : ((currentCharacter as character).largePortrait ?? false),
                         messageGenerationInfo: message.generationInfo,
                         role: message.role,

@@ -585,9 +585,7 @@ export function moduleUpdate(){
         }
     })
 
-    if(backgroundEmbedding){
-        moduleBackgroundEmbedding.set(backgroundEmbedding)
-    }
+    moduleBackgroundEmbedding.set(backgroundEmbedding)
     HideIconStore.set(getCurrentCharacter()?.hideChatIcon || moduleHideIcon)
 
     if(lastModuleIds !== ids){

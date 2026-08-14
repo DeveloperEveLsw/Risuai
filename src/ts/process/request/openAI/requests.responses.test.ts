@@ -242,6 +242,17 @@ describe('OpenAI Responses API helpers', () => {
         expect(sourceMessages[1]).toMatchObject({ role: 'user', content: 'Describe this.', multimodals: [{ type: 'image', base64: 'data:image/png;base64,abc' }] })
     })
 
+    it('omits configured model search tools when the caller blocks them', async () => {
+        mocks.db.modelTools = ['search']
+
+        const body = await __testResponsesAPI.buildResponsesBody(baseArg({
+            tools: [],
+            blockModelTools: true,
+        }))
+
+        expect(body.tools).toBeUndefined()
+    })
+
     it('requests reasoning summaries for Responses reasoning models', async () => {
         const body = await __testResponsesAPI.buildResponsesBody(baseArg())
 

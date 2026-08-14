@@ -59,12 +59,21 @@ const MODULE_ID = 'e2e-compat-module';
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 const childProcesses = new Set();
+const childClosePromises = new WeakMap();
 let temporaryRoot = null;
 let mockProvider = null;
 let cdp = null;
 
 function sleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function trackChild(child) {
+    childProcesses.add(child);
+    const closed = once(child, 'close').catch(() => {});
+    childClosePromises.set(child, closed);
+    void closed.finally(() => childProcesses.delete(child));
+    return child;
 }
 
 async function eventually(operation, options = {}) {
@@ -105,7 +114,7 @@ async function run(command, args, options = {}) {
         env: { ...process.env, ...options.env },
         stdio: options.stdio ?? 'inherit',
     });
-    childProcesses.add(child);
+    trackChild(child);
     const [exitCode, signal] = await once(child, 'exit');
     childProcesses.delete(child);
     if (exitCode !== 0) {
@@ -579,7 +588,7 @@ async function startRisuServer() {
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });
-    childProcesses.add(child);
+    trackChild(child);
     child.stdout.on('data', (chunk) => output.push(chunk.toString()));
     child.stderr.on('data', (chunk) => output.push(chunk.toString()));
     const baseUrl = `http://127.0.0.1:${port}`;
@@ -1010,7 +1019,7 @@ async function launchChromium() {
         `--user-data-dir=${profilePath}`,
         'about:blank',
     ], { stdio: ['ignore', 'ignore', 'pipe'] });
-    childProcesses.add(child);
+    trackChild(child);
     let stderr = '';
     const endpoint = await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error(`Chromium DevTools endpoint timed out:\n${stderr}`)), 15_000);
@@ -1059,29 +1068,58 @@ async function clickCharacterChoice(page, characterId, characterName) {
 }
 
 async function stopChild(child) {
-    if (!child || child.exitCode !== null || child.signalCode !== null) {
+    if (!child) {
+        return;
+    }
+    const exited = child.exitCode !== null || child.signalCode !== null;
+    const closed = childClosePromises.get(child)
+        ?? (exited ? Promise.resolve() : once(child, 'close').catch(() => {}));
+    const waitForClose = async (timeoutMs) => {
+        let timer;
+        try {
+            return await Promise.race([
+                closed.then(() => true),
+                new Promise((resolve) => {
+                    timer = setTimeout(() => resolve(false), timeoutMs);
+                }),
+            ]);
+        }
+        finally {
+            clearTimeout(timer);
+        }
+    };
+    if (exited) {
+        await waitForClose(2_000);
         childProcesses.delete(child);
         return;
     }
-    const exited = once(child, 'exit');
     child.kill('SIGTERM');
-    if (await Promise.race([exited.then(() => true), sleep(2_000).then(() => false)])) {
+    if (await waitForClose(2_000)) {
         childProcesses.delete(child);
         return;
     }
     child.kill('SIGKILL');
-    await once(child, 'exit').catch(() => {});
+    await waitForClose(2_000);
     childProcesses.delete(child);
 }
 
-async function authenticateToCharacterCatalog(page, baseUrl) {
+async function stopAllChildren() {
+    await Promise.all([...childProcesses].map(stopChild));
+}
+
+async function authenticateToCharacterCatalog(
+    page,
+    baseUrl,
+    characterId = CHARACTER_ID,
+    characterName = CHARACTER_NAME,
+) {
     await page.navigate(baseUrl);
     await page.waitFor(`document.querySelector('#alert-input') !== null`, { timeoutMs: 20_000 });
     await page.setInput('#alert-input', CLEAR_PASSWORD);
     await page.clickButtonText('OK');
     await page.waitFor(`document.querySelector('#alert-input') === null`, { timeoutMs: 20_000 });
     const initialDestination = await page.waitFor(`(() => {
-        if (${characterChoiceExpression(CHARACTER_ID, CHARACTER_NAME)}) return 'character';
+        if (${characterChoiceExpression(characterId, characterName)}) return 'character';
         const catalogButton = [...document.querySelectorAll('button')].find((button) => (
             [...button.querySelectorAll('span')].some((span) => (
                 span.childElementCount === 0 && span.textContent.trim() === 'Character'
@@ -1092,16 +1130,25 @@ async function authenticateToCharacterCatalog(page, baseUrl) {
     if (initialDestination === 'catalog') {
         await page.clickButtonText('Character');
     }
-    await waitForCharacterChoice(page, CHARACTER_ID, CHARACTER_NAME);
+    await waitForCharacterChoice(page, characterId, characterName);
 }
 
-async function authenticateAndOpenCharacter(page, baseUrl) {
-    await authenticateToCharacterCatalog(page, baseUrl);
-    await clickCharacterChoice(page, CHARACTER_ID, CHARACTER_NAME);
+async function authenticateAndOpenCharacter(
+    page,
+    baseUrl,
+    characterId = CHARACTER_ID,
+    characterName = CHARACTER_NAME,
+) {
+    await authenticateToCharacterCatalog(page, baseUrl, characterId, characterName);
+    await clickCharacterChoice(page, characterId, characterName);
     await page.waitFor(`document.querySelector('textarea.text-input-area') !== null`, { timeoutMs: 10_000 });
 }
 
-async function navigateCharacterToHome(page) {
+async function navigateCharacterToHome(
+    page,
+    characterId = CHARACTER_ID,
+    characterName = CHARACTER_NAME,
+) {
     const result = await page.evaluate(`(() => {
         const mobileBack = document.querySelector('button[data-runtime-mobile-chat-back]');
         if (mobileBack) {
@@ -1148,7 +1195,7 @@ async function navigateCharacterToHome(page) {
     try {
         await page.waitFor(
             `document.querySelector('textarea.text-input-area') === null
-                && ${characterChoiceExpression(CHARACTER_ID, CHARACTER_NAME)}`,
+                && ${characterChoiceExpression(characterId, characterName)}`,
             { timeoutMs: 10_000 },
         );
     }
@@ -1864,7 +1911,7 @@ async function cleanup() {
         await mockProvider.close().catch(() => {});
         mockProvider = null;
     }
-    await Promise.all([...childProcesses].map(stopChild));
+    await stopAllChildren();
     if (temporaryRoot && process.env.RISU_BROWSER_E2E_KEEP !== '1') {
         const resolved = path.resolve(temporaryRoot);
         const tempPrefix = `${path.resolve(os.tmpdir())}${path.sep}risu-browser-e2e-`;
@@ -1873,14 +1920,55 @@ async function cleanup() {
     }
 }
 
-(async () => {
-    try {
-        await runScenario();
-    }
-    finally {
-        await cleanup();
-    }
-})().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+module.exports = {
+    constants: {
+        REPOSITORY_ROOT,
+        DATABASE_STORAGE_KEY,
+        DATABASE_FILE_NAME,
+        LEGACY_SAVE_HEADER,
+        BLOCK_SAVE_HEADER,
+        CLEAR_PASSWORD,
+        PASSWORD_HASH,
+        DEFAULT_TIMEOUT_MS,
+    },
+    sleep,
+    eventually,
+    buildApplication,
+    createSeedDatabase,
+    encodeLegacySave,
+    decodeCanonicalDatabase,
+    writeSse,
+    startRisuServer,
+    launchChromium,
+    stopChild,
+    stopAllChildren,
+    authenticateToCharacterCatalog,
+    authenticateAndOpenCharacter,
+    navigateCharacterToHome,
+    waitForCharacterChoice,
+    clickCharacterChoice,
+    waitForResident,
+    listCommands,
+    listDatabaseConflicts,
+    waitForNewCommand,
+    waitForTerminal,
+    loadCanonicalDatabase,
+    waitForStableCanonicalRevision,
+    setTemporaryRoot(value) {
+        temporaryRoot = value;
+    },
+};
+
+if (require.main === module) {
+    (async () => {
+        try {
+            await runScenario();
+        }
+        finally {
+            await cleanup();
+        }
+    })().catch((error) => {
+        console.error(error);
+        process.exitCode = 1;
+    });
+}

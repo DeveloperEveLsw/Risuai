@@ -192,7 +192,7 @@ vi.mock('src/ts/process/mcp/pluginmcp', () => ({
 }))
 vi.mock('src/ts/process/files/inlays', () => ({ getInlayAsset: vi.fn() }))
 vi.mock('src/ts/translator/translator', () => ({
-    getLLMCache: mocks.getLLMCache,
+    getLLMCacheByStorageKey: mocks.getLLMCache,
     searchLLMCache: mocks.searchLLMCache,
 }))
 vi.mock('src/ts/parser/parser.svelte', () => ({

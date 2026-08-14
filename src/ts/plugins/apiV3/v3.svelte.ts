@@ -14,7 +14,7 @@ import { isNodeServer, isTauri } from "src/ts/platform";
 import { get } from "svelte/store";
 import { registerMCPModule, registeredCustomPluginMCPs, unregisterMCPModule } from "src/ts/process/mcp/pluginmcp";
 import { getInlayAsset } from "src/ts/process/files/inlays";
-import { getLLMCache, searchLLMCache } from "src/ts/translator/translator";
+import { getLLMCacheByStorageKey, searchLLMCache } from "src/ts/translator/translator";
 import { hasher } from "src/ts/parser/parser.svelte";
 import localforage from "localforage";
 import { LLMFlags, LLMFormat, LLMProvider, LLMTokenizer, type LLMModel } from "src/ts/model/types";
@@ -1676,7 +1676,7 @@ const makeRisuaiAPIV3 = (
         },
         getTranslationCache: async (key: string) => {
             await requirePluginPermission(principal, 'db', permissionSignal);
-            return getLLMCache(key)
+            return getLLMCacheByStorageKey(key)
         },
         _getAliases: () => {
             return {

@@ -7,6 +7,7 @@ import { resetScriptCache } from "./process/scripts";
 import type { hubType } from "./characterCards";
 import type { PluginSafetyErrors } from "./plugins/pluginSafety";
 import { DBState } from "./storage/databaseState.svelte";
+import { notifySelectedCharacterChanged } from "./selectionEvents";
 
 export { DBState } from "./storage/databaseState.svelte";
 
@@ -107,6 +108,7 @@ export function createSimpleCharacter(char:character|groupChat){
         type: "simple",
         customscript: char.customscript,
         chaId: char.chaId,
+        translatorNote: char.translatorNote,
         additionalAssets: char.additionalAssets,
         virtualscript: char.virtualscript,
         emotionImages: char.emotionImages,
@@ -197,6 +199,7 @@ ReloadGUIPointer.subscribe(() => {
 
 $effect.root(() => {
     selectedCharID.subscribe((v) => {
+        notifySelectedCharacterChanged()
         selIdState.selId = v
 
         if (

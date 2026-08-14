@@ -16,6 +16,7 @@ import { getStopStrings, stringlizeAINChat, unstringlizeAIN, unstringlizeChat } 
 import { applyChatTemplate } from "../templates/chatTemplate";
 import { runTransformers } from "../transformers";
 import { runTrigger } from "../triggers";
+import { getModuleTriggers } from "../modules";
 import { requestClaude } from './anthropic';
 import { requestGoogleCloudVertex } from './google';
 import { requestOpenAI, requestOpenAILegacyInstruct, requestOpenAIResponseAPI } from "./openAI/requests";
@@ -51,6 +52,8 @@ interface requestDataArgument{
     tools?: MCPTool[]
     rememberToolUsage?: boolean
     blockPlugins?:boolean
+    blockModelTools?:boolean
+    blockBatching?:boolean
 }
 
 export interface RequestDataArgumentExtended extends requestDataArgument{
@@ -65,7 +68,7 @@ export interface RequestDataArgumentExtended extends requestDataArgument{
     saveSignatures?:boolean
 }
 
-export type requestDataResponse = {
+type requestDataResponseCore = {
     type: 'success'|'fail'
     result: string
     noRetry?: boolean,
@@ -90,7 +93,57 @@ export type requestDataResponse = {
     model?: string
 }
 
+export type requestDataResponse = requestDataResponseCore & {
+    /** True when request/response hooks made this execution unsuitable for
+     * semantic translation caching or cross-call single-flight reuse. */
+    pipelineStateful?: boolean
+}
+
 export interface StreamResponseChunk{[key:string]:string}
+
+/**
+ * Translation cache safety must follow the same hook sources that
+ * requestChatData executes. These hooks may read chat/script state or random
+ * values, so hashing their definitions is not sufficient.
+ */
+export function translationRequestPipelineIsStateful(): boolean {
+    const db = getDatabase()
+    const translationModel = db.seperateModelsForAxModels && db.seperateModels?.translate
+        ? db.seperateModels.translate
+        : db.subModel
+    const translationRoutes = [translationModel, ...(db.fallbackModels?.translate ?? [])]
+    // This pseudo-model resolves to a changing remote free-model list during
+    // request execution, so a pre-request semantic key cannot identify it.
+    if (translationRoutes.includes('openrouter') && db.openrouterRequestModel === 'risu/free') {
+        return true
+    }
+    if (translationRoutes.some((route) => route === 'custom' || route.startsWith('pluginmodel:::'))) {
+        return true
+    }
+    // Ooba stop strings are evaluated through risuChatParser at request time
+    // and may contain date/random/chat-state macros. A pre-request key cannot
+    // safely identify that execution.
+    if (
+        db.localStopStrings?.length > 0
+        && translationRoutes.some((route) => {
+            const format = getModelInfo(route).format
+            return format === LLMFormat.Ooba || format === LLMFormat.OobaLegacy
+        })
+    ) {
+        return true
+    }
+    if (
+        pluginV2.replacerbeforeRequest.size > 0
+        || pluginV2.replacerafterRequest.size > 0
+    ) {
+        return true
+    }
+
+    const currentChar = getCurrentCharacter()
+    if (!currentChar || currentChar.type === 'group') return false
+    return (currentChar.triggerscript ?? []).some((trigger) => trigger.type === 'request')
+        || getModuleTriggers().some((trigger) => trigger.type === 'request')
+}
 
 type OllamaThinkMode = boolean | 'low' | 'medium' | 'high'
 
@@ -206,6 +259,10 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
     const db = getDatabase()
     const fallBackModels:string[] = safeStructuredClone(db?.fallbackModels?.[model] ?? [])
     const tools = arg.tools ?? (await getTools())
+    let pipelineStateful = translationRequestPipelineIsStateful()
+    const withPipelineState = (response: requestDataResponse): requestDataResponse => (
+        pipelineStateful ? { ...response, pipelineStateful: true } : response
+    )
     fallBackModels.push('')
     let da:requestDataResponse
 
@@ -228,18 +285,20 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
         }
 
         while(true){
+            pipelineStateful ||= translationRequestPipelineIsStateful()
             
             if(abortSignal?.aborted){
-                return {
+                return withPipelineState({
                     type: 'fail',
                     result: 'Aborted'
-                }
+                })
             }
     
             if(pluginV2.replacerbeforeRequest.size > 0){
                 for(const replacer of pluginV2.replacerbeforeRequest){
                     arg.formated = await replacer(arg.formated, model)
                 }
+                pipelineStateful = true
             }
             
             try{
@@ -263,6 +322,7 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
             catch(e){
                 console.error(e)
             }
+            pipelineStateful ||= translationRequestPipelineIsStateful()
             
     
             da = await requestChatDataMain({
@@ -270,12 +330,13 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
                 staticModel: fallBackModels[fallbackIndex],
                 tools: tools,
             }, model, abortSignal)
+            pipelineStateful ||= translationRequestPipelineIsStateful()
 
             if(abortSignal?.aborted){
-                return {
+                return withPipelineState({
                     type: 'fail',
                     result: 'Aborted'
-                }
+                })
             }
 
             if(da.type === 'success' && arg.escape){
@@ -286,7 +347,9 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
                 for(const replacer of pluginV2.replacerafterRequest){
                     da.result = await replacer(da.result, model)
                 }
+                pipelineStateful = true
             }
+            pipelineStateful ||= translationRequestPipelineIsStateful()
     
             if(da.type === 'success' && db.banCharacterset?.length > 0){
                 let failed = false
@@ -314,10 +377,10 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
     
             if(da.type !== 'fail' || da.noRetry){
                 const usedModel = fallBackModels[fallbackIndex] || da.model
-                return usedModel ? {
+                return withPipelineState(usedModel ? {
                     ...da,
                     model: usedModel
-                } : da
+                } : da)
             }
     
             if(da.failByServerError){
@@ -331,7 +394,7 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
             if(trys > db.requestRetrys){
                 const isPluginModel = da.model === 'custom' || da.model?.startsWith('pluginmodel:::')
                 if(fallbackIndex === fallBackModels.length-1 || isPluginModel){
-                    return da
+                    return withPipelineState(da)
                 }
                 break
             }
@@ -339,10 +402,10 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
     }
 
 
-    return da ?? {
+    return withPipelineState(da ?? {
         type: 'fail',
         result: "All models failed"
-    }
+    })
 }
 
 export function reformater(formated:OpenAIChat[],modelInfo:LLMModel|LLMFlags[]){

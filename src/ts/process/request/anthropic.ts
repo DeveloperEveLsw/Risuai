@@ -612,7 +612,7 @@ export async function requestClaude(arg:RequestDataArgumentExtended):Promise<req
         }
     }
 
-    if(db.claudeBatching && !ollamaCloudAnthropic){
+    if(db.claudeBatching && !arg.blockBatching && !ollamaCloudAnthropic){
         if(body.stream !== undefined){
             delete body.stream
         }

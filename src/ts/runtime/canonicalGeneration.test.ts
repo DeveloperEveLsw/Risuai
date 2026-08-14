@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Message } from '../storage/database.svelte'
 
 const mocks = vi.hoisted(() => ({
     dbState: { db: {} as any },
@@ -313,7 +314,7 @@ describe('canonical resident generation boundary', () => {
     })
 
     it('runs a manual trigger against the canonical resident chat and keeps its mutation', async () => {
-        const mutatedChat = {
+        const mutatedChat: { id: string, message: Message[] } = {
             id: 'chat-a',
             message: [{ role: 'char', data: 'manual LLM result' }],
         }
@@ -340,11 +341,13 @@ describe('canonical resident generation boundary', () => {
             },
         )
         expect(mocks.dbState.db.characters[0].chats[0]).toBe(mutatedChat)
+        expect(mutatedChat.message[0].chatId).toEqual(expect.any(String))
+        expect(mutatedChat.message[0].chatId).not.toBe('')
         expect(result).toEqual({ generated: false, previousLength: 0, currentLength: 1 })
     })
 
     it('applies a manual trigger result to the live target after a DB root replacement', async () => {
-        const mutatedChat = {
+        const mutatedChat: { id: string, message: Message[] } = {
             id: 'chat-a',
             message: [{ role: 'char', data: 'live manual result' }],
         }
@@ -409,7 +412,7 @@ describe('canonical resident generation boundary', () => {
     })
 
     it('runs a module Lua chat button against a canonical group chat', async () => {
-        const mutatedChat = {
+        const mutatedChat: { id: string, message: Message[] } = {
             id: 'group-chat',
             message: [{ role: 'char', data: 'group module Lua result' }],
         }
@@ -426,6 +429,8 @@ describe('canonical resident generation boundary', () => {
             'group-module-button-payload',
         )
         expect(mocks.dbState.db.characters[1].chats[0]).toBe(mutatedChat)
+        expect(mutatedChat.message[0].chatId).toEqual(expect.any(String))
+        expect(mutatedChat.message[0].chatId).not.toBe('')
         expect(result).toEqual({ generated: false, previousLength: 0, currentLength: 1 })
     })
 
@@ -1753,6 +1758,106 @@ describe('canonical resident generation boundary', () => {
             'auto live two A',
             'auto live two B',
         ])
+    })
+
+    it('removes an unstarted auto placeholder when the next iteration is cancelled', async () => {
+        const chat = mocks.dbState.db.characters[1].chats[0]
+        const controller = new AbortController()
+        mocks.sendChat
+            .mockImplementationOnce(async () => {
+                chat.message.push(
+                    {
+                        role: 'char',
+                        data: 'auto complete A',
+                        saying: 'speaker-a',
+                        chatId: 'generation-a',
+                        generationInfo: { generationId: 'generation-a' },
+                    },
+                    {
+                        role: 'char',
+                        data: 'auto complete B',
+                        saying: 'speaker-b',
+                        chatId: 'generation-b',
+                        generationInfo: { generationId: 'generation-b' },
+                    },
+                )
+                return true
+            })
+            .mockImplementationOnce(async () => {
+                chat.message.push({
+                    role: 'char',
+                    data: '',
+                    saying: 'speaker-a',
+                    chatId: 'generation-cancelled',
+                    generationInfo: { generationId: 'generation-cancelled' },
+                })
+                controller.abort()
+                return false
+            })
+
+        const result = await executeCanonicalAuto({
+            characterId: 'group-a',
+            chatId: 'group-chat',
+            signal: controller.signal,
+        })
+
+        expect(chat.message.map((message: any) => message.data)).toEqual([
+            'auto complete A',
+            'auto complete B',
+        ])
+        expect(result).toEqual({ generated: true, previousLength: 0, currentLength: 2 })
+    })
+
+    it('removes an unstarted auto placeholder when cancellation throws', async () => {
+        const chat = mocks.dbState.db.characters[1].chats[0]
+        const controller = new AbortController()
+        mocks.sendChat.mockImplementationOnce(async () => {
+            chat.message.push({
+                role: 'char',
+                data: '',
+                saying: 'speaker-a',
+                chatId: 'generation-cancelled',
+                generationInfo: { generationId: 'generation-cancelled' },
+            })
+            controller.abort()
+            const error = new Error('cancelled before output')
+            error.name = 'AbortError'
+            throw error
+        })
+
+        await expect(executeCanonicalAuto({
+            characterId: 'group-a',
+            chatId: 'group-chat',
+            signal: controller.signal,
+        })).rejects.toMatchObject({ name: 'AbortError' })
+
+        expect(chat.message).toEqual([])
+    })
+
+    it('preserves a nonempty partial auto response when cancellation throws', async () => {
+        const chat = mocks.dbState.db.characters[1].chats[0]
+        const controller = new AbortController()
+        mocks.sendChat.mockImplementationOnce(async () => {
+            chat.message.push({
+                role: 'char',
+                data: 'received partial',
+                saying: 'speaker-a',
+                chatId: 'generation-partial',
+                generationInfo: { generationId: 'generation-partial' },
+            })
+            controller.abort()
+            const error = new Error('cancelled after output')
+            error.name = 'AbortError'
+            throw error
+        })
+
+        await expect(executeCanonicalAuto({
+            characterId: 'group-a',
+            chatId: 'group-chat',
+            signal: controller.signal,
+        })).rejects.toMatchObject({ name: 'AbortError' })
+
+        expect(chat.message.map((message: any) => message.data)).toEqual(['received partial'])
     })
 
     it('records a partial auto iteration before rethrowing a provider error', async () => {
