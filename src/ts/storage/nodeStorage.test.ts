@@ -20,9 +20,95 @@ import { NODE_DATABASE_STORAGE_KEY, NodeStorage } from './nodeStorage'
 import type { NodeDatabaseSync } from './nodeDatabaseSync'
 
 afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     localStorage.clear()
+})
+
+describe('NodeStorage rate-limited asset writes', () => {
+    function prepareStorage() {
+        const { storage } = storageWithFakeDatabaseSync()
+        storage.authChecked = true
+        const auth = vi.spyOn(storage, 'createAuth').mockResolvedValue('signed-auth')
+        return { storage, auth }
+    }
+
+    function rateLimited(retryAfter?: string) {
+        return new Response(JSON.stringify({ error: 'Too many requests' }), {
+            status: 429,
+            headers: retryAfter === undefined ? {} : { 'retry-after': retryAfter },
+        })
+    }
+
+    it.each([
+        ['seconds', '37', 37_250],
+        ['HTTP date', 'Mon, 14 Sep 2026 06:01:00 GMT', 60_250],
+        ['missing header', undefined, 60_000],
+        ['invalid header', 'invalid', 60_000],
+    ])('honors %s Retry-After and refreshes auth before retrying', async (_, header, delay) => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-09-14T06:00:00Z'))
+        const { storage, auth } = prepareStorage()
+        auth.mockResolvedValueOnce('first-token').mockResolvedValue('fresh-token')
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(rateLimited(header))
+            .mockResolvedValueOnce(new Response('{"success":true}'))
+        vi.stubGlobal('fetch', fetchMock)
+        const value = Uint8Array.from([1, 2, 3])
+        const write = storage.setItem('assets/example.png', value)
+
+        await vi.advanceTimersByTimeAsync(0)
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(delay - 1)
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(1)
+        await write
+
+        expect(fetchMock).toHaveBeenCalledTimes(2)
+        expect(fetchMock).toHaveBeenLastCalledWith('/api/write', expect.objectContaining({
+            body: value,
+            headers: expect.objectContaining({ 'risu-auth': 'fresh-token' }),
+        }))
+    })
+
+    it('holds newly queued writes during a shared cooldown', async () => {
+        vi.useFakeTimers()
+        const { storage } = prepareStorage()
+        const fetchMock = vi.fn()
+            .mockResolvedValueOnce(rateLimited('2'))
+            .mockImplementation(async () => new Response('{"success":true}'))
+        vi.stubGlobal('fetch', fetchMock)
+        const first = storage.setItem('assets/one.png', Uint8Array.of(1))
+        await vi.advanceTimersByTimeAsync(0)
+        const second = storage.setItem('assets/two.png', Uint8Array.of(2))
+        await vi.advanceTimersByTimeAsync(2249)
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(1)
+        await Promise.all([first, second])
+        expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
+    it('stops after three retries and preserves the HTTP error', async () => {
+        vi.useFakeTimers()
+        const { storage } = prepareStorage()
+        const fetchMock = vi.fn(async () => rateLimited('1'))
+        vi.stubGlobal('fetch', fetchMock)
+        const write = storage.setItem('assets/example.png', Uint8Array.of(1))
+        const rejection = expect(write).rejects.toThrow('HTTP 429')
+        await vi.advanceTimersByTimeAsync(3750)
+        await rejection
+        expect(fetchMock).toHaveBeenCalledTimes(4)
+    })
+
+    it.each([401, 413, 507])('does not retry permanent HTTP %i failures', async (status) => {
+        const { storage } = prepareStorage()
+        const fetchMock = vi.fn(async () => new Response('{"error":"server reason"}', { status }))
+        vi.stubGlobal('fetch', fetchMock)
+        await expect(storage.setItem('assets/example.png', Uint8Array.of(1)))
+            .rejects.toThrow(`HTTP ${status}) for assets/example.png: server reason`)
+        expect(fetchMock).toHaveBeenCalledOnce()
+    })
 })
 
 function storageWithFakeDatabaseSync() {

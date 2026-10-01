@@ -101,6 +101,17 @@ function isChatPageOnlyUpdate(info: DatabaseUpdateInfo): info is DatabaseUpdateI
         && info.path[2] === 'chatPage'
 }
 
+function canIntroduceCharacterIdentity(info: DatabaseUpdateInfo): boolean {
+    if (info.path.length === 0 || info.path[0] !== 'characters') {
+        return info.path.length === 0
+    }
+    // Replacing/truncating the character array, assigning a whole character,
+    // or changing its stable id can introduce a navigation identity. Changes
+    // below the character (messages, modules, ordering metadata, and so on)
+    // cannot, and must not rescan every character on each reactive write.
+    return info.path.length <= 2 || info.path[2] === 'chaId'
+}
+
 export function getNodeDatabaseCommitKind(database: RuntimeDatabase): NodeDatabaseCommitKind {
     return database.characters?.some((character) =>
         character?.chats?.some((chat) => chat?.isStreaming === true)
@@ -249,7 +260,9 @@ export class NodeDatabaseRuntime<TDatabase extends RuntimeDatabase> {
             this.captureCharacterLocalNavigation(this.getDatabase(), info.path[1])
             return false
         }
-        this.captureMissingCanonicalNavigation(this.getDatabase())
+        if (canIntroduceCharacterIdentity(info)) {
+            this.captureMissingCanonicalNavigation(this.getDatabase())
+        }
         this.markDirty()
         return true
     }

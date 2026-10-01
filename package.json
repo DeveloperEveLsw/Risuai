@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "bench:node-storage": "node scripts/benchmark-flat-storage.cjs",
     "test:runtime-browser": "node server/node/runtimeGenerations/browserE2E.cjs",
     "test:runtime-group-browser": "node server/node/runtimeGenerations/groupContentBrowserE2E.cjs",
     "tauri": "tauri",

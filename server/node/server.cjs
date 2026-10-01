@@ -345,6 +345,20 @@ function consumeProxyStreamSocketTicket(ticket, jobId) {
 const authenticatedRouteLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 2000,
+    // Character imports/export previews can transfer thousands of assets in a
+    // minute. Authenticated asset traffic must not consume the shared budget
+    // needed to commit the character database after the import completes.
+    skip: async (req, res) => {
+        const isAssetRoute = (req.method === 'POST' && req.path === '/api/write')
+            || (req.method === 'GET' && req.path === '/api/read');
+        const filePath = req.headers['file-path'];
+        if (!isAssetRoute || typeof filePath !== 'string'
+            || !/^(?:[0-9a-fA-F]{2})+$/.test(filePath)
+            || !Buffer.from(filePath, 'hex').toString('utf8').startsWith('assets/')) {
+            return false;
+        }
+        return await checkAuth(req, res, true);
+    },
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Please retry shortly.' }
@@ -1427,6 +1441,7 @@ async function getSionywAccessToken() {
     if(tokenData.refresh_token && tokenData.refresh_token !== refreshToken){
         clientData.refresh_token = tokenData.refresh_token;
         writeFileSync(clientDataPath, JSON.stringify(clientData), 'utf-8');
+        flatStorageStore.invalidateUsage();
     }
 
     accessTokenCache.token = tokenData.access_token;
@@ -1888,6 +1903,7 @@ app.post('/api/login', loginRouteLimiter, async (req, res) => {
     if(req.body.password && req.body.password.trim() === password.trim()){
         knownPublicKeysHashes.push(await hashJSON(req.body.publicKey))
         writeFileSync(knownPublicKeysPath, JSON.stringify(knownPublicKeysHashes), 'utf-8')
+        flatStorageStore.invalidateUsage()
         res.send({status:'success'})
     }
     else{
@@ -1913,6 +1929,7 @@ app.post('/api/executor_login', loginRouteLimiter, async (req, res) => {
             encoding: 'utf-8',
             mode: 0o600,
         })
+        flatStorageStore.invalidateUsage()
     }
     res.send({status:'success'})
 })
@@ -1936,6 +1953,7 @@ app.post('/api/set_password', async (req, res) => {
         }
         password = req.body.password
         writeFileSync(passwordPath, password, { encoding: 'utf-8', mode: 0o600 })
+        flatStorageStore.invalidateUsage()
         res.send({status: 'success'})
     }
     else if(password === ''){
@@ -2142,6 +2160,10 @@ app.put('/api/sync/database', authenticatedRouteLimiter, async (req, res, next) 
                 return { status: 200, headers: result, body: result };
             },
         );
+        // DatabaseRevisionStore owns the canonical blob outside the flat-store
+        // queue. Invalidate once per DB transaction; the next asset write pays
+        // one reconciliation scan instead of rescanning for every asset.
+        flatStorageStore.invalidateUsage();
         setDatabaseRevisionHeaders(res, response.headers);
         res.status(response.status).send(response.body);
     }
@@ -2449,6 +2471,7 @@ app.get('/api/oauth_callback', async (req, res) => {
     )
 
     writeFileSync(authCodePath, tokens.access_token, 'utf-8')
+    flatStorageStore.invalidateUsage()
 
     res.send(tokens)
             
@@ -2732,9 +2755,11 @@ function setupProxyStreamWebSocket(server) {
 }
 
 async function startServer() {
-    await flatStorageStore.open();
     try {
         await openDatabaseRevisionStoreAtStartup();
+        // Database recovery can replace files in the shared save root. Build
+        // the flat-asset quota snapshot only after that recovery is complete.
+        await flatStorageStore.open();
         await proxyStreamJobStore.open();
         await pruneProxyStreamJobs();
         await runtimeGenerationStore.open();

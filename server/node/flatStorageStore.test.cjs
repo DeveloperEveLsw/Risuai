@@ -48,3 +48,40 @@ test('flat asset writes preserve a filesystem free-space reserve', async () => {
         code: 'SAVE_STORAGE_QUOTA_EXCEEDED',
     });
 });
+
+test('flat writes reuse one usage snapshot until an external root mutation invalidates it', async () => {
+    const { rootDir, store } = await fixture({ maxBytes: 100 });
+    let scans = 0;
+    const scanUsageFromDisk = store.scanUsageFromDisk.bind(store);
+    store.scanUsageFromDisk = async () => {
+        scans += 1;
+        return await scanUsageFromDisk();
+    };
+
+    await store.write('aa', Buffer.from('1234'));
+    await store.write('bb', Buffer.from('5678'));
+    assert.equal(scans, 0);
+    assert.equal(await store.usage(), 8);
+
+    await fsp.writeFile(path.join(rootDir, '__external'), 'external');
+    store.invalidateUsage();
+    await store.write('cc', Buffer.from('90'));
+    assert.equal(scans, 1);
+    assert.equal(await store.usage(), 18);
+});
+
+test('an external invalidation during a write prevents a stale usage snapshot from being published', async () => {
+    let store;
+    const fixtureValue = await fixture({
+        maxBytes: 100,
+        statfs: async () => {
+            store.invalidateUsage();
+            return { bavail: 1000n, bsize: 4096n };
+        },
+    });
+    store = fixtureValue.store;
+
+    await store.write('aa', Buffer.from('1234'));
+    await fsp.writeFile(path.join(fixtureValue.rootDir, '__external'), '12');
+    assert.equal(await store.usage(), 6);
+});

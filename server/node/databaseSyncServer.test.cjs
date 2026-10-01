@@ -742,3 +742,80 @@ test('legacy write and remove endpoints cannot mutate the canonical database', {
     assert.equal(loaded.headers.get('x-risu-revision'), '0');
     assert.deepEqual(Buffer.from(await loaded.arrayBuffer()), initialData);
 });
+
+test('2877 authenticated asset transfers leave the database request budget available', {
+    timeout: 120000,
+}, async () => {
+    const initialData = Buffer.from('before-large-character-import');
+    const fixture = await startServerFixture({ initialData, withJwt: true });
+    const authHeaders = { 'risu-auth': fixture.jwt };
+
+    const unauthorizedPath = Buffer.from('assets/unauthorized.png').toString('hex');
+    const unauthorized = await fetch(`${fixture.baseUrl}/api/write`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream', 'file-path': unauthorizedPath },
+        body: Buffer.from('must not be saved'),
+    });
+    assert.notEqual(unauthorized.status, 200);
+    assert.equal(unauthorized.headers.get('ratelimit-limit'), '2000');
+    await unauthorized.arrayBuffer();
+    await assert.rejects(fs.stat(path.join(fixture.savePath, unauthorizedPath)), { code: 'ENOENT' });
+
+    for (let start = 0; start < 2877; start += 10) {
+        await Promise.all(Array.from({ length: Math.min(10, 2877 - start) }, async (_, offset) => {
+            const index = start + offset;
+            const content = Buffer.from(`asset-content-${index}`);
+            const headers = {
+                ...authHeaders,
+                'file-path': Buffer.from(`assets/import-${index}.png`).toString('hex'),
+            };
+            const saved = await fetch(`${fixture.baseUrl}/api/write`, {
+                method: 'POST',
+                headers: { ...headers, 'content-type': 'application/octet-stream' },
+                body: content,
+            });
+            assert.equal(saved.status, 200, `asset ${index} write failed`);
+            assert.equal(saved.headers.get('ratelimit-limit'), null);
+            assert.equal((await saved.json()).success, true);
+            const loaded = await fetch(`${fixture.baseUrl}/api/read`, { headers });
+            assert.equal(loaded.status, 200, `asset ${index} read failed`);
+            assert.equal(loaded.headers.get('ratelimit-limit'), null);
+            assert.deepEqual(Buffer.from(await loaded.arrayBuffer()), content);
+        }));
+    }
+
+    const database = await fetch(`${fixture.baseUrl}/api/sync/database`, { headers: authHeaders });
+    assert.equal(database.status, 200);
+    assert.ok(Number(database.headers.get('ratelimit-remaining')) > 1900);
+    const etag = database.headers.get('etag');
+    await database.arrayBuffer();
+    const committedData = Buffer.from('after-large-character-import');
+    const commit = await fetch(`${fixture.baseUrl}/api/sync/database`, {
+        method: 'PUT',
+        headers: {
+            ...authHeaders,
+            'content-type': 'application/octet-stream',
+            'if-match': etag,
+            'idempotency-key': 'large-character-import',
+            'x-risu-client-id': 'large-import-test',
+        },
+        body: committedData,
+    });
+    assert.equal(commit.status, 200);
+    await commit.arrayBuffer();
+    assert.deepEqual(await fs.readFile(path.join(fixture.savePath, databaseFileName)), committedData);
+
+    // Non-asset writes must still be counted by the general limiter.
+    const otherWrite = await fetch(`${fixture.baseUrl}/api/write`, {
+        method: 'POST',
+        headers: {
+            ...authHeaders,
+            'content-type': 'application/octet-stream',
+            'file-path': Buffer.from('test/non-asset.bin').toString('hex'),
+        },
+        body: Buffer.from('not an asset'),
+    });
+    assert.equal(otherWrite.status, 200);
+    assert.equal(otherWrite.headers.get('ratelimit-limit'), '2000');
+    await otherWrite.arrayBuffer();
+});

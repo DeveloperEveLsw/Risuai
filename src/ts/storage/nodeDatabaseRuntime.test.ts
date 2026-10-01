@@ -107,11 +107,12 @@ function makeRuntime(options: {
     let current = options.initial ?? database()
     let selectedIndex = options.selectedIndex ?? 0
     const applied: RuntimeDatabase[] = []
+    const getDatabase = vi.fn(() => current)
     let runtime: NodeDatabaseRuntime<RuntimeDatabase>
     runtime = new NodeDatabaseRuntime({
         sync: sync as any,
         decode: options.decode ?? (async () => database()),
-        getDatabase: () => current,
+        getDatabase,
         setDatabase: (next) => {
             current = next
             applied.push(next)
@@ -129,12 +130,65 @@ function makeRuntime(options: {
         sync,
         runtime,
         applied,
+        getDatabase,
         get current() { return current },
         get selectedIndex() { return selectedIndex },
     }
 }
 
 describe('NodeDatabaseRuntime', () => {
+    it('does not rescan every character for unrelated module and ordering mutations', () => {
+        const fixture = makeRuntime({
+            initial: {
+                characters: Array.from({ length: 1_000 }, (_, index) => ({
+                    chaId: `character-${index}`,
+                    chatPage: 0,
+                    chats: [{ id: `chat-${index}` }],
+                })),
+            },
+        })
+        fixture.getDatabase.mockClear()
+
+        for (let index = 0; index < 1_000; index += 1) {
+            expect(fixture.runtime.recordDatabaseUpdate({
+                path: ['modules', index],
+                value: { id: `module-${index}` },
+                oldValue: undefined,
+                type: 'set',
+            })).toBe(true)
+            expect(fixture.runtime.recordDatabaseUpdate({
+                path: ['characterOrder', index],
+                value: `character-${index}`,
+                oldValue: undefined,
+                type: 'set',
+            })).toBe(true)
+        }
+
+        expect(fixture.getDatabase).not.toHaveBeenCalled()
+    })
+
+    it('still captures navigation identity when a whole character is added', () => {
+        const fixture = makeRuntime()
+        fixture.getDatabase.mockClear()
+        fixture.current.characters?.push({
+            chaId: 'character-new',
+            chatPage: 0,
+            chats: [{ id: 'chat-new' }],
+        })
+
+        expect(fixture.runtime.recordDatabaseUpdate({
+            path: ['characters', 1],
+            value: fixture.current.characters?.[1],
+            oldValue: undefined,
+            type: 'set',
+        })).toBe(true)
+        expect(fixture.getDatabase).toHaveBeenCalledOnce()
+
+        const snapshot = structuredClone(fixture.current)
+        snapshot.characters![1].chatPage = 0
+        expect(fixture.runtime.makeCanonicalSnapshot(snapshot).characters?.[1].chatPage).toBe(0)
+    })
+
     it('installs listeners before connect and holds a startup hello until initial dirty state is saved', async () => {
         const sync = new FakeSync()
         sync.readSnapshot.mockResolvedValue({ head: head(2, sha2), data: Uint8Array.from([2]) })

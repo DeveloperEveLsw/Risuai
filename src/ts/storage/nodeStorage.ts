@@ -9,6 +9,28 @@ import { isServerResidentExecutor } from "../platform"
 
 export const NODE_DATABASE_STORAGE_KEY = 'database/database.bin'
 
+const MAX_WRITE_RATE_LIMIT_RETRIES = 3
+const DEFAULT_WRITE_RETRY_DELAY_MS = 60_000
+
+function writeRetryDelay(response: Response): number {
+    const retryAfter = response.headers.get('retry-after')?.trim()
+    if (retryAfter && /^\d+$/.test(retryAfter)) {
+        const seconds = Number(retryAfter)
+        if (Number.isSafeInteger(seconds) && seconds <= 2_147_483) {
+            return seconds * 1000 + 250
+        }
+        return DEFAULT_WRITE_RETRY_DELAY_MS
+    }
+    if (retryAfter) {
+        const retryAt = Date.parse(retryAfter)
+        const delay = retryAt - Date.now()
+        if (Number.isFinite(delay) && delay <= 2_147_483_000) {
+            return Math.max(0, delay) + 250
+        }
+    }
+    return DEFAULT_WRITE_RETRY_DELAY_MS
+}
+
 export interface NodeStorageOptions {
     databaseSync?: NodeDatabaseSync
 }
@@ -19,6 +41,7 @@ export class NodeStorage{
     readonly databaseSync: NodeDatabaseSync
     private hubSessionExpiresAt = 0
     private hubSessionRequest: Promise<void> | null = null
+    private writeRetryUntil = 0
 
     constructor(options: NodeStorageOptions = {}) {
         this.databaseSync = options.databaseSync ?? new NodeDatabaseSync({
@@ -131,21 +154,43 @@ export class NodeStorage{
             return
         }
         await this.checkAuth()
-        const da = await fetch('/api/write', {
-            method: "POST",
-            body: value as any,
-            headers: {
-                'content-type': 'application/octet-stream',
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
-                'risu-auth': await this.createAuth()
+        for (let attempt = 0; ; attempt++) {
+            // All concurrent asset saves on this storage instance share the
+            // cooldown, including writes that were still queued when it began.
+            while (Date.now() < this.writeRetryUntil) {
+                await new Promise<void>((resolve) =>
+                    setTimeout(resolve, this.writeRetryUntil - Date.now()),
+                )
             }
-        })
-        if(da.status < 200 || da.status >= 300){
-            throw "setItem Error"
-        }
-        const data = await da.json()
-        if(data.error){
-            throw data.error
+            const response = await fetch('/api/write', {
+                method: 'POST',
+                body: value as any,
+                headers: {
+                    'content-type': 'application/octet-stream',
+                    'file-path': Buffer.from(key, 'utf-8').toString('hex'),
+                    // Refresh the five-minute credential after waiting.
+                    'risu-auth': await this.createAuth(),
+                },
+            })
+            if (response.status === 429 && attempt < MAX_WRITE_RATE_LIMIT_RETRIES) {
+                this.writeRetryUntil = Math.max(
+                    this.writeRetryUntil,
+                    Date.now() + writeRetryDelay(response),
+                )
+                await response.body?.cancel()
+                continue
+            }
+            const data = await response.json().catch(() => null)
+            if (!response.ok || data?.error) {
+                const detail = typeof data?.error === 'string'
+                    ? data.error
+                    : response.statusText || 'Unknown server error'
+                throw new Error(`Storage write failed (HTTP ${response.status}) for ${key}: ${detail}`)
+            }
+            if (data === null) {
+                throw new Error(`Storage write returned invalid JSON for ${key}`)
+            }
+            return
         }
     }
     async getItem(key:string):Promise<Buffer> {

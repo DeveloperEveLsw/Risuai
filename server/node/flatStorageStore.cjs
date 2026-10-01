@@ -28,12 +28,15 @@ class FlatStorageStore {
         this.minFreeBytes = minFreeBytes;
         this.statfs = statfs;
         this.tail = Promise.resolve();
+        this.usageBytes = null;
+        this.usageEpoch = 0;
     }
 
     async open() {
         await fsp.mkdir(this.rootDir, { recursive: true, mode: 0o700 });
         await fsp.rm(this.tempDir, { recursive: true, force: true });
         await fsp.mkdir(this.tempDir, { recursive: true, mode: 0o700 });
+        await this.usage({ refresh: true });
     }
 
     runExclusive(operation) {
@@ -48,7 +51,12 @@ class FlatStorageStore {
         }
     }
 
-    async usage() {
+    invalidateUsage() {
+        this.usageEpoch += 1;
+        this.usageBytes = null;
+    }
+
+    async scanUsageFromDisk() {
         const entries = await fsp.readdir(this.rootDir, { withFileTypes: true });
         let bytes = 0;
         for (const entry of entries) {
@@ -59,6 +67,23 @@ class FlatStorageStore {
             bytes += stat.size;
         }
         return bytes;
+    }
+
+    async usage({ refresh = false } = {}) {
+        if (!refresh && this.usageBytes !== null) {
+            return this.usageBytes;
+        }
+        // An external database/auth write can invalidate the snapshot while a
+        // scan is in flight. Retry until the scan belongs to one stable epoch
+        // so a later flat write never publishes an already-stale total.
+        while (true) {
+            const epoch = this.usageEpoch;
+            const bytes = await this.scanUsageFromDisk();
+            if (epoch === this.usageEpoch) {
+                this.usageBytes = bytes;
+                return bytes;
+            }
+        }
     }
 
     async write(name, input) {
@@ -81,6 +106,7 @@ class FlatStorageStore {
             }
 
             const currentBytes = await this.usage();
+            const usageEpoch = this.usageEpoch;
             const nextBytes = currentBytes - previousBytes + data.byteLength;
             if (nextBytes > this.maxBytes) {
                 throw new FlatStorageQuotaError('Server asset storage quota would be exceeded', {
@@ -119,6 +145,9 @@ class FlatStorageStore {
                 finally {
                     await directory.close();
                 }
+                if (usageEpoch === this.usageEpoch) {
+                    this.usageBytes = nextBytes;
+                }
             }
             finally {
                 await handle?.close().catch(() => {});
@@ -133,7 +162,20 @@ class FlatStorageStore {
             this.assertName(name);
         }
         return await this.runExclusive(async () => {
+            const currentBytes = await this.usage();
+            const usageEpoch = this.usageEpoch;
+            let removedBytes = 0;
+            for (const name of names) {
+                const entry = await fsp.lstat(path.join(this.rootDir, name));
+                if (!entry.isFile()) {
+                    throw new Error('Flat storage target is not a regular file');
+                }
+                removedBytes += entry.size;
+            }
             await Promise.all(names.map((name) => fsp.rm(path.join(this.rootDir, name))));
+            if (usageEpoch === this.usageEpoch) {
+                this.usageBytes = Math.max(0, currentBytes - removedBytes);
+            }
         });
     }
 }
