@@ -540,3 +540,22 @@ describe('NodeDatabaseRuntime', () => {
         expect(fixture.runtime.isDirty).toBe(true)
     })
 })
+
+
+it('canonicalizes detached changed characters without mutating borrowed UI state', () => {
+    const fixture = makeRuntime({ initial: {
+        characters: [
+            { chaId: 'a', chatPage: 0, chats: [{ id: 'a-0' }, { id: 'a-1' }] },
+            { chaId: 'b', chatPage: 0, chats: [{ id: 'b-0' }, { id: 'b-1' }] },
+        ],
+    } })
+    fixture.current.characters![0].chatPage = 1
+    fixture.current.characters![1].chatPage = 1
+    const borrowed = fixture.current.characters![1]
+    const captured = { characters: [structuredClone(fixture.current.characters![0]), borrowed] }
+    const canonical = fixture.runtime.makeCanonicalSnapshot(captured, new Set(['a']))
+    expect(canonical.characters[0].chatPage).toBe(0)
+    expect(canonical.characters[1]).toBe(borrowed)
+    expect(borrowed.chatPage).toBe(1)
+    expect(fixture.current.characters![0].chatPage).toBe(1)
+})

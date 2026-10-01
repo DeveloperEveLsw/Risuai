@@ -18,6 +18,9 @@ export function buildRuntimeChatDisplayEntries(
     presentationOverlays: readonly RuntimeChatPresentationOverlay[],
     assistantOutputs: readonly RuntimeAssistantOutputPresentation[],
 ): RuntimeChatDisplayEntry[] {
+    const canonicalUserIds = new Set(messages
+        .filter(message => message.role === 'user' && message.chatId)
+        .map(message => message.chatId))
     const entries: RuntimeChatDisplayEntry[] = [
         ...messages.map((message, canonicalIndex) => ({
             message,
@@ -26,6 +29,9 @@ export function buildRuntimeChatDisplayEntries(
             assistantOutput: null,
         })),
         ...[...presentationOverlays]
+            // The canonical input and its pending overlay can coexist for one
+            // reactive turn while a revision is adopted. Present it once.
+            .filter(overlay => !canonicalUserIds.has(overlay.canonicalMessageId ?? overlay.requestId))
             .sort((left, right) => (
                 left.createdAt - right.createdAt
                 || left.requestId.localeCompare(right.requestId)
@@ -44,12 +50,12 @@ export function buildRuntimeChatDisplayEntries(
 
     for (const output of [...assistantOutputs].sort((left, right) => (
         left.messageIndex - right.messageIndex
+        || left.timestamp - right.timestamp
         || left.createdAt - right.createdAt
         || left.commandId.localeCompare(right.commandId)
     ))) {
         const canonicalEntryIndex = entries.findIndex((entry) => (
             entry.overlay === null
-            && entry.assistantOutput === null
             && entry.message.chatId === output.messageId
         ))
         const canonicalMessage = canonicalEntryIndex >= 0
@@ -84,4 +90,14 @@ export function buildRuntimeChatDisplayEntries(
         }
     }
     return entries
+}
+
+/** A message owns its DOM across edits and the runtime-to-canonical handoff.
+ * Room scope prevents reused/imported IDs from carrying state across chats.
+ */
+export function runtimeChatDisplayKey(roomKey: string, entry: RuntimeChatDisplayEntry): string {
+    const id = entry.message.chatId ?? entry.overlay?.canonicalMessageId ?? entry.overlay?.requestId;
+    return id
+        ? JSON.stringify([roomKey, 'message', id])
+        : JSON.stringify([roomKey, 'index', entry.canonicalIndex]);
 }

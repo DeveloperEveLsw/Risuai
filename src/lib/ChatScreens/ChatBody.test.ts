@@ -272,7 +272,8 @@ beforeEach(() => {
         touchedKeys: [],
         scope: null,
     })
-    mocks.canonical.mockClear()
+    mocks.canonical.mockReset()
+    mocks.canonical.mockImplementation(async (data: string) => `<p>canonical:${data}</p>`)
     mocks.prepare.mockReset()
     mocks.prepare.mockImplementation(async (data: string) => ({
         data: `prepared:${data}`,
@@ -280,7 +281,8 @@ beforeEach(() => {
     }))
     mocks.finalize.mockClear()
     mocks.postTranslation.mockClear()
-    mocks.readOnly.mockClear()
+    mocks.readOnly.mockReset()
+    mocks.readOnly.mockImplementation(async (data: string) => `<p>readonly:${data}</p>`)
     mocks.trimCanonical.mockClear()
     mocks.trimReadOnly.mockClear()
     mocks.getLLMCache.mockReset()
@@ -319,14 +321,14 @@ describe('ChatBody runtime presentation isolation', () => {
         expect(mocks.canonical).not.toHaveBeenCalled()
         expect(mocks.trimCanonical).not.toHaveBeenCalled()
         expect(mocks.trimReadOnly).toHaveBeenCalled()
-        expect(targets.map((target) => target.textContent?.trim())).toEqual([
+        await vi.waitFor(() => expect(targets.map((target) => target.textContent?.trim())).toEqual([
             'readonly:desktop:one',
             'readonly:desktop:two',
             'readonly:desktop:three',
             'readonly:phone:one',
             'readonly:phone:two',
             'readonly:phone:three',
-        ])
+        ]))
         expect(mocks.db).toEqual(databaseBefore)
     })
 
@@ -953,5 +955,75 @@ describe('ChatBody runtime presentation isolation', () => {
                 translatorNote: '',
             },
         })
+    })
+})
+
+
+describe('ChatBody presentation continuity', () => {
+    it('keeps radio state, focus and image nodes through pending refresh and identical output', async () => {
+        const html = '<input type="radio" name="choice"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">'
+        mocks.canonical.mockResolvedValue(html)
+        const { target, component } = await renderForceHarness('initial')
+        component.setPresentation('initial', { revision: 'ready' })
+        await vi.waitFor(() => expect(target.querySelector('input')).not.toBeNull())
+        const radio = target.querySelector('input')!
+        const image = target.querySelector('img')!
+        radio.checked = true
+        radio.focus()
+        let finish!: (html: string) => void
+        mocks.canonical.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+        component.setPresentation('refresh', { revision: 'refresh' })
+        await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+        expect(target.querySelector('input')).toBe(radio)
+        expect(target.querySelector('img')).toBe(image)
+        expect(document.activeElement).toBe(radio)
+        finish(html)
+        await tick()
+        await tick()
+        expect(target.querySelector('input')).toBe(radio)
+        expect(target.querySelector('img')).toBe(image)
+        expect(radio.checked).toBe(true)
+        expect(document.activeElement).toBe(radio)
+    })
+
+    it('retains follower HTML during canonical handoff and rejects a superseded completion', async () => {
+        const html = '<p>ready</p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">'
+        mocks.readOnly.mockResolvedValue(html)
+        const { target, component } = await renderForceHarness('initial')
+        component.setPresentation('partial', { readOnly: true })
+        await vi.waitFor(() => expect(target.querySelector('img')).not.toBeNull())
+        const image = target.querySelector('img')!
+        let stale!: (html: string) => void
+        let finish!: (html: string) => void
+        mocks.canonical.mockImplementationOnce(() => new Promise(resolve => { stale = resolve }))
+        component.setPresentation('canonical pending')
+        await vi.waitFor(() => expect(stale).toBeTypeOf('function'))
+        expect(target.querySelector('img')).toBe(image)
+        mocks.canonical.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+        component.setPresentation('new canonical')
+        await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+        finish(html)
+        await tick()
+        await tick()
+        stale('<p>stale output</p>')
+        await tick()
+        await tick()
+        expect(target.textContent).toBe('ready')
+        expect(target.querySelector('img')).toBe(image)
+    })
+
+    it('escapes raw streaming text and keeps it visible until canonical formatting completes', async () => {
+        const { target, component } = await renderForceHarness('initial')
+        component.setPresentation('<img src=x onerror=evil()> & text', { raw: true, readOnly: true })
+        await tick()
+        expect(target.textContent).toBe('<img src=x onerror=evil()> & text')
+        expect(target.querySelector('img')).toBeNull()
+        let finish!: (html: string) => void
+        mocks.canonical.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+        component.setPresentation('final')
+        await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+        expect(target.textContent).toBe('<img src=x onerror=evil()> & text')
+        finish('<p>final</p>')
+        await vi.waitFor(() => expect(target.textContent).toBe('final'))
     })
 })

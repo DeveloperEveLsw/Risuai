@@ -287,7 +287,7 @@ async function createIsolatedFixture(providerPort) {
     await fs.writeFile(path.join(savePath, '__password'), PASSWORD_HASH, { mode: 0o600 });
     await fs.writeFile(
         path.join(savePath, DATABASE_FILE_NAME),
-        harness.encodeLegacySave(createSeedDatabase(providerPort)),
+        harness.encodeFixtureSave(createSeedDatabase(providerPort)),
     );
     await fs.symlink(path.join(REPOSITORY_ROOT, 'dist'), path.join(temporaryRoot, 'dist'), 'dir');
     harness.setTemporaryRoot(temporaryRoot);

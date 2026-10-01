@@ -30,7 +30,8 @@ const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const { once } = require('node:events');
-const { Packr, Unpackr } = require('msgpackr');
+const { Unpackr } = require('msgpackr');
+const { encodeFixtureSave } = require('../runtimeGenerations/fixtureSave.cjs');
 const WebSocket = require('ws');
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -190,10 +191,7 @@ function createV3Plugin() {
     };
 }
 
-function encodeLegacySave(database) {
-    const packr = new Packr({ useRecords: false });
-    return Buffer.concat([LEGACY_SAVE_HEADER, Buffer.from(packr.encode(database))]);
-}
+
 
 function decodeCanonicalDatabase(data) {
     if (data.subarray(0, LEGACY_SAVE_HEADER.length).equals(LEGACY_SAVE_HEADER)) {
@@ -260,7 +258,7 @@ async function createIsolatedRoot(label, database) {
     await fs.writeFile(path.join(savePath, '__password'), PASSWORD_HASH, { mode: 0o600 });
     await fs.writeFile(
         path.join(savePath, DATABASE_FILE_NAME),
-        encodeLegacySave(database),
+        encodeFixtureSave(database),
     );
     await fs.symlink(path.join(REPOSITORY_ROOT, 'dist'), path.join(temporaryRoot, 'dist'), 'dir');
     return { temporaryRoot, savePath };
@@ -354,7 +352,7 @@ async function replaceCanonicalPlugins(baseUrl, plugins) {
     database.plugins = plugins;
     const response = await fetch(`${baseUrl}/api/sync/database`, {
         method: 'PUT',
-        body: encodeLegacySave(database),
+        body: encodeFixtureSave(database),
         headers: {
             'content-type': 'application/octet-stream',
             'risu-auth': PASSWORD_HASH,

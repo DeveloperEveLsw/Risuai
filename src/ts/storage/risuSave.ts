@@ -202,6 +202,10 @@ export class RisuSaveEncoder {
         })
     }
 
+    hasCharacterBlock(id: string): boolean {
+        return Object.prototype.hasOwnProperty.call(this.blocks, id)
+    }
+
     async set(data:Database, toSave:toSaveType){
         let obj:Record<any,any> = {}
         let keys = Object.keys(data)

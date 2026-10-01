@@ -48,6 +48,7 @@
         renderRawStreaming?: boolean
         rawStreamingText?: string
         readOnlyPresentation?: boolean
+        displayRevision?: string
     }
 
     let {
@@ -68,9 +69,11 @@
         renderRawStreaming = false,
         rawStreamingText = '',
         readOnlyPresentation = false,
+        displayRevision = '',
     }: Props =  $props()
 
     let lastParsed = $state('')
+    let retainedRawStreamingText = $state<string | null>(null)
     let activeIdentityKey = ''
     let activeCacheMutationRevision = 0
     let lastAutoDecisionIdentityKey = ''
@@ -1006,6 +1009,8 @@
     }
 
     let markParsingResult = $derived.by(() => {
+        void displayRevision
+        void readOnlyPresentation
         const snapshot = createTranslationRunSnapshot(
             msgDisplay,
             character,
@@ -1033,25 +1038,31 @@
         : trimMarkdown)
 
     $effect(() => {
-        if(shouldRenderRawStreaming){
+        if (shouldRenderRawStreaming) {
+            retainedRawStreamingText = rawStreamingText
             return
         }
         const presentation = markParsingResult
-        checkImg()
+        let active = true
         presentation.then((value) => {
-            if (markParsingResult !== presentation) return
+            if (!active || markParsingResult !== presentation) return
             lastParsed = value
+            retainedRawStreamingText = null
             checkImg()
+        }).catch((error) => {
+            if (active && !isAbortError(error)) console.error('[Chat display]', error)
         })
+        return () => { active = false }
     })
+
+    function escapeStreamingText(value: string): string {
+        return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+    // One HTML boundary retains nodes when the prepared output is unchanged.
+    // Keep raw streaming text visible until canonical formatting is ready.
+    let renderedHtml = $derived(retainedRawStreamingText !== null
+        ? `<span class="whitespace-pre-wrap">${escapeStreamingText(retainedRawStreamingText)}</span>`
+        : addMetadataToElement(trimRenderedMarkdown(lastParsed), modelShortName))
 </script>
 
-{#if shouldRenderRawStreaming}
-    <span class="whitespace-pre-wrap">{rawStreamingText}</span>
-{:else}
-    {#await markParsingResult}
-        {@html addMetadataToElement(trimRenderedMarkdown(lastParsed), modelShortName)}
-    {:then md}
-        {@html addMetadataToElement(trimRenderedMarkdown(md), modelShortName)}
-    {/await}
-{/if}
+{@html renderedHtml}

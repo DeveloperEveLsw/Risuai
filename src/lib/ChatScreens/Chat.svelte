@@ -761,8 +761,8 @@
             style:font-size="{0.875 * (DBState.db.zoomsize / 100)}rem"
             style:line-height="{(DBState.db.lineHeight ?? 1.25) * (DBState.db.zoomsize / 100)}rem"
         >
-            {#key `${totalLengthPointer}|${chatReloadPointer}`}
                 <ChatBody
+                    displayRevision={`${totalLengthPointer}|${chatReloadPointer}`}
                     {character}
                     translationCharacter={canonicalTranslationCharacter}
                     {manualTranslationPresentation}
@@ -783,7 +783,6 @@
                     {renderRawStreaming}
                     {rawStreamingText}
                     {readOnlyPresentation} />
-            {/key}
             {#if !readOnlyPresentation && idx >= 0 && !editMode && !isOptimizedStreamingMessage && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
                 <PartialEditController
                     messageData={message}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Message } from '../storage/database.svelte'
 import type { RuntimeAssistantOutputPresentation } from './assistantOutputPresentation.svelte'
 import type { RuntimeChatPresentationOverlay } from './chatPresentationOverlay.svelte'
-import { buildRuntimeChatDisplayEntries } from './chatPresentationEntries'
+import { buildRuntimeChatDisplayEntries, runtimeChatDisplayKey } from './chatPresentationEntries'
 
 function assistant(
     overrides: Partial<RuntimeAssistantOutputPresentation> = {},
@@ -133,4 +133,37 @@ describe('runtime chat presentation entries', () => {
         ])
         expect(entries.slice(1).every((entry) => entry.canonicalIndex === -1)).toBe(true)
     })
+})
+
+
+it('retains message identity across streaming, canonical handoff, reroll and text edits', () => {
+    const output = buildRuntimeChatDisplayEntries([], [], [assistant()])[0]
+    const canonical = buildRuntimeChatDisplayEntries([
+        { role: 'char', data: 'final answer', chatId: 'assistant-1' },
+    ], [], [])[0]
+    const reroll = buildRuntimeChatDisplayEntries([], [], [assistant({ commandId: 'reroll-command', data: 'rerolled' })])[0]
+    expect(runtimeChatDisplayKey('room-1', output)).toBe(runtimeChatDisplayKey('room-1', canonical))
+    expect(runtimeChatDisplayKey('room-1', reroll)).toBe(runtimeChatDisplayKey('room-1', canonical))
+    expect(runtimeChatDisplayKey('room-2', canonical)).not.toBe(runtimeChatDisplayKey('room-1', canonical))
+})
+
+
+it('shows input once during canonical adoption and retains its pending DOM identity', () => {
+    const overlay = pendingInput()
+    const pending = buildRuntimeChatDisplayEntries([], [overlay], [])[0]
+    const adopted = buildRuntimeChatDisplayEntries([
+        { role: 'user', data: 'hello', chatId: overlay.requestId },
+    ], [overlay], [])
+    expect(adopted).toHaveLength(1)
+    expect(adopted[0].canonicalIndex).toBe(0)
+    expect(runtimeChatDisplayKey('room', pending)).toBe(runtimeChatDisplayKey('room', adopted[0]))
+})
+
+it('presents the newest output once when continue commands overlap at the same message ID', () => {
+    const entries = buildRuntimeChatDisplayEntries([], [], [
+        assistant({ commandId: 'new-command', data: 'new', timestamp: 50 }),
+        assistant({ commandId: 'old-command', data: 'old', timestamp: 20 }),
+    ])
+    expect(entries).toHaveLength(1)
+    expect(entries[0].message.data).toBe('new')
 })

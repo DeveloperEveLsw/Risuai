@@ -335,8 +335,11 @@ export class NodeDatabaseRuntime<TDatabase extends RuntimeDatabase> {
      * Replaces each device overlay with the canonical chat id before encoding,
      * so a later character change cannot leak local navigation into the blob.
      */
-    makeCanonicalSnapshot(database: TDatabase): TDatabase {
+    makeCanonicalSnapshot(database: TDatabase, characterIds?: ReadonlySet<string>): TDatabase {
         for (const character of database.characters ?? []) {
+            // Incremental saves borrow unchanged blocks. Never mutate their
+            // live navigation or presentation arrays while canonicalizing.
+            if (characterIds && !characterIds.has(character?.chaId ?? '')) continue
             for (const chat of character?.chats ?? []) {
                 if (!chat?.message?.some(isRuntimeOptimisticMessage)) {
                     continue

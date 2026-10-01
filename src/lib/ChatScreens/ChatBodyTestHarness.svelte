@@ -19,6 +19,23 @@
         idx = 0,
     }: Props = $props()
 
+    let displayRevision = $state('initial')
+    let readOnlyPresentation = $state(false)
+    let renderRawStreaming = $state(false)
+    let rawStreamingText = $state('')
+
+    export function setPresentation(
+        source: string,
+        options: { readOnly?: boolean; raw?: boolean; revision?: string } = {},
+    ): void {
+        msgDisplay = source
+        displayRevision = options.revision ?? source
+        readOnlyPresentation = options.readOnly ?? false
+        renderRawStreaming = options.raw ?? false
+        rawStreamingText = source
+        translated = false
+    }
+
     let translated = $state(true)
     let translating = $state(false)
     let retranslate = $state(false)
@@ -49,6 +66,10 @@
     {character}
     {translationCharacter}
     {idx}
+    {displayRevision}
+    {readOnlyPresentation}
+    {renderRawStreaming}
+    {rawStreamingText}
     role="char"
     bind:translated
     bind:translating

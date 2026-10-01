@@ -40,7 +40,9 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
     writeFile: vi.fn(),
 }))
 
-import { RisuSaveEncoder } from './risuSave'
+import { RisuSaveEncoder, RisuSaveDecoder, type toSaveType } from './risuSave'
+import { snapshotDatabaseForSave } from './databaseSaveSnapshot'
+import type { Database } from './database.svelte'
 
 function readBlockTypes(encoded: Uint8Array): number[] {
     const headerLength = new TextEncoder().encode('RISUSAVE\0').byteLength
@@ -91,4 +93,41 @@ describe('RisuSaveEncoder in Node authoritative mode', () => {
         expect(mocks.remoteSetItem).not.toHaveBeenCalled()
         expect(mocks.cacheSetItem).not.toHaveBeenCalled()
     })
+})
+
+
+it('persists incremental settings and chat edits without dropping or re-reading untouched histories', async () => {
+    const db = {
+        characters: ['one', 'two'].map(chaId => ({
+            chaId, type: 'character', name: chaId, chatPage: 0,
+            chats: [{ id: chaId, message: [{ role: 'char', data: 'original' }] }],
+        })),
+        botPresets: [], modules: [], loadouts: [], plugins: [], pluginCustomStorage: {},
+        globalChatVariables: { toggle: 'off' },
+    } as unknown as Database
+    const encoder = new RisuSaveEncoder()
+    await encoder.init(db)
+    Object.defineProperty(db.characters[1].chats[0].message[0], 'data', {
+        get() { throw new Error('unchanged history must come from the encoded block') },
+    })
+    const flags = (): toSaveType => ({ character: [], botPreset: false, modules: false,
+        loadouts: false, plugins: false, pluginCustomStorage: false })
+    db.globalChatVariables.toggle = 'on'
+    let pending = flags()
+    let captured = snapshotDatabaseForSave(db, pending, structuredClone, id => encoder.hasCharacterBlock(id))
+    await encoder.set(captured.database, pending)
+    let decoded = await new RisuSaveDecoder().decode(new Uint8Array(encoder.encode()!))
+    expect(decoded.globalChatVariables.toggle).toBe('on')
+    expect(decoded.characters.map(c => c.chats[0].message[0].data)).toEqual(['original', 'original'])
+
+    db.characters[0].chats[0].message[0].data = 'edited'
+    pending = flags()
+    pending.character = ['one']
+    captured = snapshotDatabaseForSave(db, pending, structuredClone, id => encoder.hasCharacterBlock(id))
+    db.characters[0].chats[0].message[0].data = 'changed after capture'
+    await encoder.set(captured.database, pending)
+    decoded = await new RisuSaveDecoder().decode(new Uint8Array(encoder.encode()!))
+    expect(decoded.characters.map(c => c.chats[0].message[0].data)).toEqual(['edited', 'original'])
+    expect(mocks.remoteSetItem).not.toHaveBeenCalled()
+    expect(mocks.cacheSetItem).not.toHaveBeenCalled()
 })

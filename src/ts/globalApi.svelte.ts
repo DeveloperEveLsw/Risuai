@@ -1,3 +1,4 @@
+import { snapshotDatabaseForSave } from './storage/databaseSaveSnapshot'
 import {
     writeFile,
     BaseDirectory,
@@ -481,14 +482,8 @@ export async function saveDb() {
 
     $effect.root(() => {
 
-        let selIdState = $state(0)
-
         const debounceTime = 500; // 500 milliseconds
         let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-
-        const unsubscribeSel = selectedCharID.subscribe((v) => {
-            selIdState = v
-        })
 
         function saveTimeoutExecute() {
             if (saveTimeout) {
@@ -560,10 +555,8 @@ export async function saveDb() {
                 return
             }
 
-            const char = DBState.db.characters[selIdState]
-            if (char && !changeTracker.character.includes(char.chaId)) {
-                changeTracker.character.unshift(char.chaId)
-            }
+            // Root settings and global toggles do not rewrite a character.
+            // CBS/Lua mutations are tracked separately at their real paths.
             saveTimeoutExecute()
         })
         // Persist pre-listener bootstrap migrations once from the canonical
@@ -574,7 +567,6 @@ export async function saveDb() {
         }
 
         return () => {
-            unsubscribeSel()
             unsubscribeDb()
         }
     })
@@ -635,8 +627,13 @@ export async function saveDb() {
         let nodeCanonicalCommitted = false
         let nodeDbData: Uint8Array | null = null
         try {
+            const captured = nodeDatabaseRuntime && !requiresFullEncoderReload.state
+                ? snapshotDatabaseForSave(getDatabase(), toSave, (value) => $state.snapshot(value) as typeof value,
+                    (id) => encoder.hasCharacterBlock(id))
+                : null
             const db = nodeDatabaseRuntime
-                ? nodeDatabaseRuntime.makeCanonicalSnapshot(getDatabase({ snapshot: true }))
+                ? nodeDatabaseRuntime.makeCanonicalSnapshot(
+                    captured?.database ?? getDatabase({ snapshot: true }), captured?.characterIds)
                 : getDatabase()
             const nodeCommitKind = nodeDatabaseRuntime ? getNodeDatabaseCommitKind(db) : null
             const nodeSaveEpoch = nodeDatabaseRuntime?.captureSaveEpoch()
