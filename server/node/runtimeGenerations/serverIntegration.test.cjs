@@ -239,6 +239,33 @@ async function claimNext(fixture, executorId, leaseDurationMs = 5_000) {
     });
 }
 
+test('an idle executor long poll wakes when a durable command is created', async () => {
+    const fixture = await startInProcessServerFixture();
+    const pendingClaim = requestJson(fixture, '/runtime-generations/executor/claim-next', {
+        body: { executorId: 'waiting-resident', leaseDurationMs: 5_000, waitMs: 1000 },
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const created = await createCommand(fixture, 'wake');
+    const claimed = await pendingClaim;
+    assert.equal(claimed.body.claimed, true);
+    assert.equal(claimed.body.command.commandId, created.body.commandId);
+    assert.equal(claimed.body.lease.executorId, 'waiting-resident');
+});
+
+test('executor long polls are bounded and validate their wait interval', async () => {
+    const fixture = await startInProcessServerFixture();
+    for (const waitMs of [-1, 1001, 0.5]) {
+        const invalid = await requestJson(fixture, '/runtime-generations/executor/claim-next', {
+            body: {executorId: 'resident', leaseDurationMs: 5_000, waitMs},
+        });
+        assert.equal(invalid.response.status, 400);
+    }
+    const empty = await requestJson(fixture, '/runtime-generations/executor/claim-next', {
+        body: {executorId: 'resident', leaseDurationMs: 5_000, waitMs: 20},
+    });
+    assert.deepEqual(empty.body, {claimed: false});
+});
+
 function generationOutputMessage(version, overrides = {}) {
     return {
         messageId: 'assistant-message-1',

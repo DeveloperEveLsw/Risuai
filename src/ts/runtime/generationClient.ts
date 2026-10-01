@@ -705,10 +705,15 @@ export class RuntimeGenerationClient {
         }
     }
 
-    async claimNext(executorId: string, leaseDurationMs: number) {
+    async claimNext(executorId: string, leaseDurationMs: number, options?: {
+        waitMs: number
+        signal?: AbortSignal
+    }) {
         const body = await this.request('/runtime-generations/executor/claim-next', {
             method: 'POST',
-            body: JSON.stringify({ executorId, leaseDurationMs }),
+            body: JSON.stringify({ executorId, leaseDurationMs,
+                ...(options ? { waitMs: options.waitMs } : {}) }),
+            ...(options?.signal ? { signal: options.signal } : {}),
         })
         if (!isRecord(body) || typeof body.claimed !== 'boolean') {
             throw new Error('Malformed executor claim response')

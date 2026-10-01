@@ -492,6 +492,27 @@ describe('public low-level sendChat delegation', () => {
         expect(waitForPersistence).toHaveBeenCalledWith(60_000, 52)
     })
 
+    it('reserves an HTML callback before persistence and releases admission after a save failure', async () => {
+        let rejectPersistence!: (error: Error) => void
+        const waitForPersistence = vi.fn(() => new Promise<never>((_resolve, reject) => {
+            rejectPersistence = reject
+        }))
+        installRuntimeGenerationDelegation(waitForPersistence)
+        const input = { action: 'manual-trigger' as const, characterId: 'character-1',
+            chatId: 'chat-1', manualName: 'choose' }
+        const first = delegateRuntimeChatInteraction(input)
+        const rejection = expect(first).rejects.toThrow('save failed')
+        await expect(delegateRuntimeChatInteraction(input)).rejects.toThrow('already in progress')
+        await expect(queueRuntimeGeneration({action: 'generate', characterId: 'character-1', chatId: 'chat-1'}))
+            .rejects.toThrow('already in progress')
+        expect(mocks.create).not.toHaveBeenCalled()
+        rejectPersistence(new Error('save failed'))
+        await rejection
+        mocks.create.mockResolvedValue(command('queued'))
+        await expect(queueRuntimeGeneration({action: 'generate', characterId: 'character-1', chatId: 'chat-1'}))
+            .resolves.toMatchObject({state: 'queued'})
+    })
+
     it('queues a Lua chat button with its opaque community payload', async () => {
         const waitForPersistence = vi.fn()
             .mockResolvedValueOnce({ revision: 61 })

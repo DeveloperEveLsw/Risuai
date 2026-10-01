@@ -22,7 +22,7 @@
     import { get, type Unsubscriber } from "svelte/store"
     import { v4 as uuidv4, v4 } from 'uuid'
     import { language } from "../../lang"
-    import { alertClear, alertConfirm, alertInput, alertNormal, alertRequestData, alertWait } from "../../ts/alert"
+    import { alertClear, alertConfirm, alertError, alertInput, alertNormal, alertRequestData, alertWait } from "../../ts/alert"
     import { ParseMarkdown, type CbsConditions, type simpleCharacterArgument } from "../../ts/parser/parser.svelte"
     import { getCurrentCharacter, getCurrentChat, setCurrentChat, type MessageGenerationInfo, type StreamingDisplayOptimizationMode } from "../../ts/storage/database.svelte"
     import { selectedCharID } from "../../ts/stores.svelte"
@@ -41,6 +41,7 @@
     import { isAbortError, type TranslationContext, type TranslationSourceFormat } from '../../ts/translator/translationPlan'
     import { shouldShowChatTtsControl } from './chatTtsControl'
     import { delegateChatMarkupInteraction, resolveChatMarkupInteraction } from './chatMarkupInteraction'
+    import { beginChatMarkupPending } from './chatMarkupPending'
     import {
         createChatTranslationIdentityKey,
         createChatTranslationScopeKey,
@@ -519,13 +520,13 @@
     }
 
     async function handleButtonTriggerWithin(event: UIEvent) {
-        if(readOnlyPresentation){
+        if (readOnlyPresentation) {
             event.preventDefault()
             event.stopPropagation()
             return
         }
         const currentChar = getCurrentCharacter()
-        if(!currentChar){
+        if (!currentChar) {
             return
         }
 
@@ -538,11 +539,15 @@
         if (!interaction) {
             return
         }
-        const admission = admitRuntimeChatInteraction({
-            delegated: shouldDelegateGeneration(),
-            generationActive: get(doingChat) || get(localGenerationExecutionActive),
-            runtimeGenerationActive: get(runtimeGenerationActive),
-        }, () => true)
+        const admission = admitRuntimeChatInteraction(
+            {
+                delegated: shouldDelegateGeneration(),
+                generationActive:
+                    get(doingChat) || get(localGenerationExecutionActive),
+                runtimeGenerationActive: get(runtimeGenerationActive),
+            },
+            () => true,
+        )
         if (!('result' in admission)) {
             // The resident command is bound to one canonical revision. A
             // second manual/Lua mutation would be queued against a stale base.
@@ -553,48 +558,64 @@
 
         let triggerResult = null
         let handledByResident = false
-        if (shouldDelegateGeneration()) {
-            if (interaction.action === 'manual-trigger') {
-                // Preserve {{trigger_id}} rendering in the direct viewer while
-                // the actual trigger and its parser run in the resident.
-                CurrentTriggerIdStore.set(interaction.triggerId || null)
-            }
-            const chat = getCurrentChat()
-            handledByResident = await delegateChatMarkupInteraction(interaction, {
-                characterId: currentChar.chaId,
-                chatId: chat.id,
-            }, delegateRuntimeChatInteraction)
+        const finishPending = beginChatMarkupPending(origin)
+        if (!finishPending) {
+            event.preventDefault()
+            event.stopPropagation()
+            return
         }
-        else {
-            if (interaction.action === 'manual-trigger') {
-                if (currentChar.type !== 'character') {
-                    return
+        try {
+            if (shouldDelegateGeneration()) {
+                if (interaction.action === 'manual-trigger') {
+                    // Preserve {{trigger_id}} rendering in the direct viewer while
+                    // the actual trigger and its parser run in the resident.
+                    CurrentTriggerIdStore.set(interaction.triggerId || null)
                 }
-                triggerResult = await runTrigger(currentChar, 'manual', {
-                    chat: getCurrentChat(),
-                    manualName: interaction.manualName,
-                    triggerId: interaction.triggerId,
+                const chat = getCurrentChat()
+                handledByResident = await delegateChatMarkupInteraction(
+                    interaction,
+                    {
+                        characterId: currentChar.chaId,
+                        chatId: chat.id,
+                    },
+                    delegateRuntimeChatInteraction,
+                )
+            } else {
+                if (interaction.action === 'manual-trigger') {
+                    if (currentChar.type !== 'character') {
+                        return
+                    }
+                    triggerResult = await runTrigger(currentChar, 'manual', {
+                        chat: getCurrentChat(),
+                        manualName: interaction.manualName,
+                        triggerId: interaction.triggerId,
+                    })
+                } else {
+                    triggerResult = await runLuaButtonTrigger(
+                        currentChar,
+                        interaction.data,
+                    )
+                }
+            }
+
+            if (triggerResult) {
+                setCurrentChat(triggerResult.chat)
+            }
+            if (triggerResult || handledByResident) {
+                ReloadChatPointer.update((v) => {
+                    v[idx] = (v[idx] ?? 0) + 1
+                    return v
                 })
             }
-            else {
-                triggerResult = await runLuaButtonTrigger(currentChar, interaction.data)
+        } catch (error) {
+            alertError(error)
+        } finally {
+            finishPending()
+            if (interaction.action === 'manual-trigger' && interaction.triggerId) {
+                setTimeout(() => {
+                    CurrentTriggerIdStore.set(null)
+                }, 100) // Small delay to allow display mode to complete
             }
-        }
-
-        if(triggerResult) {
-            setCurrentChat(triggerResult.chat)
-        }
-        if(triggerResult || handledByResident) {
-            ReloadChatPointer.update((v) => {
-                v[idx] = (v[idx] ?? 0) + 1
-                return v
-            })
-        }
-
-        if(interaction.action === 'manual-trigger' && interaction.triggerId) {
-            setTimeout(() => {
-                CurrentTriggerIdStore.set(null)
-            }, 100) // Small delay to allow display mode to complete
         }
     }
 
@@ -1074,6 +1095,14 @@
         {/if}
     </button>    
 {/if}
+
+<style>
+    :global([data-risu-interaction-pending]) {
+        outline: 2px solid var(--risu-theme-textcolor2);
+        outline-offset: 2px;
+        cursor: progress;
+    }
+</style>
 {#if idx > -1}
     {#if shouldShowChatTtsControl(DBState.db.characters[selIdState.selId])}
         <button class="flex items-center hover:text-blue-500 transition-colors button-icon-tts" onclick={()=>{

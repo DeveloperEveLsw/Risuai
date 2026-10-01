@@ -999,8 +999,13 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
             }
         }
         while (!rootAbort.signal.aborted) {
+            const claimStartedAt = Date.now()
             try {
-                const claimed = await client.claimNext(executorId, leaseDurationMs)
+                const claimed = options.pollIntervalMs === undefined
+                    ? await client.claimNext(executorId, leaseDurationMs, {
+                        waitMs: 1_000, signal: rootAbort.signal,
+                    })
+                    : await client.claimNext(executorId, leaseDurationMs)
                 if (claimed) {
                     await runClaimed(claimed.command, claimed.lease)
                     continue
@@ -1009,7 +1014,9 @@ export function startResidentGenerationExecutor(options: ResidentExecutorOptions
             catch (error) {
                 reportError(error)
             }
-            await delay(pollIntervalMs, rootAbort.signal)
+            // A long poll already spent the idle interval on the server. Old
+            // servers that ignore waitMs still retain bounded polling.
+            await delay(Math.max(0, pollIntervalMs - (Date.now() - claimStartedAt)), rootAbort.signal)
         }
     }
     void run()

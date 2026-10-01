@@ -16,8 +16,11 @@ and image nodes. Different HTML can still replace its inner nodes.
 
 In Node mode, incremental saves snapshot root settings and changed/new blocks.
 Unchanged histories reuse the encoder's stored bytes. Canonical filtering touches
-only detached characters. Full reloads, initial loading, whole-database network
-transfer and remote proxy adoption still process the full database. CAS,
+only detached characters. After adopting a modern self-contained Node snapshot,
+the encoder reuses its validated blocks rather than cloning and serializing all
+histories again. Legacy/split/remote formats still take the full reload path.
+Initial loading, whole-database network transfer and remote proxy adoption still
+process the full database. CAS,
 idempotency, dirty epochs and executor fencing are preserved.
 
 Validation on Node 24.19 and Chromium 154:
@@ -50,3 +53,34 @@ stores, preserve prompt and Lua side effects with a compatibility corpus, adapt
 DOM parsing and plugin APIs, then validate cross-device persistence and cancel
 contracts before replacing the resident runtime. Risuai-Next provides useful
 storage/parser boundaries but currently lacks a complete generation engine.
+
+## HTML control latency
+
+Manual `risu-trigger` and Lua `risu-btn` controls immediately mark their clicked
+DOM control pending with `aria-busy`. Cleanup restores community attributes on
+success, cancellation and failure. Selection remains the canonical script result.
+These actions retain admission fencing and a Stop control but show a cancel icon
+instead of the response-generation spinner. Admission is reserved before the
+follower persistence await so rapid clicks cannot submit duplicate callbacks.
+
+An explicit Node persistence barrier flushes the normal save debounce and wakes
+the save worker. It returns after the authoritative CAS, without waiting for
+best-effort backup housekeeping. The resident uses a bounded one-second long
+poll, waking immediately after durable command creation; old servers retain
+bounded polling. Network and lease error behavior is preserved.
+
+An isolated Chromium fixture with 12,000 archived messages on the active
+character (12.76 MB seed) measured four consecutive manual/Lua interactions.
+Mean click-to-visible-state time dropped from 3,409 ms to 1,291 ms (62%). Queue
+wait dropped from 467–981 ms to 10–13 ms. Both independent desktop/phone browser
+partitions adopted the canonical state, with no new interaction save conflicts.
+These are four fixture samples, not a production p95 or a promise for arbitrary
+card scripts. The hand-assembled fixture has one startup migration conflict in
+both versions before the interaction assertions begin.
+
+```sh
+RISU_BROWSER_E2E_CHROMIUM=/usr/bin/chromium RISU_BROWSER_E2E_SKIP_BUILD=1 RISU_INTERACTION_EXPECT_PENDING=1 node server/node/runtimeGenerations/interactionBrowserE2E.cjs
+```
+
+Do not run a fixture that rebuilds `dist` alongside tests serving that directory.
+Startup tests use `RISU_STARTUP_BROWSER_E2E_SKIP_BUILD=1`, a separate variable.

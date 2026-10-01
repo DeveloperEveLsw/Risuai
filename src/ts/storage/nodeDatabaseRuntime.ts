@@ -64,7 +64,7 @@ export interface NodeDatabaseRuntimeOptions<TDatabase extends RuntimeDatabase> {
     setDatabase: (database: TDatabase) => void
     getSelectedCharacterIndex: () => number
     setSelectedCharacterIndex: (index: number) => void
-    onRemoteApplied?: (database: TDatabase) => void
+    onRemoteApplied?: (database: TDatabase, snapshot: NodeDatabaseSnapshot) => void
     onError?: (error: Error) => void
     randomUUID?: () => string
     refreshRetryBaseMs?: number
@@ -125,7 +125,7 @@ export class NodeDatabaseRuntime<TDatabase extends RuntimeDatabase> {
     private readonly setDatabase: (database: TDatabase) => void
     private readonly getSelectedCharacterIndex: () => number
     private readonly setSelectedCharacterIndex: (index: number) => void
-    private readonly onRemoteApplied?: (database: TDatabase) => void
+    private readonly onRemoteApplied?: (database: TDatabase, snapshot: NodeDatabaseSnapshot) => void
     private readonly onError?: (error: Error) => void
     private readonly randomUUID: () => string
     private readonly refreshRetryBaseMs: number
@@ -520,7 +520,7 @@ export class NodeDatabaseRuntime<TDatabase extends RuntimeDatabase> {
                 : -1
             this.setSelectedCharacterIndex(restoredIndex)
             this.sync.adoptSnapshot(candidate)
-            this.onRemoteApplied?.(database)
+            this.onRemoteApplied?.(database, candidate)
         }
         finally {
             this.applyingRemote = false

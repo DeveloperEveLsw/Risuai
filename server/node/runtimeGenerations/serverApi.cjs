@@ -351,6 +351,7 @@ function createRuntimeGenerationServer(options) {
     // Admission is provisioned before the durable create. A concurrent claim
     // can therefore attach the channel by requestId without observing a gap.
     const pendingPresentationMailboxes = new Map();
+    const claimWaiters = new Set();
     let lastExecutorContactAt = 0;
 
     function getExecutorHealth() {
@@ -1058,8 +1059,35 @@ function createRuntimeGenerationServer(options) {
                     'leaseDurationMs',
                     undefined,
                 );
-                const runningBeforeClaim = (await store.list({ state: 'running' }))[0] ?? null;
-                const claimed = await store.claimNext({ executorId, leaseDurationMs });
+                const waitMs = req.body?.waitMs === undefined
+                    ? 0 : parseNonNegativeSafeInteger(req.body.waitMs, 'waitMs');
+                if (waitMs > 1000) throw new TypeError('waitMs must be at most 1000');
+                let runningBeforeClaim = (await store.list({ state: 'running' }))[0] ?? null;
+                // Subscribe before checking the queue so a create between the
+                // check and wait cannot be lost. No store lock is held waiting.
+                let wake;
+                const queued = new Promise(resolve => { wake = resolve; });
+                if (waitMs) claimWaiters.add(wake);
+                let claimed;
+                let timer;
+                const disconnect = () => wake();
+                try {
+                    claimed = await store.claimNext({ executorId, leaseDurationMs });
+                    if (!claimed && waitMs) {
+                        res.once('close', disconnect);
+                        timer = setTimeout(wake, waitMs);
+                        await queued;
+                        if (res.destroyed) return;
+                        await expireLeaseAndBroadcast();
+                        runningBeforeClaim = (await store.list({ state: 'running' }))[0] ?? null;
+                        claimed = await store.claimNext({ executorId, leaseDurationMs });
+                    }
+                }
+                finally {
+                    clearTimeout(timer);
+                    claimWaiters.delete(wake);
+                    res.removeListener('close', disconnect);
+                }
                 if (!claimed) {
                     res.send({ claimed: false });
                     return;
@@ -1145,6 +1173,7 @@ function createRuntimeGenerationServer(options) {
                     presentationToken,
                 );
                 const created = await store.create(request);
+                for (const wake of claimWaiters) wake();
                 const presentationChannel = presentationChannelForToken(
                     created.command,
                     presentationToken,

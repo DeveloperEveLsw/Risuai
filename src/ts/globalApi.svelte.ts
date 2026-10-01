@@ -1,4 +1,5 @@
 import { snapshotDatabaseForSave } from './storage/databaseSaveSnapshot'
+import { SaveWakeSignal } from './storage/saveWakeSignal'
 import {
     writeFile,
     BaseDirectory,
@@ -62,6 +63,8 @@ import { reconcileCharacterOrderInPlace } from "./characterOrder";
 export const forageStorage = new AutoStorage()
 
 let nodeDatabaseRuntime: NodeDatabaseRuntime<Database> | null = null
+let pendingNodeEncoderSnapshot: { data: Uint8Array; characterIds: string[] } | null = null
+let flushNodeDatabaseSave: (() => void) | null = null
 let nodePluginFingerprint = ''
 let nodePluginReloadPromise: Promise<void> = Promise.resolve()
 
@@ -100,7 +103,11 @@ export async function initializeNodeDatabaseRuntime() {
         setDatabase,
         getSelectedCharacterIndex: () => get(selectedCharID),
         setSelectedCharacterIndex: (index) => selectedCharID.set(index),
-        onRemoteApplied: (database) => {
+        onRemoteApplied: (database, snapshot) => {
+            pendingNodeEncoderSnapshot = {
+                data: snapshot.data,
+                characterIds: database.characters.map(character => character.chaId),
+            }
             requiresFullEncoderReload.state = true
             // getModules() intentionally caches by enabled IDs, which does not
             // change when a module's lore/regex/trigger body is edited on the
@@ -139,6 +146,9 @@ export async function waitForNodeDatabasePersistence(
     if (minimumRevision !== undefined) {
         nodeDatabaseRuntime.requestRevision(minimumRevision)
     }
+    // An explicit durability barrier should not wait for the ordinary typing
+    // debounce or the save worker's old 500 ms polling interval.
+    flushNodeDatabaseSave?.()
     const deadline = Date.now() + timeoutMs
     while (
         nodeDatabaseRuntime.isDirty
@@ -430,6 +440,11 @@ export let requiresFullEncoderReload = $state({
 })
 export async function saveDb() {
     let changed = false
+    const saveWake = new SaveWakeSignal()
+    const requestSave = () => {
+        changed = true
+        saveWake.notify()
+    }
     syncDrive()
     let gotChannel = false
     const sessionID = v4()
@@ -490,8 +505,16 @@ export async function saveDb() {
                 clearTimeout(saveTimeout);
             }
             saveTimeout = setTimeout(() => {
-                changed = true;
+                saveTimeout = null
+                requestSave()
             }, debounceTime);
+        }
+
+        flushNodeDatabaseSave = () => {
+            if (!nodeDatabaseRuntime?.isDirty || nodeDatabaseRuntime.isSaveInFlight || saving.state) return
+            if (saveTimeout) clearTimeout(saveTimeout)
+            saveTimeout = null
+            requestSave()
         }
 
         const unsubscribeDb = onDatabaseUpdate((info) => {
@@ -499,6 +522,7 @@ export async function saveDb() {
                 return
             }
             if (info.path.length === 0) {
+                pendingNodeEncoderSnapshot = null
                 requiresFullEncoderReload.state = true
                 savetrys = 0
                 saveTimeoutExecute()
@@ -580,7 +604,7 @@ export async function saveDb() {
         })
     } catch (error) {
         requiresFullEncoderReload.state = true
-        changed = true
+        requestSave()
         console.error(error)
     }
 
@@ -603,7 +627,8 @@ export async function saveDb() {
     await sleep(1000)
     while (true) {
         if (!changed) {
-            await sleep(500)
+            if (nodeDatabaseRuntime) await saveWake.wait()
+            else await sleep(500)
             continue
         }
 
@@ -627,6 +652,13 @@ export async function saveDb() {
         let nodeCanonicalCommitted = false
         let nodeDbData: Uint8Array | null = null
         try {
+            if (nodeDatabaseRuntime && pendingNodeEncoderSnapshot) {
+                const snapshot = pendingNodeEncoderSnapshot
+                pendingNodeEncoderSnapshot = null
+                if (encoder.initFromSnapshot(snapshot.data, snapshot.characterIds, forageStorage.isAccount)) {
+                    requiresFullEncoderReload.state = false
+                }
+            }
             const captured = nodeDatabaseRuntime && !requiresFullEncoderReload.state
                 ? snapshotDatabaseForSave(getDatabase(), toSave, (value) => $state.snapshot(value) as typeof value,
                     (id) => encoder.hasCharacterBlock(id))
@@ -704,6 +736,9 @@ export async function saveDb() {
                     nodeRetryPayload = null
                     nodeSaveAttempt = null
                     nodeCanonicalCommitted = true
+                    // The canonical CAS is durable. Backup housekeeping must
+                    // not hold up a button's completion/revision barrier.
+                    saving.state = false
                 }
                 if (!forageStorage.isAccount) {
                     await forageStorage.setItem(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData)
@@ -717,7 +752,7 @@ export async function saveDb() {
             }
             savetrys = 0
             await saveDbKei()
-            await sleep(500)
+            if (!nodeDatabaseRuntime) await sleep(500)
         } catch (error) {
             if (nodeCanonicalCommitted) {
                 // The authoritative CAS already succeeded. A best-effort
@@ -803,7 +838,7 @@ export async function saveDb() {
             else {
                 console.error(error)
                 await sleep(1000)
-                changed = true
+                requestSave()
             }
         }
 

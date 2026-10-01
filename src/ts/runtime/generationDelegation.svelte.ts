@@ -745,7 +745,20 @@ export async function delegateRuntimeChatInteraction(
         throw new Error('Runtime generation delegation has not been installed')
     }
 
-    const persisted = await waitForRuntimePersistence()
+    // Reserve before awaiting the follower save; rapid clicks must not queue
+    // multiple callbacks against the same revision during that await.
+    if (runtimeGenerationAdmissions > 0 || get(runtimeGenerationActive)
+        || get(localGenerationExecutionActive)) {
+        throw new Error('A server generation is already in progress')
+    }
+    runtimeGenerationAdmissions += 1
+    let persisted: { revision: number } | null
+    try {
+        persisted = await waitForRuntimePersistence()
+    }
+    finally {
+        runtimeGenerationAdmissions -= 1
+    }
     const payload: Record<string, unknown> = {
         databaseRevision: persisted?.revision ?? null,
     }

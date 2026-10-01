@@ -129,6 +129,57 @@ export class RisuSaveEncoder {
     private blocks: { [key: string]: Uint8Array } = {};
     private compression: boolean = false;
 
+    /** Reuse an already decoded canonical Node snapshot. Legacy, remote and
+     * split-chat layouts fall back to init(); never partially replace blocks. */
+    initFromSnapshot(
+        data: Uint8Array,
+        characterIds: readonly string[],
+        compression = false,
+    ): boolean {
+        if (!magicRisuSaveHeader.every((byte, index) => data[index] === byte))
+            return false
+        const expected = new Map<string, number>([
+            ['config', RisuSaveType.CONFIG],
+            ['root', RisuSaveType.ROOT],
+            ['preset', RisuSaveType.BOTPRESET],
+            ['modules', RisuSaveType.MODULES],
+            ['loadouts', RisuSaveType.LOADOUTS],
+            ['plugins', RisuSaveType.PLUGINS],
+            ['pluginStorage', RisuSaveType.PLUGIN_STORAGE],
+        ])
+        for (const id of characterIds) {
+            if (!id || expected.has(id)) return false
+            expected.set(id, RisuSaveType.CHARACTER_WITH_CHAT)
+        }
+        const blocks: Record<string, Uint8Array> = Object.create(null)
+        let offset = magicRisuSaveHeader.length
+        while (offset < data.length) {
+            const start = offset
+            if (offset + 7 > data.length || data[offset + 1] > 1) return false
+            const type = data[offset]
+            const nameLength = data[offset + 2]
+            const lengthOffset = offset + 3 + nameLength
+            if (lengthOffset + 4 > data.length) return false
+            const name = new TextDecoder().decode(
+                data.subarray(offset + 3, lengthOffset),
+            )
+            if (expected.get(name) !== type || Object.hasOwn(blocks, name))
+                return false
+            const length = new DataView(
+                data.buffer,
+                data.byteOffset + lengthOffset,
+                4,
+            ).getUint32(0, true)
+            offset = lengthOffset + 4 + length
+            if (offset > data.length) return false
+            blocks[name] = data.slice(start, offset)
+        }
+        if (Object.keys(blocks).length !== expected.size) return false
+        this.blocks = blocks
+        this.compression = compression
+        return true
+    }
+
     async init(data:Database,arg:{
         compression?: boolean,
         skipRemoteSavingOnCharacters?: boolean
@@ -490,7 +541,6 @@ export class RisuSaveDecoder {
                 continue
             }
         }
-        console.log('blocks',this.blocks)
         let directory: string[] = []
         for(let i = 0; i < this.blocks.length; i++){
             const key = i;

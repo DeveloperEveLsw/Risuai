@@ -121,6 +121,10 @@
     let currentChatRuntimeAutoActive = $derived(
         currentRuntimeGenerationActivity.activeCommand?.action === 'auto',
     )
+    let currentChatRuntimeInteractionActive = $derived(
+        currentRuntimeGenerationActivity.activeCommand?.action === 'manual-trigger'
+        || currentRuntimeGenerationActivity.activeCommand?.action === 'lua-button',
+    )
     let delegatedRuntimeAdmissionActive = $derived(
         currentRuntimeGenerationActivity.anyActive
         || $runtimeGenerationPendingIntents.length > 0,
@@ -1151,10 +1155,14 @@
                             class="peer-focus:border-textcolor  flex justify-center border-y border-darkborderc items-center text-textcolor p-3 hover:bg-blue-500 hover:text-white transition-colors" onclick={abortChat}
                             style:height={inputHeight}
                     >
+                        {#if currentChatRuntimeInteractionActive}
+                            <XIcon size="20" />
+                        {:else}
                         <div
                             class="loadmove chat-process-stage-{$chatProcessStage}"
                             class:autoload={shouldDelegateGeneration() ? currentChatRuntimeAutoActive : autoMode}
                         ></div>
+                        {/if}
                     </button>
                 {:else}
                     <button
