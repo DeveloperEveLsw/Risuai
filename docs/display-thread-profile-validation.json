@@ -1,0 +1,760 @@
+{
+  "sourceCommit": "8d17ebe017bb62bcad4f63e2c694458869f75e36",
+  "schemaVersion": 21,
+  "diagnosticOnly": true,
+  "actualWorkersVerified": 8,
+  "mainProfiles": 8,
+  "workerProfiles": 8,
+  "codeSpeedupClaim": false,
+  "localOnly": true,
+  "productionAccess": false,
+  "privateReads": false,
+  "realModelCalls": 0,
+  "overallWallTimeAttributionComplete": false,
+  "workerCpuThrottlingVerified": false,
+  "limits": [
+    "One profiled click per condition/target: excluded from prior192 warm observations",
+    "Sample weights include profiler/throttling scheduling overhead; not exact CPU or wall-time percentages",
+    "Inclusive categories overlap; unclassified/program/GC are preserved and not assigned to guessed phases",
+    "CDP reported Duration counters are seconds, recorded independently; not summed with sampled weights",
+    "Worker and main profile windows start/stop separately and extend beyond click settlement",
+    "Physical mobile, cold/concurrent/single-large-HTML/assets/general reads/extensions/import-export/trial remain"
+  ],
+  "frameLocationProof": "Exact optimized bundle SHA and TypeScript AST character ranges; full callFrame columns retained",
+  "bundleRanges": [
+    {
+      "name": "disclose-version-BlFj3szs.js",
+      "sha256": "00a95da770ae982de3e4e64de007776bf9eaa795a1d8e27408e9f314dce0f4e5",
+      "ranges": []
+    },
+    {
+      "name": "Button-BGuBvnLs.js",
+      "sha256": "3e45e384d1fb98e8c9581aa864edeff1d473dbcf5c81fd6421902d67e03518c2",
+      "ranges": []
+    },
+    {
+      "name": "index-Bu3XhoMn.js",
+      "sha256": "72ecca0ace477460593ad06d3d72e8e60e508436c27099277acbe9ab7f7fad81",
+      "ranges": []
+    },
+    {
+      "name": "database.svelte-KPtmeqtg.js",
+      "sha256": "25c4db67e6fe1304db6c8d4461f37128474e0b8e50353a415ca42c10fec7a57e",
+      "ranges": [
+        {
+          "label": "presentation-key",
+          "start": 1302229,
+          "end": 1303763,
+          "name": "aC"
+        },
+        {
+          "label": "wire-string-size",
+          "start": 1304008,
+          "end": 1304528,
+          "name": "stringBytes"
+        },
+        {
+          "label": "wire-value-size",
+          "start": 1304528,
+          "end": 1305537,
+          "name": "measure"
+        },
+        {
+          "label": "capture-encode",
+          "start": 1333449,
+          "end": 1334963,
+          "name": "encode"
+        },
+        {
+          "label": "fresh-snapshot-pin",
+          "start": 1335264,
+          "end": 1336401,
+          "name": "GC"
+        },
+        {
+          "label": "thought-tool-format",
+          "start": 2177487,
+          "end": 2177966,
+          "name": "SG"
+        },
+        {
+          "label": "markdown-pipeline",
+          "start": 2178231,
+          "end": 2179957,
+          "name": "wG"
+        }
+      ]
+    },
+    {
+      "name": "browserRuntimeController.svelte-Cp_ARiYO.js",
+      "sha256": "16f33bf8df03650bbfc83acf1dd5fced419cdbd1cfdc0f7e2797ace4f58a294c",
+      "ranges": []
+    },
+    {
+      "name": "display.worker-BY9vK9Az.js",
+      "sha256": "fb947f4d808c6f1247faf245a30f44d8a169d81dc15b4135fc48bb106295d218",
+      "ranges": [
+        {
+          "label": "wire-string-size",
+          "start": 207503,
+          "end": 208023,
+          "name": "stringBytes"
+        },
+        {
+          "label": "wire-value-size",
+          "start": 208023,
+          "end": 209032,
+          "name": "measure"
+        },
+        {
+          "label": "capture-decode",
+          "start": 209545,
+          "end": 211434,
+          "name": "decode"
+        }
+      ]
+    },
+    {
+      "name": "jobResults-BfbIZ8jX.js",
+      "sha256": "939b1027adb58f8ee054e15a12f0ad6c806665617d624c8b5358ec157b77281d",
+      "ranges": []
+    }
+  ],
+  "sourceManifest": {
+    "path": "evidence/local-display-thread-profiles-run-20261004.json",
+    "sha256": "9d6535bd96bf9cded939505cfbb4b86be2ef687e1ce0dcb5b1ab36c4205d8684"
+  },
+  "wholeGoalComplete": false,
+  "all15ConditionsRemainActive": true,
+  "verifiedAt": "2026-10-04T09:50:26.654Z",
+  "summary": {
+    "path": "evidence/local-display-thread-profile-summary-20261004.json",
+    "sha256": "3da636dfa955d30885ecdfeb9c59e70cc01c0a8d06d5ce716e2dbfc805c27c3b"
+  },
+  "observations": [
+    {
+      "condition": "large-idle",
+      "scenario": "desktop",
+      "mainReportedMetrics": {
+        "TaskDuration": 0.54955,
+        "ScriptDuration": 0.05213200000000001,
+        "LayoutDuration": 0.002628000000000019,
+        "RecalcStyleDuration": 0.0010379999999999834,
+        "LayoutCount": 8,
+        "RecalcStyleCount": 9
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:45531/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 823.903,
+          "samples": 613,
+          "selfSampleMs": {
+            "(program)": 224.077,
+            "unclassified": 141.811,
+            "wire-string-size": 52.296,
+            "presentation-key": 21.482,
+            "wire-value-size": 36.629,
+            "capture-encode": 13.187,
+            "(idle)": 284.844,
+            "fresh-snapshot-pin": 2.148,
+            "(garbage collector)": 26.728,
+            "markdown-pipeline": 15.147,
+            "thought-tool-format": 5.359
+          },
+          "inclusiveSampleMs": {
+            "(program)": 224.077,
+            "unclassified": 823.708,
+            "wire-string-size": 68.417,
+            "wire-value-size": 106.109,
+            "presentation-key": 70.898,
+            "markdown-pipeline": 115.043,
+            "capture-encode": 53.012,
+            "(idle)": 284.844,
+            "fresh-snapshot-pin": 2.148,
+            "(garbage collector)": 26.728,
+            "thought-tool-format": 5.359
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 859.039,
+          "samples": 761,
+          "selfSampleMs": {
+            "(idle)": 576.163,
+            "wire-string-size": 45.246,
+            "capture-decode": 63.093,
+            "unclassified": 28.418,
+            "WASM-sampled": 118.3,
+            "(garbage collector)": 10.137,
+            "wire-value-size": 17.099
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 576.163,
+            "unclassified": 858.456,
+            "wire-string-size": 45.246,
+            "wire-value-size": 62.345,
+            "capture-decode": 125.438,
+            "WASM-sampled": 127.07,
+            "(garbage collector)": 10.137
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "large-idle",
+      "scenario": "mobile-emulation-4x",
+      "mainReportedMetrics": {
+        "TaskDuration": 2.562396999999999,
+        "ScriptDuration": 0.3311299999999999,
+        "LayoutDuration": 0.018412000000000095,
+        "RecalcStyleDuration": 0.005427999999999988,
+        "LayoutCount": 15,
+        "RecalcStyleCount": 9
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:45531/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 2774.088,
+          "samples": 2027,
+          "selfSampleMs": {
+            "(program)": 958.401,
+            "unclassified": 759.814,
+            "presentation-key": 126.723,
+            "wire-string-size": 197.428,
+            "wire-value-size": 166.986,
+            "(idle)": 245.314,
+            "capture-encode": 48.356,
+            "markdown-pipeline": 75.504,
+            "thought-tool-format": 83.195,
+            "fresh-snapshot-pin": 13.213,
+            "(garbage collector)": 98.863
+          },
+          "inclusiveSampleMs": {
+            "(program)": 958.401,
+            "unclassified": 2773.797,
+            "presentation-key": 402.954,
+            "wire-string-size": 318.866,
+            "wire-value-size": 492.2,
+            "markdown-pipeline": 686.989,
+            "(idle)": 245.314,
+            "capture-encode": 219.935,
+            "thought-tool-format": 83.195,
+            "fresh-snapshot-pin": 16.547,
+            "(garbage collector)": 98.863
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 2833.64,
+          "samples": 2498,
+          "selfSampleMs": {
+            "(idle)": 2515.038,
+            "unclassified": 37.458,
+            "capture-decode": 88.727,
+            "WASM-sampled": 124.328,
+            "wire-string-size": 33.885,
+            "wire-value-size": 19.695,
+            "(garbage collector)": 11.106,
+            "(program)": 2.224
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 2515.038,
+            "unclassified": 2832.461,
+            "capture-decode": 142.307,
+            "WASM-sampled": 133.195,
+            "wire-string-size": 33.885,
+            "wire-value-size": 53.58,
+            "(garbage collector)": 11.106,
+            "(program)": 2.224
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "small-cpu",
+      "scenario": "desktop",
+      "mainReportedMetrics": {
+        "TaskDuration": 0.4301579999999998,
+        "ScriptDuration": 0.038435,
+        "LayoutDuration": 0.0020960000000000006,
+        "RecalcStyleDuration": 0.000846000000000003,
+        "LayoutCount": 8,
+        "RecalcStyleCount": 9
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:46545/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 1060.949,
+          "samples": 825,
+          "selfSampleMs": {
+            "(program)": 186.276,
+            "unclassified": 89.783,
+            "wire-value-size": 47.143,
+            "presentation-key": 27.377,
+            "wire-string-size": 42.554,
+            "(idle)": 634.696,
+            "fresh-snapshot-pin": 1.086,
+            "(garbage collector)": 15.442,
+            "capture-encode": 13.126,
+            "markdown-pipeline": 2.22
+          },
+          "inclusiveSampleMs": {
+            "(program)": 186.276,
+            "unclassified": 1059.703,
+            "wire-value-size": 111.544,
+            "presentation-key": 77.664,
+            "markdown-pipeline": 76.579,
+            "wire-string-size": 63.295,
+            "(idle)": 634.696,
+            "capture-encode": 65.72,
+            "fresh-snapshot-pin": 1.086,
+            "(garbage collector)": 15.442
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 1095.439,
+          "samples": 964,
+          "selfSampleMs": {
+            "(idle)": 448.702,
+            "capture-decode": 26.064,
+            "WASM-sampled": 543.579,
+            "wire-value-size": 18.478,
+            "wire-string-size": 26.012,
+            "(garbage collector)": 10.083,
+            "unclassified": 21.894
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 448.702,
+            "unclassified": 1094.812,
+            "capture-decode": 70.554,
+            "WASM-sampled": 554.663,
+            "wire-value-size": 44.49,
+            "wire-string-size": 26.012,
+            "(garbage collector)": 10.083
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "small-cpu",
+      "scenario": "mobile-emulation-4x",
+      "mainReportedMetrics": {
+        "TaskDuration": 1.8709469999999992,
+        "ScriptDuration": 0.206337,
+        "LayoutDuration": 0.012984999999999997,
+        "RecalcStyleDuration": 0.003946000000000005,
+        "LayoutCount": 13,
+        "RecalcStyleCount": 10
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:46545/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 2435.082,
+          "samples": 1701,
+          "selfSampleMs": {
+            "(program)": 779.036,
+            "unclassified": 459.451,
+            "presentation-key": 102.05,
+            "wire-string-size": 194.398,
+            "wire-value-size": 163.645,
+            "capture-encode": 58.77,
+            "(idle)": 610.39,
+            "(garbage collector)": 48.432,
+            "markdown-pipeline": 6.299,
+            "fresh-snapshot-pin": 8.612,
+            "thought-tool-format": 3.771
+          },
+          "inclusiveSampleMs": {
+            "(program)": 779.036,
+            "unclassified": 2434.854,
+            "presentation-key": 332.401,
+            "wire-string-size": 296.403,
+            "wire-value-size": 462.346,
+            "markdown-pipeline": 354.266,
+            "capture-encode": 225.231,
+            "(idle)": 610.39,
+            "(garbage collector)": 48.432,
+            "fresh-snapshot-pin": 8.612,
+            "thought-tool-format": 3.771
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 2502.056,
+          "samples": 2204,
+          "selfSampleMs": {
+            "(idle)": 1810.464,
+            "capture-decode": 21.878,
+            "WASM-sampled": 568.56,
+            "wire-value-size": 23.052,
+            "unclassified": 28.69,
+            "(garbage collector)": 10.043,
+            "wire-string-size": 33.929,
+            "(program)": 4.364
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 1810.464,
+            "unclassified": 2500.98,
+            "capture-decode": 78.859,
+            "WASM-sampled": 579.638,
+            "wire-value-size": 56.981,
+            "(garbage collector)": 10.043,
+            "wire-string-size": 33.929,
+            "(program)": 4.364
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "large-cpu",
+      "scenario": "desktop",
+      "mainReportedMetrics": {
+        "TaskDuration": 0.5925050000000001,
+        "ScriptDuration": 0.059529,
+        "LayoutDuration": 0.003128999999999993,
+        "RecalcStyleDuration": 0.0009260000000000101,
+        "LayoutCount": 9,
+        "RecalcStyleCount": 8
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:45505/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 1399.695,
+          "samples": 1118,
+          "selfSampleMs": {
+            "(program)": 230.51,
+            "unclassified": 149.14,
+            "wire-string-size": 43.212,
+            "presentation-key": 27.513,
+            "wire-value-size": 52.231,
+            "(idle)": 815.391,
+            "markdown-pipeline": 17.491,
+            "fresh-snapshot-pin": 2.206,
+            "(garbage collector)": 38.725,
+            "capture-encode": 16.538,
+            "thought-tool-format": 6.55
+          },
+          "inclusiveSampleMs": {
+            "(program)": 230.51,
+            "unclassified": 1399.507,
+            "wire-string-size": 65.265,
+            "wire-value-size": 119.69,
+            "presentation-key": 83.044,
+            "markdown-pipeline": 124.562,
+            "(idle)": 815.391,
+            "capture-encode": 68.782,
+            "fresh-snapshot-pin": 2.206,
+            "(garbage collector)": 38.725,
+            "thought-tool-format": 6.55
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 1443.831,
+          "samples": 1264,
+          "selfSampleMs": {
+            "(idle)": 564.1,
+            "wire-value-size": 21.254,
+            "wire-string-size": 36.317,
+            "capture-decode": 77.706,
+            "WASM-sampled": 694.329,
+            "(garbage collector)": 10.665,
+            "unclassified": 38.408
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 564.1,
+            "unclassified": 1442.779,
+            "wire-value-size": 57.571,
+            "capture-decode": 135.277,
+            "wire-string-size": 36.317,
+            "WASM-sampled": 708.693,
+            "(garbage collector)": 10.665
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "large-cpu",
+      "scenario": "mobile-emulation-4x",
+      "mainReportedMetrics": {
+        "TaskDuration": 2.377687,
+        "ScriptDuration": 0.24668899999999994,
+        "LayoutDuration": 0.02167600000000003,
+        "RecalcStyleDuration": 0.005789999999999962,
+        "LayoutCount": 15,
+        "RecalcStyleCount": 9
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:45505/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 3020.104,
+          "samples": 2294,
+          "selfSampleMs": {
+            "(program)": 912.516,
+            "unclassified": 691.432,
+            "presentation-key": 106.727,
+            "wire-value-size": 136.053,
+            "wire-string-size": 181.963,
+            "markdown-pipeline": 87.036,
+            "thought-tool-format": 63.708,
+            "capture-encode": 43.938,
+            "(idle)": 689.833,
+            "fresh-snapshot-pin": 12.613,
+            "(garbage collector)": 92.776
+          },
+          "inclusiveSampleMs": {
+            "(program)": 912.516,
+            "unclassified": 3018.595,
+            "presentation-key": 323.876,
+            "wire-value-size": 429.197,
+            "wire-string-size": 289.361,
+            "markdown-pipeline": 642.795,
+            "capture-encode": 205.995,
+            "thought-tool-format": 63.708,
+            "(idle)": 689.833,
+            "fresh-snapshot-pin": 12.751,
+            "(garbage collector)": 92.776
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 3075.144,
+          "samples": 2754,
+          "selfSampleMs": {
+            "(idle)": 2219.99,
+            "wire-string-size": 38.024,
+            "capture-decode": 80.357,
+            "WASM-sampled": 669.514,
+            "unclassified": 33.876,
+            "wire-value-size": 21.883,
+            "(garbage collector)": 9.911,
+            "(program)": 1.087
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 2219.99,
+            "unclassified": 3074.642,
+            "wire-string-size": 38.024,
+            "wire-value-size": 59.907,
+            "capture-decode": 140.264,
+            "WASM-sampled": 677.151,
+            "(garbage collector)": 9.911,
+            "(program)": 1.087
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "small-idle",
+      "scenario": "desktop",
+      "mainReportedMetrics": {
+        "TaskDuration": 0.3882579999999999,
+        "ScriptDuration": 0.037136,
+        "LayoutDuration": 0.0015430000000000027,
+        "RecalcStyleDuration": 0.0011049999999999983,
+        "LayoutCount": 5,
+        "RecalcStyleCount": 9
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:46135/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 525.468,
+          "samples": 363,
+          "selfSampleMs": {
+            "(program)": 160.46,
+            "fresh-snapshot-pin": 3.311,
+            "presentation-key": 22.121,
+            "wire-string-size": 42.767,
+            "unclassified": 99.92,
+            "capture-encode": 10.866,
+            "(idle)": 141.517,
+            "wire-value-size": 28.524,
+            "(garbage collector)": 15.631
+          },
+          "inclusiveSampleMs": {
+            "(program)": 160.46,
+            "unclassified": 525.117,
+            "fresh-snapshot-pin": 3.311,
+            "presentation-key": 64.226,
+            "wire-string-size": 63.715,
+            "wire-value-size": 94.424,
+            "markdown-pipeline": 74.196,
+            "capture-encode": 54.449,
+            "(idle)": 141.517,
+            "(garbage collector)": 15.631
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 560.059,
+          "samples": 481,
+          "selfSampleMs": {
+            "(idle)": 438.632,
+            "capture-decode": 19.537,
+            "wire-string-size": 31.752,
+            "(garbage collector)": 7.718,
+            "wire-value-size": 23.031,
+            "unclassified": 30.42,
+            "WASM-sampled": 8.712
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 438.632,
+            "unclassified": 559.802,
+            "capture-decode": 74.32,
+            "wire-string-size": 31.752,
+            "wire-value-size": 54.783,
+            "(garbage collector)": 7.718,
+            "WASM-sampled": 18.478
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    },
+    {
+      "condition": "small-idle",
+      "scenario": "mobile-emulation-4x",
+      "mainReportedMetrics": {
+        "TaskDuration": 1.6809730000000007,
+        "ScriptDuration": 0.17819200000000002,
+        "LayoutDuration": 0.011452000000000018,
+        "RecalcStyleDuration": 0.005335000000000006,
+        "LayoutCount": 12,
+        "RecalcStyleCount": 10
+      },
+      "workerIdentity": {
+        "name": "risu-display-lua",
+        "url": "http://127.0.0.1:46135/assets/display.worker-BY9vK9Az.js",
+        "messageHandler": "function"
+      },
+      "profiles": [
+        {
+          "target": "main",
+          "profileWindowMs": 1801.809,
+          "samples": 1178,
+          "selfSampleMs": {
+            "(program)": 677.829,
+            "unclassified": 412.346,
+            "presentation-key": 99.722,
+            "wire-string-size": 185.598,
+            "fresh-snapshot-pin": 8.626,
+            "wire-value-size": 140.366,
+            "capture-encode": 48.603,
+            "(idle)": 168.224,
+            "markdown-pipeline": 8.002,
+            "thought-tool-format": 1.621,
+            "(garbage collector)": 49.754
+          },
+          "inclusiveSampleMs": {
+            "(program)": 677.829,
+            "unclassified": 1800.691,
+            "presentation-key": 311.675,
+            "wire-string-size": 289.505,
+            "wire-value-size": 433.661,
+            "fresh-snapshot-pin": 8.626,
+            "markdown-pipeline": 330.43,
+            "capture-encode": 224.1,
+            "(idle)": 168.224,
+            "thought-tool-format": 1.621,
+            "(garbage collector)": 49.754
+          }
+        },
+        {
+          "target": "worker",
+          "profileWindowMs": 1859.085,
+          "samples": 1633,
+          "selfSampleMs": {
+            "(idle)": 1733.386,
+            "wire-value-size": 21.927,
+            "WASM-sampled": 9.878,
+            "unclassified": 34.037,
+            "wire-string-size": 26.304,
+            "capture-decode": 26.308,
+            "(garbage collector)": 6.683
+          },
+          "inclusiveSampleMs": {
+            "(idle)": 1733.386,
+            "unclassified": 1858.523,
+            "wire-value-size": 49.32,
+            "capture-decode": 75.628,
+            "WASM-sampled": 18.69,
+            "wire-string-size": 26.304,
+            "(garbage collector)": 6.683
+          }
+        }
+      ],
+      "originalCallbacks": 106,
+      "independentCallbacks": 94
+    }
+  ],
+  "reusedGates": {
+    "runtimeCodeMatches": "8d17ebe017bb62bcad4f63e2c694458869f75e36",
+    "app": {
+      "passed": 505,
+      "existingSkips": 3
+    },
+    "backend": {
+      "passed": 377,
+      "node": "24.19.0",
+      "freshThisDiagnostic": false
+    },
+    "browser": {
+      "serialPassed": 19,
+      "freshThisDiagnostic": false
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 0,
+      "freshThisDiagnostic": false
+    },
+    "builds": "native/entity/ordinary from8d; no fresh build during profiling",
+    "audit": "169 from8d; runtime unchanged"
+  }
+}

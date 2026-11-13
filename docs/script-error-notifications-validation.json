@@ -1,0 +1,81 @@
+{
+  "baselineCommit": "639d7b23f52e494fcb43de54a566e8e0ea8dd8f8",
+  "appPassed": 605,
+  "appSkipped": 3,
+  "backendPassed": 483,
+  "browserPassed": 1,
+  "gates": [
+    {
+      "step": "types",
+      "exitCode": 0,
+      "passed": null,
+      "log": "evidence/alert-error-20261007-types.log",
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    {
+      "step": "app",
+      "exitCode": 0,
+      "passed": 605,
+      "log": "evidence/alert-error-20261007-app.log",
+      "sha256": "9d825ace47c7f6b8950029415f7823b9d51471d97bf1daca7ade4d6f65f49ccb"
+    },
+    {
+      "step": "native",
+      "exitCode": 0,
+      "passed": null,
+      "log": "evidence/alert-error-20261007-native.log",
+      "sha256": "bf47d270b5c811dc723e088ccbed796339026b849e120a745bf41920d45a0395"
+    },
+    {
+      "step": "backend",
+      "exitCode": 0,
+      "passed": 483,
+      "log": "evidence/alert-error-20261007-backend.log",
+      "sha256": "4592c5b10f5543cbb3f9f9d98439bef35665564587326007ebe7a0343bb1fbbf"
+    },
+    {
+      "step": "entity",
+      "exitCode": 0,
+      "passed": null,
+      "log": "evidence/alert-error-20261007-entity.log",
+      "sha256": "212d8e15bafe9f5c8160fd62bd1d0e880e4da21dbd8d888de91fcea0b38600cd"
+    },
+    {
+      "step": "ordinary",
+      "exitCode": 0,
+      "passed": null,
+      "log": "evidence/alert-error-20261007-ordinary.log",
+      "sha256": "86e2b1a4b7acee9ded69db6eee01bde3d544da5465eb0c31d72d1469d8b72b5b"
+    },
+    {
+      "step": "browser",
+      "exitCode": 0,
+      "passed": 1,
+      "log": "evidence/alert-error-20261007-browser.log",
+      "sha256": "d286ed6011037cbf4e36bc1dcf63e161b1b44a4cc8b495da2750786636e16d7c"
+    }
+  ],
+  "beforeFix": {
+    "targetedFailures": 2,
+    "log": "evidence/alert-error-20261007-before.log",
+    "sha256": "37dec6779b35b6647fec4dba7d7b6c714fc023f806ca09242225ee792d5fcf21"
+  },
+  "schemaVersion": 21,
+  "schemaChanged": false,
+  "recoveryGuardsUnchanged": true,
+  "generationFatalErrorPolicyUnchanged": true,
+  "all15Preserved": true,
+  "wholeGoalComplete": false,
+  "privateAccess": {
+    "reportedJobMetadataRead": true,
+    "targetedSetupFunctionRead": true,
+    "promptsOrChatBodiesRead": false,
+    "authValuesRead": false
+  },
+  "realModelRequestsInitiated": 0,
+  "reportedButtonReplayed": false,
+  "productionModified": false,
+  "deploymentDecisionRequired": true,
+  "physicalDeviceTested": false,
+  "verifiedAt": "2026-10-06T15:26:07.223544+00:00"
+}

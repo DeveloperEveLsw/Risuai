@@ -1,0 +1,59 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/hypav3.ts",
+  "core": "src/ts/process/memory/hypaV3Runtime.ts",
+  "factory": "createHypaV3Runtime",
+  "functions": [
+    "splitBySeparator",
+    "hypaMemoryV3",
+    "hypaMemoryV3MainExp",
+    "hypaMemoryV3Main",
+    "toHypaV3Data",
+    "toSerializableHypaV3Data",
+    "cleanOrphanedSummary",
+    "isSubset",
+    "wrapWithXml",
+    "simpleCC",
+    "simpleRRF",
+    "childToParentRRF",
+    "normalizeScores"
+  ],
+  "classes": ["HypaProcesserEx"],
+  "ports": [
+    {
+      "name": "getDatabase"
+    },
+    {
+      "name": "getCurrentHypaV3Preset"
+    },
+    {
+      "name": "summarize"
+    },
+    {
+      "name": "unloadEngine"
+    },
+    {
+      "name": "HypaProcesser"
+    },
+    {
+      "name": "similarity"
+    },
+    {
+      "name": "isContextModel"
+    },
+    {
+      "name": "getContextProvider"
+    },
+    {
+      "name": "HypaProcessorV2"
+    },
+    {
+      "name": "TaskRateLimiter"
+    },
+    {
+      "name": "hypaV3ProgressStore"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": true
+}

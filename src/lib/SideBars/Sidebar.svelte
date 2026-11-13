@@ -1,5 +1,5 @@
 <script lang="ts">
-    import {
+  import {
     CharEmotion,
     DynamicGUI,
     botMakerMode,
@@ -9,18 +9,14 @@
     sideBarStore,
     OpenRealmStore,
     PlaygroundStore,
-
     QuickSettings,
-
-    additionalHamburgerMenu
-
-
+    additionalHamburgerMenu,
   } from "../../ts/stores.svelte";
-    import { setDatabase, type folder } from "../../ts/storage/database.svelte";
-    import { DBState } from 'src/ts/stores.svelte';
-    import BarIcon from "./BarIcon.svelte";
-    import SidebarIndicator from "./SidebarIndicator.svelte";
-    import {
+  import { setDatabase, type folder } from "../../ts/storage/database.svelte";
+  import { DBState } from "src/ts/stores.svelte";
+  import BarIcon from "./BarIcon.svelte";
+  import SidebarIndicator from "./SidebarIndicator.svelte";
+  import {
     ShellIcon,
     Settings,
     ListIcon,
@@ -31,31 +27,44 @@
     WrenchIcon,
     User2Icon,
   } from "@lucide/svelte";
-    import {
-  addCharacter,
-    changeChar,
-    getCharImage,
-  } from "../../ts/characters";
-    import CharConfig from "./CharConfig.svelte";
-    import { language } from "../../lang";
-    import isEqual from "lodash/isEqual";
-    import SidebarAvatar from "./SidebarAvatar.svelte";
-    import BaseRoundedButton from "../UI/BaseRoundedButton.svelte";
-    import { getCharacterIndexObject, selectSingleFile } from "src/ts/util";
-    import { v4 } from "uuid";
-    import { checkCharOrder, getFileSrc, saveAsset } from "src/ts/globalApi.svelte";
-    import { alertInput, alertSelect } from "src/ts/alert";
-    import SideChatList from "./SideChatList.svelte";
-    import { ConnectionIsHost, ConnectionOpenStore, RoomIdStore } from "src/ts/sync/multiuser";
+  import { addCharacter, changeChar, getCharImage } from "../../ts/characters";
+  import CharConfig from "./CharConfig.svelte";
+  import { language } from "../../lang";
+  import isEqual from "lodash/isEqual";
+  import SidebarAvatar from "./SidebarAvatar.svelte";
+  import BaseRoundedButton from "../UI/BaseRoundedButton.svelte";
+  import { getCharacterIndexObject, selectSingleFile } from "src/ts/util";
+  import { v4 } from "uuid";
+  import {
+    checkCharOrder,
+    getFileSrc,
+    saveAsset,
+  } from "src/ts/globalApi.svelte";
+  import { alertInput, alertSelect } from "src/ts/alert";
+  import SideChatList from "./SideChatList.svelte";
+  import {
+    ConnectionIsHost,
+    ConnectionOpenStore,
+    RoomIdStore,
+  } from "src/ts/sync/multiuser";
   import { sideBarSize } from "src/ts/gui/guisize";
   import DevTool from "./DevTool.svelte";
-    import QuickSettingsGui from "../Others/QuickSettingsGUI.svelte";
-    import PluginDefinedIcon from "../Others/PluginDefinedIcon.svelte";
-    import { RISU_SIDEBAR_DRAG_TYPE } from "src/ts/dragTypes";
+  import QuickSettingsGui from "../Others/QuickSettingsGUI.svelte";
+  import PluginDefinedIcon from "../Others/PluginDefinedIcon.svelte";
+  import { RISU_SIDEBAR_DRAG_TYPE } from "src/ts/dragTypes";
+  import {
+    browserRuntime,
+    entityRuntimeEnabled,
+    reportRuntimeError,
+  } from "src/ts/runtime/browserRuntimeState.svelte";
+  import type {
+    CharacterNavigationTarget,
+    CharacterNavigationItem,
+  } from "src/ts/runtime/characterNavigation.mjs";
   let sideBarMode = $state(0);
   let editMode = $state(false);
   let menuMode = $state(0);
-  let devTool = $state(false)
+  let devTool = $state(false);
 
   function reseter() {
     menuMode = 0;
@@ -65,12 +74,27 @@
     CharEmotion.set({});
   }
 
-  type sortTypeNormal = { type:'normal',img: string, index: number, name:string }
-  type sortType =  sortTypeNormal|{type:'folder',folder:sortTypeNormal[],id:string, name:string, color:string, img?:string}
+  type sortTypeNormal = {
+    type: "normal";
+    id: string;
+    img: string;
+    index: number;
+    name: string;
+  };
+  type sortType =
+    | sortTypeNormal
+    | {
+        type: "folder";
+        folder: sortTypeNormal[];
+        id: string;
+        name: string;
+        color: string;
+        img?: string;
+      };
   let charImages: sortType[] = $state([]);
-  let IconRounded = $state(false)
-  let openFolders:string[] = $state([])
-  let currentDrag: DragData | null = $state(null)
+  let IconRounded = $state(false);
+  let openFolders: string[] = $state([]);
+  let currentDrag: DragData | null = $state(null);
   interface Props {
     openGrid?: any;
     hidden?: boolean;
@@ -78,36 +102,39 @@
 
   let { openGrid = () => {}, hidden = false }: Props = $props();
 
-  sideBarClosing.set(false)
+  sideBarClosing.set(false);
 
   $effect(() => {
     let newCharImages: sortType[] = [];
-    const idObject = getCharacterIndexObject()
-    for (const id of DBState.db.characterOrder) {
-      if(typeof(id) === 'string'){
-        const index = idObject[id] ?? -1
-        if(index !== -1){
-          const cha = DBState.db.characters[index]
+    const idObject = getCharacterIndexObject();
+    for (const id of entityRuntimeEnabled
+      ? browserRuntime().characterNavigationOrder()
+      : DBState.db.characterOrder) {
+      if (typeof id === "string") {
+        const index = idObject[id] ?? -1;
+        if (index !== -1) {
+          const cha = DBState.db.characters[index];
           newCharImages.push({
-            img:cha.image ?? "",
-            index:index,
+            id,
+            img: cha.image ?? "",
+            index: index,
             type: "normal",
-            name: cha.name
+            name: cha.name,
           });
         }
-      }
-      else{
-        const folder = id
-        let folderCharImages: sortTypeNormal[] = []
-        for(const id of folder.data){
-          const index = idObject[id] ?? -1
-          if(index !== -1){
-            const cha = DBState.db.characters[index]
+      } else {
+        const folder = id;
+        let folderCharImages: sortTypeNormal[] = [];
+        for (const id of folder.data) {
+          const index = idObject[id] ?? -1;
+          if (index !== -1) {
+            const cha = DBState.db.characters[index];
             folderCharImages.push({
-              img:cha.image ?? "",
-              index:index,
+              id,
+              img: cha.image ?? "",
+              index: index,
               type: "normal",
-              name: cha.name
+              name: cha.name,
             });
           }
         }
@@ -124,772 +151,1084 @@
     if (!isEqual(charImages, newCharImages)) {
       charImages = newCharImages;
     }
-    if(IconRounded !== DBState.db.roundIcons){
-      IconRounded = DBState.db.roundIcons
+    if (IconRounded !== DBState.db.roundIcons) {
+      IconRounded = DBState.db.roundIcons;
     }
-  })
+  });
 
-
-  const inserter = (mainIndex:DragData, targetIndex:DragData) => {
-    if(mainIndex.index === targetIndex.index && mainIndex.folder === targetIndex.folder){
-      return
+  const inserter = (mainIndex: DragData, targetIndex: DragData) => {
+    if (entityRuntimeEnabled) {
+      if (!mainIndex.capture || !mainIndex.item) return;
+      const list = targetIndex.folder
+        ? charImages.find(
+            (value) =>
+              value.type === "folder" && value.id === targetIndex.folder,
+          )
+        : null;
+      const before = targetIndex.folder
+        ? list?.type === "folder"
+          ? list.folder[targetIndex.index]
+          : undefined
+        : charImages[targetIndex.index];
+      if (targetIndex.folder && list?.type !== "folder") return;
+      browserRuntime()
+        .changeCharacterNavigation(mainIndex.capture, {
+          type: "move",
+          source: mainIndex.item,
+          destination: {
+            folderId: targetIndex.folder ?? null,
+            before: before
+              ? {
+                  kind: before.type === "folder" ? "folder" : "character",
+                  id: before.id,
+                }
+              : null,
+          },
+        })
+        .catch(reportRuntimeError);
+      return;
     }
-    let db = DBState.db
-    let mainFolderIndex = mainIndex.folder ? getFolderIndex(mainIndex.folder) : null
-    let targetFolderIndex = targetIndex.folder ? getFolderIndex(targetIndex.folder) : null
-    let mainFolderId = mainIndex.folder ? (db.characterOrder[mainFolderIndex] as folder).id : ''
-    let movingFolder:folder|false = false
-    let mainId = ''
-    if(mainIndex.folder){
-      mainId = (db.characterOrder[mainFolderIndex] as folder).data[mainIndex.index]
+    if (
+      mainIndex.index === targetIndex.index &&
+      mainIndex.folder === targetIndex.folder
+    ) {
+      return;
     }
-    else{
-      const da = db.characterOrder[mainIndex.index]
-      if(typeof(da) !== 'string'){
-        mainId = da.id
-        movingFolder = $state.snapshot(da)
-        if(targetIndex.folder){
-          return
+    let db = DBState.db;
+    let mainFolderIndex = mainIndex.folder
+      ? getFolderIndex(mainIndex.folder)
+      : null;
+    let targetFolderIndex = targetIndex.folder
+      ? getFolderIndex(targetIndex.folder)
+      : null;
+    let mainFolderId = mainIndex.folder
+      ? (db.characterOrder[mainFolderIndex] as folder).id
+      : "";
+    let movingFolder: folder | false = false;
+    let mainId = "";
+    if (mainIndex.folder) {
+      mainId = (db.characterOrder[mainFolderIndex] as folder).data[
+        mainIndex.index
+      ];
+    } else {
+      const da = db.characterOrder[mainIndex.index];
+      if (typeof da !== "string") {
+        mainId = da.id;
+        movingFolder = $state.snapshot(da);
+        if (targetIndex.folder) {
+          return;
         }
+      } else {
+        mainId = da;
       }
-      else{
-        mainId = da
-      }
     }
-    if(targetIndex.folder){
-        const folder = db.characterOrder[targetFolderIndex] as folder
-        folder.data.splice(targetIndex.index,0,mainId)
-        db.characterOrder[targetFolderIndex] = folder
+    if (targetIndex.folder) {
+      const folder = db.characterOrder[targetFolderIndex] as folder;
+      folder.data.splice(targetIndex.index, 0, mainId);
+      db.characterOrder[targetFolderIndex] = folder;
+    } else if (movingFolder) {
+      db.characterOrder.splice(targetIndex.index, 0, movingFolder);
+    } else {
+      db.characterOrder.splice(targetIndex.index, 0, mainId);
     }
-    else if(movingFolder){
-        db.characterOrder.splice(targetIndex.index,0,movingFolder)
-    }
-    else{
-        db.characterOrder.splice(targetIndex.index,0,mainId)
-    }
-    if(mainIndex.folder){
-      mainFolderIndex = -1
-      for(let i=0;i<db.characterOrder.length;i++){
-        const a =db.characterOrder[i]
-        if(typeof(a) !== 'string'){
-          if(a.id === mainFolderId){
-            mainFolderIndex = i
-            break
+    if (mainIndex.folder) {
+      mainFolderIndex = -1;
+      for (let i = 0; i < db.characterOrder.length; i++) {
+        const a = db.characterOrder[i];
+        if (typeof a !== "string") {
+          if (a.id === mainFolderId) {
+            mainFolderIndex = i;
+            break;
           }
         }
       }
-      if(mainFolderIndex !== -1){
-        const folder:folder = db.characterOrder[mainFolderIndex] as folder
-        const ind = mainIndex.index > targetIndex.index ? folder.data.lastIndexOf(mainId) : folder.data.indexOf(mainId) 
-        if(ind !== -1){
-          folder.data.splice(ind, 1)
+      if (mainFolderIndex !== -1) {
+        const folder: folder = db.characterOrder[mainFolderIndex] as folder;
+        const ind =
+          mainIndex.index > targetIndex.index
+            ? folder.data.lastIndexOf(mainId)
+            : folder.data.indexOf(mainId);
+        if (ind !== -1) {
+          folder.data.splice(ind, 1);
         }
-        db.characterOrder[mainFolderIndex] = folder
+        db.characterOrder[mainFolderIndex] = folder;
+      } else {
+        console.log("folder not found");
       }
-      else{
-        console.log('folder not found')
+    } else if (movingFolder) {
+      let idList: string[] = [];
+      for (const ord of db.characterOrder) {
+        idList.push(typeof ord === "string" ? ord : ord.id);
       }
-    }
-    else if(movingFolder){
-      let idList:string[] = []
-      for(const ord of db.characterOrder){
-        idList.push(typeof(ord) === 'string' ? ord : ord.id)
+      const ind =
+        mainIndex.index > targetIndex.index
+          ? idList.lastIndexOf(mainId)
+          : idList.indexOf(mainId);
+      if (ind !== -1) {
+        db.characterOrder.splice(ind, 1);
       }
-      const ind = mainIndex.index > targetIndex.index ? idList.lastIndexOf(mainId) : idList.indexOf(mainId) 
-      if(ind !== -1){
-        db.characterOrder.splice(ind, 1)
-      }
-    }
-    else{
-      const ind = mainIndex.index > targetIndex.index ? db.characterOrder.lastIndexOf(mainId) : db.characterOrder.indexOf(mainId) 
-      if(ind !== -1){
-        db.characterOrder.splice(ind, 1)
+    } else {
+      const ind =
+        mainIndex.index > targetIndex.index
+          ? db.characterOrder.lastIndexOf(mainId)
+          : db.characterOrder.indexOf(mainId);
+      if (ind !== -1) {
+        db.characterOrder.splice(ind, 1);
       }
     }
 
-    DBState.db.characterOrder = db.characterOrder
-    checkCharOrder()
-  }
+    DBState.db.characterOrder = db.characterOrder;
+    checkCharOrder();
+  };
 
-  function getFolderIndex(id:string){
-    for(let i=0;i<DBState.db.characterOrder.length;i++){
-      const data = DBState.db.characterOrder[i]
-      if(typeof(data) !== 'string' && data.id === id){
-        return i
+  function getFolderIndex(id: string) {
+    for (let i = 0; i < DBState.db.characterOrder.length; i++) {
+      const data = DBState.db.characterOrder[i];
+      if (typeof data !== "string" && data.id === id) {
+        return i;
       }
     }
-    return -1
+    return -1;
   }
 
   function scrollToActiveCharacter() {
-    const selectedId = $selectedCharID
-    if (selectedId === -1) return
-    
-    const characterId = DBState.db.characters[selectedId]?.chaId
-    if (!characterId) return
-    
-    let targetFolderId: string | null = null
-    
+    const selectedId = $selectedCharID;
+    if (selectedId === -1) return;
+
+    const characterId = DBState.db.characters[selectedId]?.chaId;
+    if (!characterId) return;
+
+    let targetFolderId: string | null = null;
+
     for (const item of charImages) {
-      if (item.type === 'folder') {
-        const foundChar = item.folder.find(c => 
-          DBState.db.characters[c.index]?.chaId === characterId
-        )
+      if (item.type === "folder") {
+        const foundChar = item.folder.find(
+          (c) => DBState.db.characters[c.index]?.chaId === characterId,
+        );
         if (foundChar) {
-          targetFolderId = item.id
-          break
+          targetFolderId = item.id;
+          break;
         }
       }
     }
-    
+
     if (targetFolderId && !openFolders.includes(targetFolderId)) {
-      openFolders.push(targetFolderId)
-      openFolders = openFolders
+      openFolders.push(targetFolderId);
+      openFolders = openFolders;
     }
-    
+
     setTimeout(() => {
-      const activeElement = document.querySelector(`[data-char-id="${characterId}"]`)
+      const activeElement = document.querySelector(
+        `[data-char-id="${characterId}"]`,
+      );
       if (activeElement) {
-        activeElement.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start' 
-        })
+        activeElement.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       }
-    }, 100)
+    }, 100);
   }
 
   $effect(() => {
-    if (typeof window === 'undefined') return
-    
+    if (typeof window === "undefined") return;
+
     const handler = () => {
-      scrollToActiveCharacter()
-    }
-    
-    window.addEventListener('scrollToActiveCharacter', handler)
-    
+      scrollToActiveCharacter();
+    };
+
+    window.addEventListener("scrollToActiveCharacter", handler);
+
     return () => {
-      window.removeEventListener('scrollToActiveCharacter', handler)
-    }
-  })
+      window.removeEventListener("scrollToActiveCharacter", handler);
+    };
+  });
 
-
-  const createFolder = (mainIndex:DragData, targetIndex:DragData) => {
-    if(mainIndex.index === targetIndex.index && mainIndex.folder === targetIndex.folder){
-      return
+  const createFolder = (mainIndex: DragData, targetIndex: DragData) => {
+    if (entityRuntimeEnabled) {
+      if (
+        !mainIndex.capture ||
+        mainIndex.item?.kind !== "character" ||
+        targetIndex.folder
+      )
+        return;
+      const target = charImages[targetIndex.index];
+      if (!target || target.id === mainIndex.item.id) return;
+      browserRuntime()
+        .changeCharacterNavigation(mainIndex.capture, {
+          type: "group",
+          sourceId: mainIndex.item.id,
+          target: {
+            kind: target.type === "folder" ? "folder" : "character",
+            id: target.id,
+          },
+          ...(target.type === "normal"
+            ? { folder: { id: v4(), name: "New Folder", color: "" } }
+            : {}),
+        })
+        .catch(reportRuntimeError);
+      return;
     }
-    let db = DBState.db
-    let mainFolderIndex = mainIndex.folder ? getFolderIndex(mainIndex.folder) : null
-    let mainFolder = db.characterOrder[mainFolderIndex] as folder
-    if(targetIndex.folder){
-      return
+    if (
+      mainIndex.index === targetIndex.index &&
+      mainIndex.folder === targetIndex.folder
+    ) {
+      return;
     }
-    const main = mainIndex.folder ? mainFolder.data[mainIndex.index] : db.characterOrder[mainIndex.index]
-    const target = db.characterOrder[targetIndex.index]
-    if(typeof(main) !== 'string'){
-      return
+    let db = DBState.db;
+    let mainFolderIndex = mainIndex.folder
+      ? getFolderIndex(mainIndex.folder)
+      : null;
+    let mainFolder = db.characterOrder[mainFolderIndex] as folder;
+    if (targetIndex.folder) {
+      return;
     }
-    if(typeof (target) === 'string'){
-      const newFolder:folder = {
+    const main = mainIndex.folder
+      ? mainFolder.data[mainIndex.index]
+      : db.characterOrder[mainIndex.index];
+    const target = db.characterOrder[targetIndex.index];
+    if (typeof main !== "string") {
+      return;
+    }
+    if (typeof target === "string") {
+      const newFolder: folder = {
         name: "New Folder",
         data: [main, target],
         color: "",
-        id: v4()
+        id: v4(),
+      };
+      db.characterOrder[targetIndex.index] = newFolder;
+      if (mainIndex.folder) {
+        mainFolder.data.splice(mainIndex.index, 1);
+        db.characterOrder[mainFolderIndex] = mainFolder;
+      } else {
+        db.characterOrder.splice(mainIndex.index, 1);
       }
-      db.characterOrder[targetIndex.index] = newFolder
-      if(mainIndex.folder){
-        mainFolder.data.splice(mainIndex.index, 1)
-        db.characterOrder[mainFolderIndex] = mainFolder
-      }
-      else{
-        db.characterOrder.splice(mainIndex.index, 1)
-      }
-    }
-    else{
-      target.data.push(main)
-      if(mainIndex.folder){
-        mainFolder.data.splice(mainIndex.index, 1)
-        db.characterOrder[mainFolderIndex] = mainFolder
-      }
-      else{
-        db.characterOrder.splice(mainIndex.index, 1)
+    } else {
+      target.data.push(main);
+      if (mainIndex.folder) {
+        mainFolder.data.splice(mainIndex.index, 1);
+        db.characterOrder[mainFolderIndex] = mainFolder;
+      } else {
+        db.characterOrder.splice(mainIndex.index, 1);
       }
     }
 
-    DBState.db.characterOrder = db.characterOrder
-    checkCharOrder()
-  }
+    DBState.db.characterOrder = db.characterOrder;
+    checkCharOrder();
+  };
 
   type DragEv = DragEvent & {
     currentTarget: EventTarget & HTMLDivElement;
-  }
+  };
   type DragData = {
-    index:number,
-    folder?:string
-  }
-  const avatarDragStart = (ind:DragData, e:DragEv) => {
-    e.dataTransfer.setData('text/plain', '');
-    e.dataTransfer.setData(RISU_SIDEBAR_DRAG_TYPE, 'true');
-    currentDrag = ind
-    const avatar = e.currentTarget.querySelector('.avatar')
-    if(avatar){
+    index: number;
+    folder?: string;
+    capture?: CharacterNavigationTarget;
+    item?: CharacterNavigationItem;
+  };
+  const avatarDragStart = (ind: DragData, e: DragEv) => {
+    if (entityRuntimeEnabled) {
+      try {
+        const parent = ind.folder
+          ? charImages.find(
+              (value) => value.type === "folder" && value.id === ind.folder,
+            )
+          : null;
+        const item = ind.folder
+          ? parent?.type === "folder"
+            ? parent.folder[ind.index]
+            : undefined
+          : charImages[ind.index];
+        if (!item)
+          throw new Error("The dragged character is no longer available");
+        ind = {
+          ...ind,
+          capture: browserRuntime().captureCharacterNavigation(),
+          item: {
+            kind: item.type === "folder" ? "folder" : "character",
+            id: item.id,
+          },
+        };
+      } catch (error) {
+        reportRuntimeError(error);
+        e.preventDefault();
+        clearCurrentDrag();
+        return;
+      }
+    }
+    e.dataTransfer.setData("text/plain", "");
+    e.dataTransfer.setData(RISU_SIDEBAR_DRAG_TYPE, "true");
+    currentDrag = ind;
+    const avatar = e.currentTarget.querySelector(".avatar");
+    if (avatar) {
       e.dataTransfer.setDragImage(avatar, 10, 10);
     }
-  }
+  };
 
   const clearCurrentDrag = () => {
-    currentDrag = null
+    currentDrag = null;
+  };
+
+  async function editRuntimeFolder(folderId: string, name: string) {
+    try {
+      const target = browserRuntime().captureCharacterNavigation();
+      const selection = Number(
+        await alertSelect([
+          language.renameFolder,
+          language.changeFolderColor,
+          language.changeFolderImage,
+          language.cancel,
+        ]),
+      );
+      if (selection === 0) {
+        const value = await alertInput(language.changeFolderName, [], name);
+        if (value)
+          await browserRuntime().changeCharacterNavigation(target, {
+            type: "edit-folder",
+            folderId,
+            updates: { name: value },
+          });
+      } else if (selection === 1) {
+        const colors = [
+          "red",
+          "green",
+          "blue",
+          "yellow",
+          "indigo",
+          "purple",
+          "pink",
+          "default",
+        ];
+        const value = Number(await alertSelect(colors));
+        if (Number.isInteger(value) && colors[value])
+          await browserRuntime().changeCharacterNavigation(target, {
+            type: "edit-folder",
+            folderId,
+            updates: { color: colors[value] },
+          });
+      } else if (selection === 2) {
+        const value = Number(
+          await alertSelect(["Reset to Default Image", "Select Image File"]),
+        );
+        if (value === 0)
+          await browserRuntime().changeCharacterNavigation(target, {
+            type: "edit-folder",
+            folderId,
+            updates: { imgFile: null, img: "" },
+          });
+        else if (value === 1) {
+          const file = await selectSingleFile(["png", "jpg", "webp"]);
+          if (!file) return;
+          const imgFile = await saveAsset(file.data);
+          await browserRuntime().changeCharacterNavigation(target, {
+            type: "edit-folder",
+            folderId,
+            updates: { imgFile, img: await getFileSrc(imgFile) },
+          });
+        }
+      }
+    } catch (error) {
+      reportRuntimeError(error);
+    }
   }
 
   $effect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === "undefined") return;
 
-    window.addEventListener('dragend', clearCurrentDrag)
-    window.addEventListener('drop', clearCurrentDrag)
-    window.addEventListener('blur', clearCurrentDrag)
+    window.addEventListener("dragend", clearCurrentDrag);
+    window.addEventListener("drop", clearCurrentDrag);
+    window.addEventListener("blur", clearCurrentDrag);
 
     return () => {
-      window.removeEventListener('dragend', clearCurrentDrag)
-      window.removeEventListener('drop', clearCurrentDrag)
-      window.removeEventListener('blur', clearCurrentDrag)
-    }
-  })
+      window.removeEventListener("dragend", clearCurrentDrag);
+      window.removeEventListener("drop", clearCurrentDrag);
+      window.removeEventListener("blur", clearCurrentDrag);
+    };
+  });
 
-  const getCurrentSidebarDrag = (e:DragEvent) => {
-    if(!currentDrag || !e.dataTransfer?.types.includes(RISU_SIDEBAR_DRAG_TYPE)){
-      return null
+  const getCurrentSidebarDrag = (e: DragEvent) => {
+    if (
+      !currentDrag ||
+      !e.dataTransfer?.types.includes(RISU_SIDEBAR_DRAG_TYPE)
+    ) {
+      return null;
     }
-    return currentDrag
-  }
+    return currentDrag;
+  };
 
-  const avatarDragOver = (e:DragEv) => {
-    if(!getCurrentSidebarDrag(e)){
-      return
+  const avatarDragOver = (e: DragEv) => {
+    if (!getCurrentSidebarDrag(e)) {
+      return;
     }
-    e.preventDefault()
-    e.stopPropagation()
-    e.dataTransfer.dropEffect = 'move'
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+  };
 
-  const avatarDrop = (ind:DragData, e:DragEv) => {
-    const drag = getCurrentSidebarDrag(e)
-    if(!drag){
-      return
+  const avatarDrop = (ind: DragData, e: DragEv) => {
+    const drag = getCurrentSidebarDrag(e);
+    if (!drag) {
+      return;
     }
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
     try {
-      createFolder(drag,ind)
+      createFolder(drag, ind);
     } catch (error) {
-      console.error('avatarDrop error:', error)
+      console.error("avatarDrop error:", error);
     } finally {
-      clearCurrentDrag()
+      clearCurrentDrag();
     }
-  }
+  };
 
-  const preventAll = (e:DragEvent) => {
-    if(!getCurrentSidebarDrag(e)){
-      return
+  const preventAll = (e: DragEvent) => {
+    if (!getCurrentSidebarDrag(e)) {
+      return;
     }
-    e.preventDefault()
-    e.stopPropagation()
-    return false
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  };
 </script>
-{#if DBState.db.menuSideBar}
-<div
-  class="h-full w-20 min-w-20 flex-col items-center bg-bgcolor text-textcolor shadow-lg relative rs-sidebar"
-  class:editMode
-  class:risu-sub-sidebar={$sideBarClosing}
-  class:risu-sub-sidebar-close={$sideBarClosing}
-  class:hidden={hidden}
-  class:flex={!hidden}
->
-<button
-  class="flex items-center justify-center py-2 flex-col gap-1 w-full mt-4"
-  class:text-textcolor2={!(
-    $selectedCharID < 0 &&
-    $PlaygroundStore === 0 &&
-    !$settingsOpen
-  )}
-  onclick={() => {
-    reseter();
-    selectedCharID.set(-1)
-    PlaygroundStore.set(0)
-    OpenRealmStore.set(false)
-  }}
->
-  <HomeIcon />
-  <span class="text-xs">{language.home}</span>
-</button>
-<button
-  class="flex items-center justify-center py-2 flex-col gap-1 w-full"
-  class:text-textcolor2={!$settingsOpen}
-  onclick={() => {
-    if ($settingsOpen) {
-      reseter();
-      settingsOpen.set(false);
-    } else {
-      reseter();
-      settingsOpen.set(true);
-    }
-  }}
->
-  <Settings />
-  <span class="text-xs">{language.settings}</span>
-</button>
-<button
-  class="flex items-center justify-center py-2 flex-col gap-1 w-full"
-  class:text-textcolor2={!(
-    $selectedCharID >= 0
-  )}
-  onclick={() => {
-    reseter();
-    openGrid();
 
-  }}
->
-  <User2Icon />
-  <span class="text-xs">{language.character}</span>
-</button>
-<button
-  class="flex items-center justify-center py-2 flex-col gap-1 w-full"
-  class:text-textcolor2={!(
-    $selectedCharID < 0 &&
-    $PlaygroundStore !== 0
-  )}
-  onclick={() => {
-    reseter();
-    selectedCharID.set(-1)
-    PlaygroundStore.set(1)
-  }}
->
-  <ShellIcon />
-  <span class="text-xs">{language.playground.playground}</span>
-</button>
-</div>
-{:else}
-<div
-  class="h-full w-20 min-w-20 flex-col items-center bg-bgcolor text-textcolor shadow-lg relative rs-sidebar"
-  class:editMode
-  class:risu-sub-sidebar={$sideBarClosing}
-  class:risu-sub-sidebar-close={$sideBarClosing}
-  class:hidden={hidden}
-  class:flex={!hidden}
->
-  {#if !DBState.db.hamburgerButtonBottom}
-  <button
-    class="flex h-8 min-h-8 w-14 min-w-14 cursor-pointer text-white mt-2 items-center justify-center rounded-md bg-textcolor2 transition-colors hover:bg-blue-500"
-    onclick={() => {
-      menuMode = 1 - menuMode;
-    }}><ListIcon />
-  </button>
-  <div class="mt-2 border-b border-b-selected w-full relative text-white ">
-    {#if menuMode === 1}
-      <div class="absolute w-20 min-w-20 flex border-b-selected border-b bg-bgcolor flex-col items-center pt-2 rounded-b-md z-20 pb-2">
-        <BarIcon
-        onClick={() => {
-          if ($settingsOpen) {
-            reseter();
-            settingsOpen.set(false);
-          } else {
-            reseter();
-            settingsOpen.set(true);
-          }
-        }}><Settings /></BarIcon
-      >
-      <div class="mt-2"></div>
-      <BarIcon
-        onClick={() => {
+{#if DBState.db.menuSideBar}
+  <div
+    class="h-full w-20 min-w-20 flex-col items-center bg-bgcolor text-textcolor shadow-lg relative rs-sidebar"
+    class:editMode
+    class:risu-sub-sidebar={$sideBarClosing}
+    class:risu-sub-sidebar-close={$sideBarClosing}
+    class:hidden
+    class:flex={!hidden}
+  >
+    <button
+      class="flex items-center justify-center py-2 flex-col gap-1 w-full mt-4"
+      class:text-textcolor2={!(
+        $selectedCharID < 0 &&
+        $PlaygroundStore === 0 &&
+        !$settingsOpen
+      )}
+      onclick={() => {
+        reseter();
+        selectedCharID.set(-1);
+        PlaygroundStore.set(0);
+        OpenRealmStore.set(false);
+      }}
+    >
+      <HomeIcon />
+      <span class="text-xs">{language.home}</span>
+    </button>
+    <button
+      class="flex items-center justify-center py-2 flex-col gap-1 w-full"
+      class:text-textcolor2={!$settingsOpen}
+      onclick={() => {
+        if ($settingsOpen) {
           reseter();
-          selectedCharID.set(-1)
-          PlaygroundStore.set(0)
-          OpenRealmStore.set(false)
-        }}><HomeIcon /></BarIcon>
-      <div class="mt-2"></div>
-      <BarIcon
-        onClick={() => {
-          reseter()
-          if($selectedCharID === -1 && $PlaygroundStore !== 0){
-            PlaygroundStore.set(0)
-            return
-          }
-          selectedCharID.set(-1)
-          PlaygroundStore.set(1)
-        }}
-      ><ShellIcon /></BarIcon>
-      {#each additionalHamburgerMenu as menu}
-        <div class="mt-2"></div>
-        <BarIcon
-          onClick={() => {
-            reseter();
-            menu.callback();
-          }}>
-            <PluginDefinedIcon ico={menu} />
-          </BarIcon
-        >
-      {/each}
-      <div class="mt-2"></div>
-      <BarIcon
-        onClick={() => {
+          settingsOpen.set(false);
+        } else {
           reseter();
-          openGrid();
-        }}><LayoutGridIcon /></BarIcon
-      >
-    </div>
-    {/if}
+          settingsOpen.set(true);
+        }
+      }}
+    >
+      <Settings />
+      <span class="text-xs">{language.settings}</span>
+    </button>
+    <button
+      class="flex items-center justify-center py-2 flex-col gap-1 w-full"
+      class:text-textcolor2={!($selectedCharID >= 0)}
+      onclick={() => {
+        reseter();
+        openGrid();
+      }}
+    >
+      <User2Icon />
+      <span class="text-xs">{language.character}</span>
+    </button>
+    <button
+      class="flex items-center justify-center py-2 flex-col gap-1 w-full"
+      class:text-textcolor2={!($selectedCharID < 0 && $PlaygroundStore !== 0)}
+      onclick={() => {
+        reseter();
+        selectedCharID.set(-1);
+        PlaygroundStore.set(1);
+      }}
+    >
+      <ShellIcon />
+      <span class="text-xs">{language.playground.playground}</span>
+    </button>
   </div>
-  {/if}
-  <div class="flex grow w-full flex-col items-center overflow-x-hidden overflow-y-auto pr-0">
-    <div class="h-4 min-h-4 w-14" role="listitem" ondragover={(e) => {
-      if(!getCurrentSidebarDrag(e)){ return }
-      e.preventDefault()
-      e.stopPropagation()
-      e.dataTransfer.dropEffect = 'move'
-      e.currentTarget.classList.add('bg-green-500')
-    }} ondragleave={(e) => {
-      e.currentTarget.classList.remove('bg-green-500')
-    }} ondrop={(e) => {
-      const drag = getCurrentSidebarDrag(e)
-      if(!drag){ return }
-      e.preventDefault()
-      e.stopPropagation()
-      e.currentTarget.classList.remove('bg-green-500')
-      try {
-        inserter(drag,{index:0})
-      } finally {
-        clearCurrentDrag()
-      }
-    }} ondragenter={preventAll}></div>
-    {#each charImages as char, ind}
-      <div class="group relative flex items-center px-2"
+{:else}
+  <div
+    class="h-full w-20 min-w-20 flex-col items-center bg-bgcolor text-textcolor shadow-lg relative rs-sidebar"
+    class:editMode
+    class:risu-sub-sidebar={$sideBarClosing}
+    class:risu-sub-sidebar-close={$sideBarClosing}
+    class:hidden
+    class:flex={!hidden}
+  >
+    {#if !DBState.db.hamburgerButtonBottom}
+      <button
+        class="flex h-8 min-h-8 w-14 min-w-14 cursor-pointer text-white mt-2 items-center justify-center rounded-md bg-textcolor2 transition-colors hover:bg-blue-500"
+        onclick={() => {
+          menuMode = 1 - menuMode;
+        }}
+        ><ListIcon />
+      </button>
+      <div class="mt-2 border-b border-b-selected w-full relative text-white">
+        {#if menuMode === 1}
+          <div
+            class="absolute w-20 min-w-20 flex border-b-selected border-b bg-bgcolor flex-col items-center pt-2 rounded-b-md z-20 pb-2"
+          >
+            <BarIcon
+              onClick={() => {
+                if ($settingsOpen) {
+                  reseter();
+                  settingsOpen.set(false);
+                } else {
+                  reseter();
+                  settingsOpen.set(true);
+                }
+              }}><Settings /></BarIcon
+            >
+            <div class="mt-2"></div>
+            <BarIcon
+              onClick={() => {
+                reseter();
+                selectedCharID.set(-1);
+                PlaygroundStore.set(0);
+                OpenRealmStore.set(false);
+              }}><HomeIcon /></BarIcon
+            >
+            <div class="mt-2"></div>
+            <BarIcon
+              onClick={() => {
+                reseter();
+                if ($selectedCharID === -1 && $PlaygroundStore !== 0) {
+                  PlaygroundStore.set(0);
+                  return;
+                }
+                selectedCharID.set(-1);
+                PlaygroundStore.set(1);
+              }}><ShellIcon /></BarIcon
+            >
+            {#each additionalHamburgerMenu as menu}
+              <div class="mt-2"></div>
+              <BarIcon
+                onClick={() => {
+                  reseter();
+                  menu.callback();
+                }}
+              >
+                <PluginDefinedIcon ico={menu} />
+              </BarIcon>
+            {/each}
+            <div class="mt-2"></div>
+            <BarIcon
+              onClick={() => {
+                reseter();
+                openGrid();
+              }}><LayoutGridIcon /></BarIcon
+            >
+          </div>
+        {/if}
+      </div>
+    {/if}
+    <div
+      class="flex grow w-full flex-col items-center overflow-x-hidden overflow-y-auto pr-0"
+    >
+      <div
+        class="h-4 min-h-4 w-14"
         role="listitem"
-        draggable="true"
-        ondragstart={(e) => {avatarDragStart({index:ind}, e)}}
-        ondragend={clearCurrentDrag}
-        ondragover={avatarDragOver}
-        ondrop={(e) => {avatarDrop({index:ind}, e)}}
+        data-character-drop-folder=""
+        data-character-drop-before={charImages[0]?.id ?? ""}
+        ondragover={(e) => {
+          if (!getCurrentSidebarDrag(e)) {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = "move";
+          e.currentTarget.classList.add("bg-green-500");
+        }}
+        ondragleave={(e) => {
+          e.currentTarget.classList.remove("bg-green-500");
+        }}
+        ondrop={(e) => {
+          const drag = getCurrentSidebarDrag(e);
+          if (!drag) {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          e.currentTarget.classList.remove("bg-green-500");
+          try {
+            inserter(drag, { index: 0 });
+          } finally {
+            clearCurrentDrag();
+          }
+        }}
         ondragenter={preventAll}
-      >
-        <SidebarIndicator
-          isActive={char.type === 'normal' && $selectedCharID === char.index && sideBarMode !== 1}
-        />
-        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      ></div>
+      {#each charImages as char, ind (char.type + ":" + char.id)}
         <div
-            role="button" tabindex="0"
+          class="group relative flex items-center px-2"
+          role="listitem"
+          draggable="true"
+          data-character-nav-id={char.id}
+          data-character-nav-kind={char.type === "normal"
+            ? "character"
+            : "folder"}
+          ondragstart={(e) => {
+            avatarDragStart({ index: ind }, e);
+          }}
+          ondragend={clearCurrentDrag}
+          ondragover={avatarDragOver}
+          ondrop={(e) => {
+            avatarDrop({ index: ind }, e);
+          }}
+          ondragenter={preventAll}
+        >
+          <SidebarIndicator
+            isActive={char.type === "normal" &&
+              $selectedCharID === char.index &&
+              sideBarMode !== 1}
+          />
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <div
+            role="button"
+            tabindex="0"
+            data-character-id={char.type === "normal"
+              ? DBState.db.characters[char.index]?.chaId
+              : undefined}
             onclick={() => {
-              if(char.type === "normal"){
-                changeChar(char.index, {reseter});
+              if (char.type === "normal") {
+                changeChar(char.index, { reseter });
               }
             }}
             onkeydown={(e) => {
               if (e.key === "Enter") {
-                if(char.type === "normal"){
-                  changeChar(char.index, {reseter});
+                if (char.type === "normal") {
+                  changeChar(char.index, { reseter });
                 }
               }
             }}
           >
-          {#if char.type === 'normal'}
-            <SidebarAvatar 
-              src={char.img ? getCharImage(char.img, "plain") : "/none.webp"} 
-              size="56" 
-              rounded={IconRounded} 
-              name={char.name}
-              chaId={DBState.db.characters[char.index]?.chaId}
-            />
-          {:else if char.type === "folder"}
-            {#key char.color}
-            {#key char.name}
-              <SidebarAvatar src="slot" size="56" rounded={IconRounded} bordered name={char.name} color={char.color} backgroundimg={char.img ? getCharImage(char.img, "plain") : ""}
-              oncontextmenu={async (e) => {
-                e.preventDefault()
-                const sel = parseInt(await alertSelect([language.renameFolder,language.changeFolderColor,language.changeFolderImage,language.cancel]))
-                if(sel === 0){
-                  const v = await alertInput(language.changeFolderName, [], char.name)
-                  const db = DBState.db
-                  if(v){
-                    const oder = db.characterOrder[ind]
-                    if(typeof(oder) === 'string'){
-                      return
-                    }
-                    oder.name = v
-                    db.characterOrder[ind] = oder
-                  }
-                }
-                else if(sel === 1){
-                  const colors = ["red","green","blue","yellow","indigo","purple","pink","default"]
-                  const sel = parseInt(await alertSelect(colors))
-                  const db = DBState.db
-                  const oder = db.characterOrder[ind]
-                  if(typeof(oder) === 'string'){
-                    return
-                  }
-                  oder.color = colors[sel].toLocaleLowerCase()
-                  db.characterOrder[ind] = oder
-                }
-                else if(sel === 2) {
-                  const sel = parseInt(await alertSelect(['Reset to Default Image', 'Select Image File']))
-                  const db = DBState.db
-                  const oder = db.characterOrder[ind]
-                  if(typeof(oder) === 'string'){
-                    return
-                  }
-
-                  switch (sel) {
-                    case 0:
-                      oder.imgFile = null
-                      oder.img = ''
-                      break;
-                  
-                    case 1:
-                      const folderImage = await selectSingleFile([
-                        'png',
-                        'jpg',
-                        'webp',
-                      ])
-
-                      if(!folderImage) {
-                        return
-                      }
-
-                      const folderImageData = await saveAsset(folderImage.data)
-
-                      oder.imgFile = folderImageData
-                      oder.img = await getFileSrc(folderImageData)
-                      db.characterOrder[ind] = oder
-                      break;
-                  }
-                }
-              }}
-              onClick={() => {
-                if(char.type !== 'folder'){
-                  return
-                }
-                if(openFolders.includes(char.id)){
-                  openFolders.splice(openFolders.indexOf(char.id), 1)
-                }
-                else{
-                  openFolders.push(char.id)
-                }
-                openFolders = openFolders
-              }}>
-                {#if DBState.db.showFolderName}
-                  <div class="h-full w-full flex justify-center items-center">
-                    <span class="hyphens-auto truncate font-bold">{char.name}</span>
-                  </div>
-                {:else if openFolders.includes(char.id)}
-                  <FolderOpenIcon />
-                {:else}
-                  <FolderIcon />
-                {/if}
-              </SidebarAvatar>
-            {/key}
-            {/key}
-          {/if}
-        </div>
-      </div>
-      {#if char.type === 'folder' && openFolders.includes(char.id)}
-        {#key char.color}
-        <div class="p-1 flex flex-col items-center py-1 mt-1 rounded-lg relative">
-          <div class="absolute top-0 left-1 border border-selected w-full h-full rounded-lg z-0 {
-            char.color === 'red' ? 'bg-red-700/20' :
-            char.color === 'yellow' ? 'bg-yellow-700/20' :
-            char.color === 'green' ? 'bg-green-700/20' :
-            char.color === 'blue' ? 'bg-blue-700/20' :
-            char.color === 'indigo' ? 'bg-indigo-700/20' :
-            char.color === 'purple' ? 'bg-purple-700/20' :
-            char.color === 'pink' ? 'bg-pink-700/20' :
-            'bg-darkbg/20'
-          }"></div>
-          <div class="h-4 min-h-4 w-14 relative z-10" role="listitem" ondragover={(e) => {
-            if(!getCurrentSidebarDrag(e)){ return }
-            e.preventDefault()
-            e.stopPropagation()
-            e.dataTransfer.dropEffect = 'move'
-            e.currentTarget.classList.add('bg-green-500')
-          }} ondragleave={(e) => {
-            e.currentTarget.classList.remove('bg-green-500')
-          }} ondrop={(e) => {
-            const drag = getCurrentSidebarDrag(e)
-            if(!drag){ return }
-            e.preventDefault()
-            e.stopPropagation()
-            e.currentTarget.classList.remove('bg-green-500')
-            try {
-              if(char.type === 'folder'){
-                inserter(drag,{index:0,folder:char.id})
-              }
-            } finally {
-              clearCurrentDrag()
-            }
-          }} ondragenter={preventAll}></div>
-          {#each char.folder as char2, ind}
-              <div class="group relative flex items-center px-2 z-10"
-              role="listitem"
-              draggable="true"
-              ondragstart={(e) => {if(char.type === 'folder'){avatarDragStart({index: ind, folder:char.id}, e)}}}
-              ondragend={clearCurrentDrag}
-              ondragover={avatarDragOver}
-              ondrop={(e) => {if(char.type === 'folder'){avatarDrop({index: ind, folder:char.id}, e)}}}
-              ondragenter={preventAll}
-            >
-              <SidebarIndicator
-                isActive={$selectedCharID === char2.index && sideBarMode !== 1}
+            {#if char.type === "normal"}
+              <SidebarAvatar
+                src={char.img ? getCharImage(char.img, "plain") : "/none.webp"}
+                size="56"
+                rounded={IconRounded}
+                name={char.name}
+                chaId={DBState.db.characters[char.index]?.chaId}
               />
-              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-              <div
-                  role="button" tabindex="0"
-                  onclick={() => {
-                    if(char2.type === "normal"){
-                      changeChar(char2.index, {reseter});
-                    }
-                  }}
-                  onkeydown={(e) => {
-                    if (e.key === "Enter") {
-                      if(char2.type === "normal"){
-                        changeChar(char2.index, {reseter});
+            {:else if char.type === "folder"}
+              {#key char.color}
+                {#key char.name}
+                  <SidebarAvatar
+                    src="slot"
+                    size="56"
+                    rounded={IconRounded}
+                    bordered
+                    name={char.name}
+                    color={char.color}
+                    backgroundimg={char.img
+                      ? getCharImage(char.img, "plain")
+                      : ""}
+                    oncontextmenu={async (e) => {
+                      e.preventDefault();
+                      if (entityRuntimeEnabled) {
+                        if (char.type === "folder")
+                          await editRuntimeFolder(char.id, char.name);
+                        return;
                       }
+                      const sel = parseInt(
+                        await alertSelect([
+                          language.renameFolder,
+                          language.changeFolderColor,
+                          language.changeFolderImage,
+                          language.cancel,
+                        ]),
+                      );
+                      if (sel === 0) {
+                        const v = await alertInput(
+                          language.changeFolderName,
+                          [],
+                          char.name,
+                        );
+                        const db = DBState.db;
+                        if (v) {
+                          const oder = db.characterOrder[ind];
+                          if (typeof oder === "string") {
+                            return;
+                          }
+                          oder.name = v;
+                          db.characterOrder[ind] = oder;
+                        }
+                      } else if (sel === 1) {
+                        const colors = [
+                          "red",
+                          "green",
+                          "blue",
+                          "yellow",
+                          "indigo",
+                          "purple",
+                          "pink",
+                          "default",
+                        ];
+                        const sel = parseInt(await alertSelect(colors));
+                        const db = DBState.db;
+                        const oder = db.characterOrder[ind];
+                        if (typeof oder === "string") {
+                          return;
+                        }
+                        oder.color = colors[sel].toLocaleLowerCase();
+                        db.characterOrder[ind] = oder;
+                      } else if (sel === 2) {
+                        const sel = parseInt(
+                          await alertSelect([
+                            "Reset to Default Image",
+                            "Select Image File",
+                          ]),
+                        );
+                        const db = DBState.db;
+                        const oder = db.characterOrder[ind];
+                        if (typeof oder === "string") {
+                          return;
+                        }
+
+                        switch (sel) {
+                          case 0:
+                            oder.imgFile = null;
+                            oder.img = "";
+                            break;
+
+                          case 1:
+                            const folderImage = await selectSingleFile([
+                              "png",
+                              "jpg",
+                              "webp",
+                            ]);
+
+                            if (!folderImage) {
+                              return;
+                            }
+
+                            const folderImageData = await saveAsset(
+                              folderImage.data,
+                            );
+
+                            oder.imgFile = folderImageData;
+                            oder.img = await getFileSrc(folderImageData);
+                            db.characterOrder[ind] = oder;
+                            break;
+                        }
+                      }
+                    }}
+                    onClick={() => {
+                      if (char.type !== "folder") {
+                        return;
+                      }
+                      if (openFolders.includes(char.id)) {
+                        openFolders.splice(openFolders.indexOf(char.id), 1);
+                      } else {
+                        openFolders.push(char.id);
+                      }
+                      openFolders = openFolders;
+                    }}
+                  >
+                    {#if DBState.db.showFolderName}
+                      <div
+                        class="h-full w-full flex justify-center items-center"
+                      >
+                        <span class="hyphens-auto truncate font-bold"
+                          >{char.name}</span
+                        >
+                      </div>
+                    {:else if openFolders.includes(char.id)}
+                      <FolderOpenIcon />
+                    {:else}
+                      <FolderIcon />
+                    {/if}
+                  </SidebarAvatar>
+                {/key}
+              {/key}
+            {/if}
+          </div>
+        </div>
+        {#if char.type === "folder" && openFolders.includes(char.id)}
+          {#key char.color}
+            <div
+              class="p-1 flex flex-col items-center py-1 mt-1 rounded-lg relative"
+            >
+              <div
+                class="absolute top-0 left-1 border border-selected w-full h-full rounded-lg z-0 {char.color ===
+                'red'
+                  ? 'bg-red-700/20'
+                  : char.color === 'yellow'
+                    ? 'bg-yellow-700/20'
+                    : char.color === 'green'
+                      ? 'bg-green-700/20'
+                      : char.color === 'blue'
+                        ? 'bg-blue-700/20'
+                        : char.color === 'indigo'
+                          ? 'bg-indigo-700/20'
+                          : char.color === 'purple'
+                            ? 'bg-purple-700/20'
+                            : char.color === 'pink'
+                              ? 'bg-pink-700/20'
+                              : 'bg-darkbg/20'}"
+              ></div>
+              <div
+                class="h-4 min-h-4 w-14 relative z-10"
+                role="listitem"
+                data-character-drop-folder={char.id}
+                data-character-drop-before={char.folder[0]?.id ?? ""}
+                ondragover={(e) => {
+                  if (!getCurrentSidebarDrag(e)) {
+                    return;
+                  }
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.dataTransfer.dropEffect = "move";
+                  e.currentTarget.classList.add("bg-green-500");
+                }}
+                ondragleave={(e) => {
+                  e.currentTarget.classList.remove("bg-green-500");
+                }}
+                ondrop={(e) => {
+                  const drag = getCurrentSidebarDrag(e);
+                  if (!drag) {
+                    return;
+                  }
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.currentTarget.classList.remove("bg-green-500");
+                  try {
+                    if (char.type === "folder") {
+                      inserter(drag, { index: 0, folder: char.id });
+                    }
+                  } finally {
+                    clearCurrentDrag();
+                  }
+                }}
+                ondragenter={preventAll}
+              ></div>
+              {#each char.folder as char2, ind (char2.id)}
+                <div
+                  class="group relative flex items-center px-2 z-10"
+                  role="listitem"
+                  draggable="true"
+                  data-character-nav-id={char2.id}
+                  data-character-nav-kind="character"
+                  data-character-nav-folder={char.id}
+                  ondragstart={(e) => {
+                    if (char.type === "folder") {
+                      avatarDragStart({ index: ind, folder: char.id }, e);
                     }
                   }}
+                  ondragend={clearCurrentDrag}
+                  ondragover={avatarDragOver}
+                  ondrop={(e) => {
+                    if (char.type === "folder") {
+                      avatarDrop({ index: ind, folder: char.id }, e);
+                    }
+                  }}
+                  ondragenter={preventAll}
                 >
-                <SidebarAvatar 
-                  src={char2.img ? getCharImage(char2.img, "plain") : "/none.webp"} 
-                  size="56" 
-                  rounded={IconRounded} 
-                  name={char2.name}
-                  chaId={DBState.db.characters[char2.index]?.chaId}
-                />
-              </div>
+                  <SidebarIndicator
+                    isActive={$selectedCharID === char2.index &&
+                      sideBarMode !== 1}
+                  />
+                  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+                  <div
+                    role="button"
+                    tabindex="0"
+                    data-character-id={char2.id}
+                    onclick={() => {
+                      if (char2.type === "normal") {
+                        changeChar(char2.index, { reseter });
+                      }
+                    }}
+                    onkeydown={(e) => {
+                      if (e.key === "Enter") {
+                        if (char2.type === "normal") {
+                          changeChar(char2.index, { reseter });
+                        }
+                      }
+                    }}
+                  >
+                    <SidebarAvatar
+                      src={char2.img
+                        ? getCharImage(char2.img, "plain")
+                        : "/none.webp"}
+                      size="56"
+                      rounded={IconRounded}
+                      name={char2.name}
+                      chaId={DBState.db.characters[char2.index]?.chaId}
+                    />
+                  </div>
+                </div>
+                <div
+                  class="h-4 min-h-4 w-14 relative z-20"
+                  role="listitem"
+                  data-character-drop-folder={char.id}
+                  data-character-drop-before={char.folder[ind + 1]?.id ?? ""}
+                  ondragover={(e) => {
+                    if (!getCurrentSidebarDrag(e)) {
+                      return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = "move";
+                    e.currentTarget.classList.add("bg-green-500");
+                  }}
+                  ondragleave={(e) => {
+                    e.currentTarget.classList.remove("bg-green-500");
+                  }}
+                  ondrop={(e) => {
+                    const drag = getCurrentSidebarDrag(e);
+                    if (!drag) {
+                      return;
+                    }
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.remove("bg-green-500");
+                    try {
+                      if (char.type === "folder") {
+                        inserter(drag, { index: ind + 1, folder: char.id });
+                      }
+                    } finally {
+                      clearCurrentDrag();
+                    }
+                  }}
+                  ondragenter={preventAll}
+                ></div>
+              {/each}
             </div>
-            <div class="h-4 min-h-4 w-14 relative z-20" role="listitem" ondragover={(e) => {
-              if(!getCurrentSidebarDrag(e)){ return }
-              e.preventDefault()
-              e.stopPropagation()
-              e.dataTransfer.dropEffect = 'move'
-              e.currentTarget.classList.add('bg-green-500')
-            }} ondragleave={(e) => {
-              e.currentTarget.classList.remove('bg-green-500')
-            }} ondrop={(e) => {
-              const drag = getCurrentSidebarDrag(e)
-              if(!drag){ return }
-              e.preventDefault()
-              e.stopPropagation()
-              e.currentTarget.classList.remove('bg-green-500')
-              try {
-                if(char.type === 'folder'){
-                  inserter(drag,{index:ind+1,folder:char.id})
-                }
-              } finally {
-                clearCurrentDrag()
-              }
-            }} ondragenter={preventAll}></div>
-          {/each}
-        </div>
-        {/key}
-      {/if}
-      <div class="h-4 min-h-4 w-14" role="listitem" ondragover={((e) => {
-        if(!getCurrentSidebarDrag(e)){ return }
-        e.preventDefault()
-        e.stopPropagation()
-        e.dataTransfer.dropEffect = 'move'
-        e.currentTarget.classList.add('bg-green-500')
-      })} ondragleave={(e) => {
-        e.currentTarget.classList.remove('bg-green-500')
-      }} ondrop={(e) => {
-        const drag = getCurrentSidebarDrag(e)
-        if(!drag){ return }
-        e.preventDefault()
-        e.stopPropagation()
-        e.currentTarget.classList.remove('bg-green-500')
-        try {
-          inserter(drag,{index:ind+1})
-        } finally {
-          clearCurrentDrag()
-        }
-      }} ondragenter={preventAll}></div>
-    {/each}
-    <div class="flex flex-col items-center gap-2 px-2">
-      <BaseRoundedButton
-        onClick={async () => {
-          addCharacter({reseter}) 
-        }}
-        ><svg viewBox="0 0 24 24" width="1.2em" height="1.2em"
-          ><path
-            fill="none"
-            stroke="currentColor"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          /></svg
-        ></BaseRoundedButton
-      >
-    </div>
-  </div>
-  {#if DBState.db.hamburgerButtonBottom}
-  <div class="border-t border-t-selected w-full relative text-white ">
-    {#if menuMode === 1}
-      <div class="absolute bottom-full w-20 min-w-20 flex border-t-selected border-t bg-bgcolor flex-col items-center pt-2 rounded-t-md z-20 pb-2">
-        <BarIcon
-        onClick={() => {
-          if ($settingsOpen) {
-            reseter();
-            settingsOpen.set(false);
-          } else {
-            reseter();
-            settingsOpen.set(true);
-          }
-        }}><Settings /></BarIcon
-      >
-      <div class="mt-2"></div>
-      <BarIcon
-        onClick={() => {
-          reseter();
-          selectedCharID.set(-1)
-          PlaygroundStore.set(0)
-          OpenRealmStore.set(false)
-        }}><HomeIcon /></BarIcon>
-      <div class="mt-2"></div>
-      <BarIcon
-        onClick={() => {
-          reseter()
-          if($selectedCharID === -1 && $PlaygroundStore !== 0){
-            PlaygroundStore.set(0)
-            return
-          }
-          selectedCharID.set(-1)
-          PlaygroundStore.set(1)
-        }}
-      ><ShellIcon /></BarIcon>
-      {#each additionalHamburgerMenu as menu}
-        <div class="mt-2"></div>
-        <BarIcon
-          onClick={() => {
-            reseter();
-            menu.callback();
-          }}>
-            <PluginDefinedIcon ico={menu} />
-          </BarIcon
-        >
+          {/key}
+        {/if}
+        <div
+          class="h-4 min-h-4 w-14"
+          role="listitem"
+          data-character-drop-folder=""
+          data-character-drop-before={charImages[ind + 1]?.id ?? ""}
+          ondragover={(e) => {
+            if (!getCurrentSidebarDrag(e)) {
+              return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = "move";
+            e.currentTarget.classList.add("bg-green-500");
+          }}
+          ondragleave={(e) => {
+            e.currentTarget.classList.remove("bg-green-500");
+          }}
+          ondrop={(e) => {
+            const drag = getCurrentSidebarDrag(e);
+            if (!drag) {
+              return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove("bg-green-500");
+            try {
+              inserter(drag, { index: ind + 1 });
+            } finally {
+              clearCurrentDrag();
+            }
+          }}
+          ondragenter={preventAll}
+        ></div>
       {/each}
-      <div class="mt-2"></div>
-      <BarIcon
-        onClick={() => {
-          reseter();
-          openGrid();
-        }}><LayoutGridIcon /></BarIcon
-      >
+      <div class="flex flex-col items-center gap-2 px-2">
+        <BaseRoundedButton
+          ariaLabel={language.addCharacter}
+          onClick={async () => {
+            addCharacter({ reseter });
+          }}
+          ><svg viewBox="0 0 24 24" width="1.2em" height="1.2em"
+            ><path
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+            /></svg
+          ></BaseRoundedButton
+        >
+      </div>
     </div>
+    {#if DBState.db.hamburgerButtonBottom}
+      <div class="border-t border-t-selected w-full relative text-white">
+        {#if menuMode === 1}
+          <div
+            class="absolute bottom-full w-20 min-w-20 flex border-t-selected border-t bg-bgcolor flex-col items-center pt-2 rounded-t-md z-20 pb-2"
+          >
+            <BarIcon
+              onClick={() => {
+                if ($settingsOpen) {
+                  reseter();
+                  settingsOpen.set(false);
+                } else {
+                  reseter();
+                  settingsOpen.set(true);
+                }
+              }}><Settings /></BarIcon
+            >
+            <div class="mt-2"></div>
+            <BarIcon
+              onClick={() => {
+                reseter();
+                selectedCharID.set(-1);
+                PlaygroundStore.set(0);
+                OpenRealmStore.set(false);
+              }}><HomeIcon /></BarIcon
+            >
+            <div class="mt-2"></div>
+            <BarIcon
+              onClick={() => {
+                reseter();
+                if ($selectedCharID === -1 && $PlaygroundStore !== 0) {
+                  PlaygroundStore.set(0);
+                  return;
+                }
+                selectedCharID.set(-1);
+                PlaygroundStore.set(1);
+              }}><ShellIcon /></BarIcon
+            >
+            {#each additionalHamburgerMenu as menu}
+              <div class="mt-2"></div>
+              <BarIcon
+                onClick={() => {
+                  reseter();
+                  menu.callback();
+                }}
+              >
+                <PluginDefinedIcon ico={menu} />
+              </BarIcon>
+            {/each}
+            <div class="mt-2"></div>
+            <BarIcon
+              onClick={() => {
+                reseter();
+                openGrid();
+              }}><LayoutGridIcon /></BarIcon
+            >
+          </div>
+        {/if}
+      </div>
+      <button
+        class="flex h-8 min-h-8 w-14 min-w-14 cursor-pointer text-white mb-2 mt-2 items-center justify-center rounded-md bg-textcolor2 transition-colors hover:bg-blue-500"
+        onclick={() => {
+          menuMode = 1 - menuMode;
+        }}
+        ><ListIcon />
+      </button>
     {/if}
   </div>
-  <button
-    class="flex h-8 min-h-8 w-14 min-w-14 cursor-pointer text-white mb-2 mt-2 items-center justify-center rounded-md bg-textcolor2 transition-colors hover:bg-blue-500"
-    onclick={() => {
-      menuMode = 1 - menuMode;
-    }}><ListIcon />
-  </button>
-  {/if}
-</div>
 {/if}
 <div
   class="setting-area h-full flex-col overflow-y-auto overflow-x-hidden bg-darkbg py-6 text-textcolor max-h-full"
@@ -906,20 +1245,20 @@
   class:px-2={$DynamicGUI}
   class:px-4={!$DynamicGUI}
   class:dynamic-sidebar={$DynamicGUI}
-  class:hidden={hidden}
+  class:hidden
   class:flex={!hidden}
   onanimationend={() => {
-    if($sideBarClosing){
-      $sideBarClosing = false
-      sideBarStore.set(false)
+    if ($sideBarClosing) {
+      $sideBarClosing = false;
+      sideBarStore.set(false);
     }
   }}
 >
   <button
     class="flex w-full justify-end text-textcolor"
     onclick={async () => {
-      if($sideBarClosing){
-        return
+      if ($sideBarClosing) {
+        return;
       }
       $sideBarClosing = true;
     }}
@@ -930,10 +1269,12 @@
     {#if $selectedCharID < 0 || $settingsOpen}
       <div>
         <h1 class="text-xl">Welcome to RisuAI!</h1>
-        <span class="text-xs text-textcolor2">Select a bot to start chatting</span>
+        <span class="text-xs text-textcolor2"
+          >Select a bot to start chatting</span
+        >
       </div>
-    {:else if DBState.db.characters[$selectedCharID]?.chaId === '§playground'}
-      <SideChatList bind:chara={ DBState.db.characters[$selectedCharID]} />
+    {:else if DBState.db.characters[$selectedCharID]?.chaId === "§playground"}
+      <SideChatList bind:chara={DBState.db.characters[$selectedCharID]} />
     {:else if $ConnectionOpenStore}
       <div class="flex flex-col">
         <h1 class="text-xl">{language.connectionOpen}</h1>
@@ -951,19 +1292,35 @@
         </div>
       </div>
     {:else}
-      <div class="w-full h-8 min-h-8 border-l border-b border-r border-selected relative bottom-6 rounded-b-md flex">
-        <button onclick={() => {
-          devTool = false
-          botMakerMode.set(false)
-        }} class="grow border-r border-r-selected rounded-bl-md" class:text-textcolor2={$botMakerMode || devTool}>{language.Chat}</button>
-        <button onclick={() => {
-          devTool = false
-          botMakerMode.set(true)
-        }} class="grow rounded-br-md" class:text-textcolor2={!$botMakerMode || devTool}>{language.character}</button>
+      <div
+        class="w-full h-8 min-h-8 border-l border-b border-r border-selected relative bottom-6 rounded-b-md flex"
+      >
+        <button
+          onclick={() => {
+            devTool = false;
+            botMakerMode.set(false);
+          }}
+          class="grow border-r border-r-selected rounded-bl-md"
+          class:text-textcolor2={$botMakerMode || devTool}
+          >{language.Chat}</button
+        >
+        <button
+          onclick={() => {
+            devTool = false;
+            botMakerMode.set(true);
+          }}
+          class="grow rounded-br-md"
+          class:text-textcolor2={!$botMakerMode || devTool}
+          >{language.character}</button
+        >
         {#if DBState.db.enableDevTools}
-          <button onclick={() => {
-            devTool = true
-          }} class="border-l border-l-selected rounded-br-md px-1" class:text-textcolor2={!devTool}>
+          <button
+            onclick={() => {
+              devTool = true;
+            }}
+            class="border-l border-l-selected rounded-br-md px-1"
+            class:text-textcolor2={!devTool}
+          >
             <WrenchIcon size={18} />
           </button>
         {/if}
@@ -975,29 +1332,32 @@
       {:else if $botMakerMode}
         <CharConfig />
       {:else}
-        <SideChatList bind:chara={ DBState.db.characters[$selectedCharID]} />
+        <SideChatList bind:chara={DBState.db.characters[$selectedCharID]} />
       {/if}
     {/if}
   {/if}
 </div>
 
 {#if $DynamicGUI}
-    <div role="button" tabindex="0" class="grow h-full min-w-12" class:hidden={hidden} onclick={() => {
-      if($sideBarClosing){
-        return
+  <div
+    role="button"
+    tabindex="0"
+    class="grow h-full min-w-12"
+    class:hidden
+    onclick={() => {
+      if ($sideBarClosing) {
+        return;
       }
       $sideBarClosing = true;
     }}
-      onkeydown={(e)=>{
-        if(e.key === 'Enter'){
-            e.currentTarget.click()
-        }
-      }}
-      class:sidebar-dark-animation={!$sideBarClosing}
-      class:sidebar-dark-close-animation={$sideBarClosing}>
-
-    </div>
-
+    onkeydown={(e) => {
+      if (e.key === "Enter") {
+        e.currentTarget.click();
+      }
+    }}
+    class:sidebar-dark-animation={!$sideBarClosing}
+    class:sidebar-dark-close-animation={$sideBarClosing}
+  ></div>
 {/if}
 
 <style>
@@ -1015,7 +1375,7 @@
   @keyframes sidebar-transition-close {
     from {
       width: var(--sidebar-size);
-      right:0rem;
+      right: 0rem;
     }
     to {
       width: 0rem;
@@ -1036,12 +1396,12 @@
     from {
       width: var(--sidebar-size);
       min-width: var(--sidebar-size);
-      right:0rem;
+      right: 0rem;
     }
     to {
       width: 0rem;
       min-width: 0rem;
-      right:3rem;
+      right: 3rem;
     }
   }
   @keyframes sub-sidebar-transition {
@@ -1059,8 +1419,7 @@
       width: 5rem;
       min-width: 5rem;
       max-width: 5rem;
-      right:0rem;
-
+      right: 0rem;
     }
     to {
       width: 0rem;
@@ -1069,20 +1428,20 @@
       right: 10rem;
     }
   }
-  @keyframes sidebar-dark-animation{
+  @keyframes sidebar-dark-animation {
     from {
-      background-color: rgba(0,0,0,0) !important;
+      background-color: rgba(0, 0, 0, 0) !important;
     }
     to {
-      background-color: rgba(0,0,0,0.5) !important;
+      background-color: rgba(0, 0, 0, 0.5) !important;
     }
   }
-  @keyframes sidebar-dark-closing-animation{
+  @keyframes sidebar-dark-closing-animation {
     from {
-      background-color: rgba(0,0,0,0.5) !important;
+      background-color: rgba(0, 0, 0, 0.5) !important;
     }
     to {
-      background-color: rgba(0,0,0,0) !important;
+      background-color: rgba(0, 0, 0, 0) !important;
     }
   }
 
@@ -1106,7 +1465,6 @@
     right: 3rem;
   }
 
-
   .risu-sub-sidebar {
     animation-name: sub-sidebar-transition;
     animation-duration: var(--risu-animation-speed);
@@ -1116,14 +1474,14 @@
     animation-duration: var(--risu-animation-speed);
     position: relative;
   }
-  .sidebar-dark-animation{
+  .sidebar-dark-animation {
     animation-name: sidebar-dark-transition;
     animation-duration: var(--risu-animation-speed);
-    background-color: rgba(0,0,0,0.5)
+    background-color: rgba(0, 0, 0, 0.5);
   }
-  .sidebar-dark-close-animation{
+  .sidebar-dark-close-animation {
     animation-name: sidebar-dark-closing-transition;
     animation-duration: var(--risu-animation-speed);
-    background-color: rgba(0,0,0,0)
+    background-color: rgba(0, 0, 0, 0);
   }
 </style>

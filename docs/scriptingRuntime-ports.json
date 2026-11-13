@@ -1,0 +1,212 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/scriptings.ts",
+  "factory": "createScriptingRuntime",
+  "functions": [
+    "runScripted",
+    "makeLuaFactory",
+    "ensureLuaFactory",
+    "getOrCreateEngineState",
+    "luaCodeWrapper",
+    "runLuaEditTrigger",
+    "runLuaButtonTrigger"
+  ],
+  "ports": [
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentCharacter"
+    },
+    {
+      "name": "setChatVar",
+      "specifier": "../parser/chatVar.svelte",
+      "original": "setChatVar"
+    },
+    {
+      "name": "getChatVar",
+      "specifier": "../parser/chatVar.svelte",
+      "original": "getChatVar"
+    },
+    {
+      "name": "getCurrentChat",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentChat"
+    },
+    {
+      "name": "PyodideContext",
+      "specifier": "./scriptings",
+      "original": "PyodideContext"
+    },
+    {
+      "name": "getGlobalChatVar",
+      "specifier": "../parser/chatVar.svelte",
+      "original": "getGlobalChatVar"
+    },
+    {
+      "name": "alertError",
+      "specifier": "../alert",
+      "original": "alertError"
+    },
+    {
+      "name": "alertNormal",
+      "specifier": "../alert",
+      "original": "alertNormal"
+    },
+    {
+      "name": "alertInput",
+      "specifier": "../alert",
+      "original": "alertInput"
+    },
+    {
+      "name": "alertSelect",
+      "specifier": "../alert",
+      "original": "alertSelect"
+    },
+    {
+      "name": "alertConfirm",
+      "specifier": "../alert",
+      "original": "alertConfirm"
+    },
+    {
+      "name": "tokenize",
+      "specifier": "../tokenizer",
+      "original": "tokenize"
+    },
+    {
+      "name": "risuChatParser",
+      "specifier": "../parser/parser.svelte",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "ReloadGUIPointer",
+      "specifier": "../stores.svelte",
+      "original": "ReloadGUIPointer"
+    },
+    {
+      "name": "ReloadChatPointer",
+      "specifier": "../stores.svelte",
+      "original": "ReloadChatPointer"
+    },
+    {
+      "name": "HypaProcesser",
+      "specifier": "./memory/hypamemory",
+      "original": "HypaProcesser"
+    },
+    {
+      "name": "fetchNative",
+      "specifier": "../globalApi.svelte",
+      "original": "fetchNative"
+    },
+    {
+      "name": "generateAIImage",
+      "specifier": "./stableDiff",
+      "original": "generateAIImage"
+    },
+    {
+      "name": "writeInlayImage",
+      "specifier": "./files/inlays",
+      "original": "writeInlayImage"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "selectedCharID",
+      "specifier": "../stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "readImage",
+      "specifier": "../globalApi.svelte",
+      "original": "readImage"
+    },
+    {
+      "name": "asBuffer",
+      "specifier": "src/ts/util",
+      "original": "asBuffer"
+    },
+    {
+      "name": "getUserIcon",
+      "specifier": "../util",
+      "original": "getUserIcon"
+    },
+    {
+      "name": "hasher",
+      "specifier": "../parser/parser.svelte",
+      "original": "hasher"
+    },
+    {
+      "name": "getInlayAsset",
+      "specifier": "./files/inlays",
+      "original": "getInlayAsset"
+    },
+    {
+      "name": "requestChatData",
+      "specifier": "./request/request",
+      "original": "requestChatData"
+    },
+    {
+      "name": "DBState",
+      "specifier": "../stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "getUserName",
+      "specifier": "../util",
+      "original": "getUserName"
+    },
+    {
+      "name": "getPersonaPrompt",
+      "specifier": "../util",
+      "original": "getPersonaPrompt"
+    },
+    {
+      "name": "getModuleLorebooks",
+      "specifier": "./modules",
+      "original": "getModuleLorebooks"
+    },
+    {
+      "name": "loadLoreBookV3Prompt",
+      "specifier": "./lorebook.svelte",
+      "original": "loadLoreBookV3Prompt"
+    },
+    {
+      "name": "v4",
+      "specifier": "uuid",
+      "original": "v4"
+    },
+    {
+      "name": "getModuleTriggers",
+      "specifier": "./modules",
+      "original": "getModuleTriggers"
+    }
+  ],
+  "globals": ["Image", "fetch"],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Actual Lua APIs tested in Node and real worker jobs; Python/browser/provider capabilities remain incomplete",
+  "invocationPolicies": [
+    {
+      "function": "runScripted",
+      "originalHash": "07a3b48ac7ac1954ba0dd835306d46a25c0d09695a7c2bd87021215cb9e6a474",
+      "extractedHash": "2f6813633785f7f225ad857a8461c9b1e465203222d97cbfc21602dff79d66d1",
+      "description": "Invocation access tokens are revoked in finally; caught Lua failures notify the transactional host without changing ordinary fallback results.",
+      "tests": [
+        "src/ts/process/scriptingRuntime.test.ts",
+        "src/ts/runtime/browserDisplayLua.test.ts"
+      ]
+    },
+    {
+      "function": "runLuaEditTrigger",
+      "originalHash": "ed1d6801398254047e15c1a3b06f30950e063a28f0d83bde2cbb2581cd7db2b7",
+      "extractedHash": "73d2d3c92866a08e20d35b5ce9f8771a2b733fa18046dd63e8f3258da97a21ac",
+      "description": "Caught setup/compile failures notify the transactional host before returning the original display input.",
+      "tests": [
+        "src/ts/process/scriptingRuntime.test.ts",
+        "src/ts/runtime/browserDisplayLua.test.ts"
+      ]
+    }
+  ]
+}

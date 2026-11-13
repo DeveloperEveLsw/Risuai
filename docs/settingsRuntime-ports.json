@@ -1,0 +1,102 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/storage/database.svelte.ts",
+  "core": "src/ts/storage/settingsRuntime.ts",
+  "factory": "createSettingsRuntime",
+  "functions": ["setDatabase"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "checkNullish",
+      "specifier": "../util",
+      "original": "checkNullish"
+    },
+    {
+      "name": "defaultMainPrompt",
+      "specifier": "./defaultPrompts",
+      "original": "defaultMainPrompt"
+    },
+    {
+      "name": "defaultJailbreak",
+      "specifier": "./defaultPrompts",
+      "original": "defaultJailbreak"
+    },
+    {
+      "name": "defaultAutoSuggestPrompt",
+      "specifier": "./defaultPrompts",
+      "original": "defaultAutoSuggestPrompt"
+    },
+    {
+      "name": "safeStructuredClone",
+      "specifier": "../polyfill",
+      "original": "safeStructuredClone"
+    },
+    {
+      "name": "prebuiltNAIpresets",
+      "specifier": "../process/templates/templates",
+      "original": "prebuiltNAIpresets"
+    },
+    {
+      "name": "defaultColorScheme",
+      "specifier": "../gui/colorscheme",
+      "original": "defaultColorScheme"
+    },
+    {
+      "name": "LLMFormat",
+      "specifier": "../model/modellist",
+      "original": "LLMFormat"
+    },
+    {
+      "name": "createHypaV3Preset",
+      "specifier": "../process/memory/hypav3",
+      "original": "createHypaV3Preset"
+    },
+    {
+      "name": "normalizeTranslatorPresetState",
+      "specifier": "../translator/presets",
+      "original": "normalizeTranslatorPresetState"
+    },
+    {
+      "name": "defaultHotkeys",
+      "specifier": "../defaulthotkeys",
+      "original": "defaultHotkeys"
+    },
+    {
+      "name": "normalizeChatLoadPages",
+      "specifier": "../chatLoadPages",
+      "original": "normalizeChatLoadPages"
+    },
+    {
+      "name": "DEFAULT_CHAT_LOAD_INITIAL_PAGES",
+      "specifier": "../chatLoadPages",
+      "original": "DEFAULT_CHAT_LOAD_INITIAL_PAGES"
+    },
+    {
+      "name": "DEFAULT_CHAT_LOAD_ADDITIONAL_PAGES",
+      "specifier": "../chatLoadPages",
+      "original": "DEFAULT_CHAT_LOAD_ADDITIONAL_PAGES"
+    },
+    {
+      "name": "isNodeServer",
+      "specifier": "src/ts/platform",
+      "original": "isNodeServer"
+    },
+    {
+      "name": "isTauri",
+      "specifier": "src/ts/platform",
+      "original": "isTauri"
+    },
+    {
+      "name": "changeLanguage",
+      "specifier": "../../lang",
+      "original": "changeLanguage"
+    },
+    {
+      "name": "setDatabaseLite",
+      "specifier": "./database.svelte",
+      "original": "setDatabaseLite"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

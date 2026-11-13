@@ -1,0 +1,48 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/model/modellist.ts",
+  "core": "src/ts/model/modelRuntime.ts",
+  "factory": "createModelRuntime",
+  "functions": ["getModelInfo"],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "LLMProvider",
+      "specifier": "./types",
+      "original": "LLMProvider"
+    },
+    {
+      "name": "LLMFormat",
+      "specifier": "./types",
+      "original": "LLMFormat"
+    },
+    {
+      "name": "OpenAIParameters",
+      "specifier": "./types",
+      "original": "OpenAIParameters"
+    },
+    {
+      "name": "LLMTokenizer",
+      "specifier": "./types",
+      "original": "LLMTokenizer"
+    },
+    {
+      "name": "LLMModels",
+      "specifier": "./modelCatalog",
+      "original": "LLMModels"
+    },
+    {
+      "name": "customV3ProviderMetaStore",
+      "specifier": "../plugins/apiV3/v3.svelte",
+      "original": "customV3ProviderMetaStore"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Actual built-in/derived model lookup and per-context flags; dynamic registration/providers are not yet integrated"
+}

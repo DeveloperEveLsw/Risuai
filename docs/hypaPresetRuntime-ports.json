@@ -1,0 +1,11 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/hypav3.ts",
+  "core": "src/ts/process/memory/hypaPresetRuntime.ts",
+  "factory": "createHypaPresetRuntime",
+  "functions": ["createHypaV3Preset"],
+  "classes": [],
+  "ports": [],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

@@ -1,0 +1,57 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/supaMemory.ts",
+  "core": "src/ts/process/memory/supaMemoryRuntime.ts",
+  "factory": "createSupaMemoryRuntime",
+  "functions": ["supaMemory"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "../../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "tokenize",
+      "specifier": "../../tokenizer",
+      "original": "tokenize"
+    },
+    {
+      "name": "requestChatData",
+      "specifier": "../request/request",
+      "original": "requestChatData"
+    },
+    {
+      "name": "HypaProcesser",
+      "specifier": "./hypamemory",
+      "original": "HypaProcesser"
+    },
+    {
+      "name": "stringlizeChat",
+      "specifier": "../stringlize",
+      "original": "stringlizeChat"
+    },
+    {
+      "name": "globalFetch",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "globalFetch"
+    },
+    {
+      "name": "runSummarizer",
+      "specifier": "../transformers",
+      "original": "runSummarizer"
+    },
+    {
+      "name": "parseChatML",
+      "specifier": "src/ts/parser/chatML",
+      "original": "parseChatML"
+    },
+    {
+      "name": "getUserName",
+      "specifier": "src/ts/util",
+      "original": "getUserName"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "nativeHostIntegrated": true
+}

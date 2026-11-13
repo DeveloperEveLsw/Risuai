@@ -1,7 +1,7 @@
 import "./ts/polyfill";
 import "core-js/actual"
 import "./ts/storage/database.svelte"
-import { isServerResidentExecutor } from "./ts/platform";
+import App from "./App.svelte";
 import { loadData } from "./ts/bootstrap";
 import { initHotkey } from "./ts/hotkey";
 import { preLoadCheck } from "./preload";
@@ -13,15 +13,11 @@ window.addEventListener('vite:preloadError', (event) => {
 });
 
 preLoadCheck()
-// The resident runs the engine without mounting the chat/catalog/settings UI.
-const { default: App } = isServerResidentExecutor
-    ? await import('./ResidentApp.svelte')
-    : await import('./App.svelte');
 let app = mount(App, {
     target: document.getElementById("app"),
 });
 loadData()
-if (!isServerResidentExecutor) initHotkey()
+initHotkey()
 document.getElementById('preloading').remove()
 
 export default app;

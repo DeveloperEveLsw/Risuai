@@ -1,0 +1,141 @@
+{
+  "verifiedAt": "2026-10-04T01:26:55.504722+00:00",
+  "status": "test_only_milestone_verified_goal_active",
+  "baseCommit": "467723ab80de964cf725adec13b99c7395abfcd6",
+  "all15Preserved": true,
+  "wholeGoalComplete": false,
+  "syntheticOnly": true,
+  "productionCodeChanged": false,
+  "productionAccess": false,
+  "privateContentRead": false,
+  "deployment": false,
+  "remotePush": false,
+  "externalProviderCalls": 0,
+  "checks": {
+    "backend": {
+      "passed": 237,
+      "nativeGroupTests": 12,
+      "log": "risu-group-recovery-backend.log"
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 0,
+      "log": "risu-group-recovery-check.log"
+    },
+    "browser": {
+      "passed": 1,
+      "skipped": 0,
+      "independentContexts": 2,
+      "providerCalls": 6,
+      "runtimeExceptions": 0,
+      "actualNativeProcessKilled": true,
+      "localServiceRestarted": true,
+      "oldDomRowsRetained": true,
+      "interruptedStatusVisible": true,
+      "log": "risu-group-recovery-browser-first.log"
+    },
+    "nativeRecovery": {
+      "newCases": 1,
+      "providerCalls": 4,
+      "canonicalQueuedTurnMessages": 3,
+      "canonicalInterruptedTurnMessages": 0,
+      "canonicalInterruptedVariableWrites": 0,
+      "retainedProgressRows": 3,
+      "retainedAssistantProgressRows": 2,
+      "dbWorkerReopened": true,
+      "idempotentInterruptedReplay": true,
+      "idempotentQueuedReplay": true,
+      "staleWorkerFenced": true,
+      "individualArchivesPreserved": true,
+      "log": "risu-group-recovery-native-corrected.log"
+    }
+  },
+  "unchangedSourceBaseline": {
+    "commit": "467723ab80de964cf725adec13b99c7395abfcd6",
+    "nonTestSourceChanged": false,
+    "applicationPassed": 431,
+    "applicationSkipped": 3,
+    "builds": [
+      "native",
+      "entityWeb",
+      "ordinaryWeb"
+    ],
+    "auditDeclarations": 168,
+    "auditOriginalBodies": 166,
+    "auditPriorPolicies": 2,
+    "accounting": "These gates are reused from the exact unchanged 467723a source; this test-only follow-up did not rerun application/build/audit checks. Backend, type and extended real browser checks above are fresh.",
+    "artifactHashes": {
+      "nativeBundleSha256": "3453f9d795b914fc35bb76902e1d294be977a681df66e03647c190b6dd2af0d4",
+      "entityIndexSha256": "7eb0b57e362548595b4f07793346912562946db46f7fbf074a33c6f6451f30aa"
+    }
+  },
+  "fixtureCorrection": {
+    "log": "risu-group-recovery-native-first.log",
+    "reason": "new-send progress includes admitted user input plus two assistant replies; assert by role and preserve full checkpoint",
+    "countedPassed": false
+  },
+  "boundaries": [
+    "scheduler close",
+    "native SIGKILL during second member stream",
+    "DB-worker close/reopen",
+    "queued-only restart",
+    "old owner/fence rejection",
+    "two-browser canonical/DOM preservation and visible interrupted status",
+    "orderly local service close/reopen"
+  ],
+  "notVerified": [
+    "machine power failure",
+    "abrupt supervisor death",
+    "prolonged disk failure",
+    "resumed provider stream",
+    "explicit user-facing retained-output choose/copy/retry flow",
+    "physical mobile lifecycle",
+    "previous/next variants",
+    "automode and empty/inactive/orphan groups",
+    "complete definition read dependency policy",
+    "general extensions",
+    "representative latency/long tasks",
+    "all15 configured trial"
+  ],
+  "sourceHashes": {
+    "server/native/groupGeneration.test.cjs": "8573e7e1bee70427a657770ddef7876d667bd8e6d8988e00fe8236b113effed7",
+    "server/browser/groupGenerationUi.test.cjs": "14973cd8db4e08798e3921338b5de29f85e8ac911ea626bbcfca9c847e712fc2",
+    "docs/group-recovery-runtime.md": "48d24349a84dbb656da05f8ebef16cc0bb124ef72a05301224d2ccb4122c63fa",
+    "docs/group-reroll-runtime.md": "4616776d2c3d315146e77e4699f3c48c2f6af0e278efc9af7a91ec8bba1130b7",
+    "docs/server-runtime-plan.md": "da3f12906bdd21e81481bb93c32e05723eda14d4247b0a83f796cb7de945d9cb"
+  },
+  "logHashes": {
+    "risu-group-recovery-backend.log": {
+      "bytes": 112875,
+      "sha256": "46cd9fccb4e4d592020f423fc35727e2e10e072339114cf67f00897c6b48c2a4"
+    },
+    "risu-group-recovery-browser-first.log": {
+      "bytes": 1983,
+      "sha256": "e0e5e0c1878112a7afe6a30c1efa1087e09cf411b8db98c7c255eb40a114e5a1"
+    },
+    "risu-group-recovery-browser-format.log": {
+      "bytes": 47,
+      "sha256": "95b40495190dcdd5ddbe9a4d78f4f1a3d47b8301673aa48258e17e7680088c12"
+    },
+    "risu-group-recovery-check.log": {
+      "bytes": 324,
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    "risu-group-recovery-format.log": {
+      "bytes": 44,
+      "sha256": "b2f16e6868422dd55d68f6a5529d9a4ef604c5b4a184dd2ab5da7215e629a7d4"
+    },
+    "risu-group-recovery-format2.log": {
+      "bytes": 44,
+      "sha256": "c0c24c061bf8de590b741ee1a8a06da3661972047a1fbf210de0115a068051f3"
+    },
+    "risu-group-recovery-native-corrected.log": {
+      "bytes": 1472,
+      "sha256": "f666e5483719984d648133a1182d311947f60143ab34af9105e34b90cdc57134"
+    },
+    "risu-group-recovery-native-first.log": {
+      "bytes": 3001,
+      "sha256": "aa42ad111783c081d5d234fd74a3c03184ee5e7f0238d7119de0ce078e90e868"
+    }
+  }
+}

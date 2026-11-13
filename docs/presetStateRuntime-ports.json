@@ -1,0 +1,20 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/translator/presets.ts",
+  "core": "src/ts/translator/presetStateRuntime.ts",
+  "factory": "createPresetStateRuntime",
+  "functions": [
+    "isRecord",
+    "getDefaultTranslatorPreset",
+    "getNormalizedTranslatorPresetName",
+    "createTranslatorPreset",
+    "normalizeTranslatorPresetState",
+    "syncCurrentTranslatorPresetToLegacyFields",
+    "getCurrentTranslatorPresetFromState",
+    "isTranslatorPresetValue"
+  ],
+  "classes": [],
+  "ports": [],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

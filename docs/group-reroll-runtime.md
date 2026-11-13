@@ -1,0 +1,27 @@
+# Original group reroll boundary and atomic replacement
+
+A first reroll after two group members replied kept the first member's old reply and generated only the second member again. A real isolated native process reproduced one provider call where the original UI's rewind loop requires two. The before-control is retained as a failure, rather than counted as a passing regression.
+
+The native job now computes the same first-reroll boundary as the original UI: walk backward until a user message or the second occurrence of the last speaker. Truncate only the private job history, then run the original group speaker selection and generation. Final replacement of all affected messages and variables stays inside the fenced transaction. The original UI source remains unchanged. A differential test evaluates its actual loop against seven authored individual/group/repeated-speaker/non-user-tail histories; exhausted reply-only history fails before a provider request, matching the upstream failure boundary.
+
+## Validation
+
+Four additional real-process tests verify the whole latest batch, group continue, cancellation during the second reroll response and an obsolete target changed by a peer. A completed reroll replaces both assistant IDs while retaining the user ID. Cancellation retains every original message and variable. A stale target becomes a durable failed job without an additional provider call. These tests use a loopback synthetic provider and synthetic cards.
+
+The built original UI acceptance uses two independent authenticated Chromium contexts. It first streams two replies, closes all tabs before completion and reconnects to the saved group. It then clicks the original reroll button and holds the fourth synthetic provider response. While both new replies are provisional, the canonical old batch and variables remain unchanged, and each old message retains its original connected DOM row in both browsers. Completion replaces the whole batch, and both devices converge to the same three canonical IDs. The successful run reports no browser runtime exceptions and exactly four synthetic provider calls.
+
+Final gates: 431 application tests pass with three existing skips; 236 backend tests pass, including 11 native group cases; types report zero errors/warnings; native, entity-web and ordinary-web builds pass. The existing structural audit still compares 168 declarations, with 166 original bodies and two prior explicit Lua policies. It does not audit this new helper; the separately recorded differential comparison checks the actual original first-reroll loop. Source/log hashes and original-loop identity are in [group-reroll-validation.json](group-reroll-validation.json) and root `evidence/local-group-reroll-20261004.json` / `evidence/local-group-reroll-logs/`.
+
+Failed fixture attempts are preserved separately: the worker reports a rejected target as a completed protocol message containing `state=failed`, not a rejected process promise; the job-list API takes a chat-ID string, not an object; persisted message roles are user/char, so the non-user tail fixture uses an unassigned character speaker. None changes the required application behavior.
+
+## Original behavior and remaining work
+
+Subsequent actual shutdown/kill/restart and queued recovery acceptance is recorded in [group-recovery-runtime.md](group-recovery-runtime.md). It confirms the existing fencing/atomic contract; an explicit retained-output recovery flow remains unfinished. The remaining-boundary paragraph below records this earlier reroll milestone.
+
+Original group continue selects the next speakers and appends a new reply; its recursive group calls do not forward individual-character continuation. The current implementation preserves that distinction. In the unordered two-member fixture, a final Beta response is followed by Alpha, and earlier message identities/text stay intact. This check does not establish ordered/automatic-mode acceptance.
+
+Both the public upstream `Chat.svelte` and the current original UI return before handling HTML buttons for a group. The native API also rejects group button execution without a member context. Selecting a member for such buttons would be an additional feature requiring an explicit policy; its absence is not a newly introduced failure of original group-button behavior. Individual character buttons retain their existing contract.
+
+This change covers first-reroll generation, not the browser's ephemeral `Prereroll` cache or previous/next reply variants. Previous-variant selection remains visibly unavailable in entity mode. Group automode, empty/inactive/orphan cases, interrupted compound recovery and complete member-definition read dependencies need separate acceptance. Large-history rewinding and progress scans still have history-dependent costs. Physical mobile lifecycle, configured user cards and representative latency/long-task checks remain necessary.
+
+For a local trial, use a disposable synthetic DB and the isolated launch procedure in [server-runtime-plan.md](server-runtime-plan.md). In two profiles, send to a two-member group, reroll its final reply, cancel a second reroll mid-request and compare the retained batch on both devices. Repeat after all tabs close. All 15 completion requirements and the active goal remain unchanged. This milestone performed no production access, private-content read, deployment, remote push or real model call.

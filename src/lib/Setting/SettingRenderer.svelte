@@ -5,6 +5,7 @@
     import { getModelInfo } from 'src/ts/model/modellist';
     import { settingRegistry } from 'src/ts/setting/settingRegistry';
     import { checkCondition } from 'src/ts/setting/utils';
+    import { getSettingDatabase } from 'src/ts/runtime/fieldControls';
 
     interface Props {
         items: SettingItem[];
@@ -17,12 +18,12 @@
     let { items, modelInfo, subModelInfo }: Props = $props();
 
     // Derive modelInfo if not provided
-    let effectiveModelInfo = $derived(modelInfo ?? getModelInfo(DBState.db.aiModel));
-    let effectiveSubModelInfo = $derived(subModelInfo ?? getModelInfo(DBState.db.subModel));
+    let effectiveModelInfo = $derived(modelInfo ?? getModelInfo(getSettingDatabase(DBState.db).aiModel));
+    let effectiveSubModelInfo = $derived(subModelInfo ?? getModelInfo(getSettingDatabase(DBState.db).subModel));
 
     // Build context for condition checks
     let ctx: SettingContext = $derived({
-        db: DBState.db,
+        db: getSettingDatabase(DBState.db),
         modelInfo: effectiveModelInfo,
         subModelInfo: effectiveSubModelInfo,
     });

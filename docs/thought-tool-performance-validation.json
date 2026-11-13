@@ -1,0 +1,80 @@
+{
+  "runtimeImplementationCommit": "20852d75c3cf5b96b4f21d5817a52fc72b0d99a0",
+  "schemaVersion": 21,
+  "verifiedAt": "2026-10-04T11:40:14.201029+00:00",
+  "runtimeImplementationChanged": false,
+  "scope": {
+    "localOnly": true,
+    "productionAccesses": 0,
+    "privateReads": 0,
+    "realModelCalls": 0,
+    "deployments": 0,
+    "remotePushes": 0
+  },
+  "all15ConditionsRemainActive": true,
+  "wholeGoalComplete": false,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "performanceIssueResolved": false,
+  "warmObservations": 192,
+  "profileTargets": {
+    "main": 2,
+    "worker": 2,
+    "actualWorkersVerified": 2
+  },
+  "conditionalDebuggerRuns": 2,
+  "gates": {
+    "reusedFrom": "20852d75c3cf5b96b4f21d5817a52fc72b0d99a0",
+    "unchangedRuntimeFiles": 783,
+    "app": {
+      "passed": 533,
+      "existingSkips": 3,
+      "fresh": false
+    },
+    "backend": {
+      "passed": 385,
+      "node": "v24.19.0",
+      "fresh": false
+    },
+    "browser": {
+      "passed": 22,
+      "fresh": false
+    },
+    "check": {
+      "errors": 0,
+      "warnings": 0,
+      "fresh": false
+    },
+    "builds": {
+      "kinds": ["native", "entity", "ordinary"],
+      "fresh": false
+    },
+    "audit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2,
+      "fresh": false
+    }
+  },
+  "artifacts": {
+    "nativeSha256": "ab496e296e04cb688e30feb44401727e7c4678f5731aa801c5e7d10ed78f7fbd",
+    "entityIndexSha256": "071d40cd6c7cc2bfef10d1677ba998f7933182ebdef747de1c759f3c4efb14f7"
+  },
+  "evidenceFingerprints": {
+    "evidence/local-thought-format-performance-comparison-20261004.json": "c2057d6b700dea160413c52d574b825dbe8e5aa40ac44d94d3d46449372b1b3f",
+    "evidence/local-thought-format-performance-summary-20261004.json": "6d69e554f26740fca4a5d774fd96e38417a0257be563b3268be28a33c0ad19c6",
+    "evidence/local-thought-format-profile-summary-20261004.json": "034538f27132e8c7bb5da7644b798f45245821ade63b2b1bd40d769e1c42a523",
+    "evidence/local-thought-format-profiles-run-20261004.json": "294a428cbbd20f24817aec0626efd4a56b2d1448c4fb3bce880673a2546ddfb7",
+    "evidence/local-thought-format-performance-reuse-proof-20261004.json": "75d72a2bc71bcc4a647afd2af792645d6167611a5e88052b96fe5114b11564c2",
+    "evidence/local-thought-format-selection-desktop.json": "e6c68a998314e9b570227ba4497fe6f8f88baec97bbbc38fd58d7899f9d3ffaf",
+    "evidence/local-thought-format-selection-mobile-emulation-4x.json": "1a75d7f70ec9f049ee5f735b80f39b9444cf7dedf2069edccc9d68db58e6a0b9",
+    "evidence/local-thought-format-selection-args-desktop.json": "358a4fe71bf4aa5578f98b0708347590c807ab94f2f8f604c2465b93b4a99223",
+    "evidence/local-thought-format-selection-args-mobile-emulation-4x.json": "03c94456b40083940e5a8cd925aaaea566af321f35e31d358c13010f82fee259"
+  },
+  "reportSha256": "67212d05473209288ff2b21335a4ecfdaa6be2d456b66b78a5d50e6c08fe9591",
+  "limits": [
+    "Paired warm helper; basic observer/counter retained, no additional profiler/debugger",
+    "Single diagnostic click per page; captures rejection reason and all other-click frequencies are not proved",
+    "Debugger metadata reads/timing excluded from warm evidence",
+    "Physical mobile, complete compatibility/storage/trial and all15 remain open"
+  ]
+}

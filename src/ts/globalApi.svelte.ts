@@ -1,5 +1,3 @@
-import { snapshotDatabaseForSave } from './storage/databaseSaveSnapshot'
-import { SaveWakeSignal } from './storage/saveWakeSignal'
 import {
     writeFile,
     BaseDirectory,
@@ -10,13 +8,14 @@ import {
     remove
 } from "@tauri-apps/plugin-fs"
 import { changeFullscreen, checkNullish, sleep } from "./util"
+import { entityRuntimeEnabled, browserRuntime, reportRuntimeError } from "./runtime/browserRuntimeState.svelte";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core"
 import { v4 as uuidv4, v4 } from 'uuid';
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { get } from "svelte/store";
 import { open } from '@tauri-apps/plugin-shell'
 import streamSaver from 'streamsaver';
-import { setDatabase, type Database, defaultSdDataFunc, getDatabase, appVer, getCurrentCharacter, onDatabaseUpdate, type character, type groupChat } from "./storage/database.svelte";
+import { setDatabase, type Database, defaultSdDataFunc, getDatabase, appVer, getCurrentCharacter, type character, type groupChat, appSubVer } from "./storage/database.svelte";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { checkRisuUpdate } from "./update";
 import { MobileGUI, botMakerMode, selectedCharID, loadedStore, DBState, LoadingStatusState, selIdState, ReloadGUIPointer, bodyIntercepterStore } from "./stores.svelte";
@@ -40,162 +39,15 @@ import { updateGuisize } from "./gui/guisize";
 import { updateLorebooks } from "./characters";
 import { initMobileGesture } from "./hotkey";
 import { fetch as TauriHTTPFetch } from '@tauri-apps/plugin-http';
-import { moduleUpdate, refreshModules } from "./process/modules";
+import { moduleUpdate } from "./process/modules";
 import type { AccountStorage } from "./storage/accountStorage";
 import { getColdStorageItem, makeColdData } from "./process/coldstorage.svelte";
-import { isNodeServer, isServerResidentExecutor, isTauri } from "./platform";
+import { isTauri, isNodeServer } from "./platform";
 import { isLocalNetworkUrl } from "./network/localNetwork";
-import { fetchDurableProxyJob, isDurableOpenAIProxyInterceptor } from "./network/proxyJobClient";
+import { decodeProxyJobWsChunk, formatProxyStreamErrorMessage, parseProxyJobWsEvent } from "./network/proxyJobWs";
 import { getNodeServerProxyAuth } from "./storage/nodeStorage";
-import {
-    NodeDatabaseRuntime,
-    getNodeDatabaseCommitKind,
-    type NodeDatabaseSaveAttempt,
-} from "./storage/nodeDatabaseRuntime";
-import {
-    NodeDatabaseConflictError,
-    NodeDatabaseHttpError,
-} from "./storage/nodeDatabaseSync";
-import { getActiveRuntimeExecutionFence } from "./runtime/executionContext";
-import { buildAssetDataUri } from "./media/assetMime";
-import { reconcileCharacterOrderInPlace } from "./characterOrder";
 
 export const forageStorage = new AutoStorage()
-
-let nodeDatabaseRuntime: NodeDatabaseRuntime<Database> | null = null
-let pendingNodeEncoderSnapshot: { data: Uint8Array; characterIds: string[] } | null = null
-let flushNodeDatabaseSave: (() => void) | null = null
-let nodePluginFingerprint = ''
-let nodePluginReloadPromise: Promise<void> = Promise.resolve()
-
-function getNodePluginFingerprint(database: Database) {
-    return JSON.stringify(database.plugins ?? [])
-}
-
-function queueNodePluginReload(database: Database) {
-    const nextFingerprint = getNodePluginFingerprint(database)
-    if (nextFingerprint === nodePluginFingerprint) {
-        return
-    }
-    nodePluginFingerprint = nextFingerprint
-    nodePluginReloadPromise = nodePluginReloadPromise
-        // A failed plugin must not permanently poison the reload queue. The
-        // failed generation still sees the rejection below, while a later DB
-        // revision can retry with the newly supplied plugin configuration.
-        .catch(() => {})
-        .then(() => loadPlugins())
-    void nodePluginReloadPromise.catch((error) => console.error('[Node Plugin Reload]', error))
-}
-
-export async function initializeNodeDatabaseRuntime() {
-    if (!isNodeServer || nodeDatabaseRuntime) {
-        return nodeDatabaseRuntime
-    }
-    const sync = forageStorage.getNodeDatabaseSync()
-    if (!sync) {
-        return null
-    }
-    nodePluginFingerprint = getNodePluginFingerprint(getDatabase())
-    nodeDatabaseRuntime = new NodeDatabaseRuntime<Database>({
-        sync,
-        decode: decodeRisuSave,
-        getDatabase: () => getDatabase(),
-        setDatabase,
-        getSelectedCharacterIndex: () => get(selectedCharID),
-        setSelectedCharacterIndex: (index) => selectedCharID.set(index),
-        onRemoteApplied: (database, snapshot) => {
-            pendingNodeEncoderSnapshot = {
-                data: snapshot.data,
-                characterIds: database.characters.map(character => character.chaId),
-            }
-            requiresFullEncoderReload.state = true
-            // getModules() intentionally caches by enabled IDs, which does not
-            // change when a module's lore/regex/trigger body is edited on the
-            // other device. A canonical snapshot replacement must invalidate
-            // that browser-memory cache before the resident builds a prompt.
-            refreshModules()
-            ReloadGUIPointer.set(Math.random())
-            queueNodePluginReload(database)
-        },
-        onError: (error) => console.error(error),
-    })
-    // Only the canonical resident persists bootstrap format/ID migrations.
-    // A phone opened during generation must begin as a clean follower; an
-    // unconditional startup write would block remote streaming snapshots and
-    // later conflict with the resident's newer revision.
-    if (isServerResidentExecutor) {
-        nodeDatabaseRuntime.markDirty()
-    }
-    await nodeDatabaseRuntime.start()
-    return nodeDatabaseRuntime
-}
-
-export async function waitForNodeDatabasePersistence(
-    timeoutMs = 60_000,
-    minimumRevision?: number,
-) {
-    if (!nodeDatabaseRuntime) {
-        return null
-    }
-    if (
-        minimumRevision !== undefined
-        && (!Number.isSafeInteger(minimumRevision) || minimumRevision < 0)
-    ) {
-        throw new TypeError('minimumRevision must be a non-negative safe integer')
-    }
-    if (minimumRevision !== undefined) {
-        nodeDatabaseRuntime.requestRevision(minimumRevision)
-    }
-    // An explicit durability barrier should not wait for the ordinary typing
-    // debounce or the save worker's old 500 ms polling interval.
-    flushNodeDatabaseSave?.()
-    const deadline = Date.now() + timeoutMs
-    while (
-        nodeDatabaseRuntime.isDirty
-        || nodeDatabaseRuntime.isSaveInFlight
-        || saving.state
-        || (
-            minimumRevision !== undefined
-            && (nodeDatabaseRuntime.loadedSnapshotHead?.revision ?? -1) < minimumRevision
-        )
-    ) {
-        if (nodeDatabaseRuntime.persistenceError) {
-            throw nodeDatabaseRuntime.persistenceError
-        }
-        if (Date.now() >= deadline) {
-            throw new Error(`Timed out waiting ${timeoutMs}ms for the canonical database save`)
-        }
-        await sleep(50)
-    }
-    if (nodeDatabaseRuntime.persistenceError) {
-        throw nodeDatabaseRuntime.persistenceError
-    }
-    // Remote plugin enable/disable/update is part of the canonical database,
-    // but the executable provider/replacer/DOM hooks live in browser memory.
-    // Drain the current reload chain (including one queued while awaiting a
-    // previous reload) before the resident executor is allowed to generate.
-    while (true) {
-        const pendingReload = nodePluginReloadPromise
-        await pendingReload
-        if (pendingReload === nodePluginReloadPromise) {
-            break
-        }
-    }
-    return nodeDatabaseRuntime.loadedSnapshotHead
-}
-
-export function getCleanNodeDatabaseHead() {
-    return nodeDatabaseRuntime?.canApplyEphemeralMutation
-        ? nodeDatabaseRuntime.loadedSnapshotHead
-        : null
-}
-
-export function runNodeDatabaseEphemeralMutation<TResult>(operation: () => TResult) {
-    if (!nodeDatabaseRuntime) {
-        throw new Error('Node database runtime is not initialized')
-    }
-    return nodeDatabaseRuntime.runEphemeralMutation(operation)
-}
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -262,6 +114,8 @@ let checkedPaths: string[] = []
  * @returns {Promise<string>} - A promise that resolves to the source URL of the file.
  */
 export async function getFileSrc(loc: string) {
+    if (entityRuntimeEnabled && loc.startsWith("assets/"))
+      return browserRuntime().assetUrl(loc);
     if (isTauri) {
         if (loc.startsWith('assets')) {
             if (appDataDirPath === '') {
@@ -328,7 +182,7 @@ export async function getFileSrc(loc: string) {
                 fileCache.res.push('loading')
                 const f: Uint8Array = await forageStorage.getItem(loc) as unknown as Uint8Array
                 fileCache.res[ind] = f
-                return buildAssetDataUri(loc, f)
+                return `data:image/png;base64,${Buffer.from(f).toString('base64')}`
             }
             else {
                 const f = fileCache.res[ind]
@@ -336,9 +190,9 @@ export async function getFileSrc(loc: string) {
                     while (fileCache.res[ind] === 'loading') {
                         await sleep(10)
                     }
-                    return buildAssetDataUri(loc, fileCache.res[ind] as Uint8Array)
+                    return `data:image/png;base64,${Buffer.from(fileCache.res[ind]).toString('base64')}`
                 }
-                return buildAssetDataUri(loc, f as Uint8Array)
+                return `data:image/png;base64,${Buffer.from(f).toString('base64')}`
             }
         }
     } catch (error) {
@@ -356,6 +210,7 @@ let appDataDirPath = ''
  * @returns {Promise<Uint8Array>} - A promise that resolves to the data of the image file.
  */
 export async function readImage(data: string) {
+    if (entityRuntimeEnabled) return browserRuntime().readAsset(data);
     if (isTauri) {
         if (data.startsWith('assets')) {
             if (appDataDirPath === '') {
@@ -379,6 +234,13 @@ export async function readImage(data: string) {
  * @returns {Promise<string>} - A promise that resolves to the path of the saved asset file.
  */
 export async function saveAsset(data: Uint8Array, customId: string = '', fileName: string = '') {
+    if (entityRuntimeEnabled) {
+      if (customId)
+        throw new Error(
+          "Mutable custom asset names require a server alias capability",
+        );
+      return browserRuntime().uploadAsset(data, fileName);
+    }
     let id = ''
     if (customId !== '') {
         id = customId
@@ -417,6 +279,7 @@ export async function saveAsset(data: Uint8Array, customId: string = '', fileNam
  * @returns {Promise<Uint8Array>} - A promise that resolves to the data of the loaded asset file.
  */
 export async function loadAsset(id: string) {
+    if (entityRuntimeEnabled) return browserRuntime().readAsset(id);
     if (isTauri) {
         return await readFile(id, { baseDir: BaseDirectory.AppData })
     }
@@ -439,17 +302,13 @@ export let requiresFullEncoderReload = $state({
     state: false
 })
 export async function saveDb() {
+    if (entityRuntimeEnabled) return;
     let changed = false
-    const saveWake = new SaveWakeSignal()
-    const requestSave = () => {
-        changed = true
-        saveWake.notify()
-    }
     syncDrive()
     let gotChannel = false
     const sessionID = v4()
     let channel: BroadcastChannel
-    if (window.BroadcastChannel && !isNodeServer) {
+    if (window.BroadcastChannel) {
         channel = new BroadcastChannel('risu-db')
     }
     if (channel) {
@@ -466,280 +325,152 @@ export async function saveDb() {
         }
     }
 
-    const createChangeTracker = (): toSaveType => ({
+    const changeTracker: toSaveType = {
         character: [],
+        chat: [],
         botPreset: false,
         modules: false,
         loadouts: false,
         plugins: false,
         pluginCustomStorage: false
-    })
-    const cloneChangeTracker = (tracker: toSaveType): toSaveType => ({
-        ...tracker,
-        character: [...tracker.character]
-    })
-    const mergeChangeTrackers = (target: toSaveType, source: toSaveType) => {
-        for (const characterId of source.character) {
-            if (!target.character.includes(characterId)) {
-                target.character.push(characterId)
-            }
-        }
-        target.botPreset ||= source.botPreset
-        target.modules ||= source.modules
-        target.loadouts ||= source.loadouts
-        target.plugins ||= source.plugins
-        target.pluginCustomStorage ||= source.pluginCustomStorage
     }
-    let changeTracker = createChangeTracker()
-    let savetrys = 0
 
     let encoder = new RisuSaveEncoder()
+    await encoder.init(getDatabase(), {
+        compression: forageStorage.isAccount
+    })
 
     $effect.root(() => {
 
+        let selIdState = $state(0)
+
         const debounceTime = 500; // 500 milliseconds
         let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        selectedCharID.subscribe((v) => {
+            selIdState = v
+        })
 
         function saveTimeoutExecute() {
             if (saveTimeout) {
                 clearTimeout(saveTimeout);
             }
             saveTimeout = setTimeout(() => {
-                saveTimeout = null
-                requestSave()
+                changed = true;
             }, debounceTime);
         }
 
-        flushNodeDatabaseSave = () => {
-            if (!nodeDatabaseRuntime?.isDirty || nodeDatabaseRuntime.isSaveInFlight || saving.state) return
-            if (saveTimeout) clearTimeout(saveTimeout)
-            saveTimeout = null
-            requestSave()
-        }
-
-        const unsubscribeDb = onDatabaseUpdate((info) => {
-            if (nodeDatabaseRuntime && !nodeDatabaseRuntime.recordDatabaseUpdate(info)) {
-                return
-            }
-            if (info.path.length === 0) {
-                pendingNodeEncoderSnapshot = null
-                requiresFullEncoderReload.state = true
-                savetrys = 0
-                saveTimeoutExecute()
-                return
-            }
-
-            const rootKey = info.path[0]
-
-            if (rootKey === 'botPresets' || rootKey === 'botPresetsId') {
-                changeTracker.botPreset = true
-                saveTimeoutExecute()
-                return
-            }
-
-            if (rootKey === 'modules') {
-                changeTracker.modules = true
-                saveTimeoutExecute()
-                return
-            }
-
-            if (rootKey === 'loadouts' || rootKey === 'plugins' || rootKey === 'pluginCustomStorage') {
-                changeTracker[rootKey] = true
-                saveTimeoutExecute()
-                return
-            }
-
-            if (rootKey === 'characters') {
-                const affectedCharacters: Database['characters'] = []
-
-                if (info.path.length === 1) {
-                    const oldCharacters = info.oldValue as Database['characters'] | undefined
-                    const newCharacters = info.value as Database['characters'] | undefined
-                    affectedCharacters.push(...(oldCharacters ?? []), ...(newCharacters ?? []))
-                }
-                else if (typeof info.path[1] === 'number') {
-                    if (info.path.length === 2) {
-                        const oldChar = info.oldValue as Database['characters'][number] | undefined
-                        if (oldChar) {
-                            affectedCharacters.push(oldChar)
-                        }
-                    }
-                    const char = DBState.db.characters[info.path[1]]
-                    if (char) {
-                        affectedCharacters.push(char)
-                    }
-                }
-
-                for (const char of affectedCharacters) {
-                    if (!changeTracker.character.includes(char.chaId)) {
-                        changeTracker.character.unshift(char.chaId)
-                    }
-                }
-                saveTimeoutExecute()
-                return
-            }
-
-            // Root settings and global toggles do not rewrite a character.
-            // CBS/Lua mutations are tracked separately at their real paths.
+        $effect(() => {
+            DBState.db.botPresetsId
+            DBState.db.botPresets.length
+            changeTracker.botPreset = true
             saveTimeoutExecute()
         })
-        // Persist pre-listener bootstrap migrations once from the canonical
-        // resident. Direct multi-device pages start clean and save only real
-        // user mutations observed by this listener.
-        if (!nodeDatabaseRuntime || isServerResidentExecutor) {
+        $effect(() => {
+            $state.snapshot(DBState.db.modules)
+            changeTracker.modules = true
             saveTimeoutExecute()
-        }
-
-        return () => {
-            unsubscribeDb()
-        }
+        })
+        $effect(() => {
+            $state.snapshot(DBState.db.loadouts)
+            changeTracker.loadouts = true
+            saveTimeoutExecute()
+        })
+        $effect(() => {
+            $state.snapshot(DBState.db.plugins)
+            changeTracker.plugins = true
+            saveTimeoutExecute()
+        })
+        $effect(() => {
+            $state.snapshot(DBState.db.pluginCustomStorage)
+            changeTracker.pluginCustomStorage = true
+            saveTimeoutExecute()
+        })
+        $effect(() => {
+            for (const key in DBState.db) {
+                if (
+                    key !== 'characters' && key !== 'botPresets' && key !== 'modules' &&
+                    key !== 'loadouts' && key !== 'plugins' && key !== 'pluginCustomStorage'
+                ) {
+                    $state.snapshot(DBState.db[key])
+                }
+            }
+            if (DBState?.db?.characters?.[selIdState]) {
+                for (const key in DBState.db.characters[selIdState]) {
+                    if (key !== 'chats') {
+                        $state.snapshot(DBState.db.characters[selIdState][key])
+                    }
+                }
+                $state.snapshot(DBState.db.characters[selIdState].chats)
+                if (changeTracker.character[0] !== DBState.db.characters[selIdState]?.chaId) {
+                    changeTracker.character.unshift(DBState.db.characters[selIdState]?.chaId)
+                }
+                if (
+                    changeTracker.chat[0]?.[0] !== DBState.db.characters[selIdState]?.chaId ||
+                    changeTracker.chat[0]?.[1] !== DBState.db.characters[selIdState]?.chats[DBState.db.characters[selIdState]?.chatPage].id
+                ) {
+                    changeTracker.chat.unshift([DBState.db.characters[selIdState]?.chaId, DBState.db.characters[selIdState]?.chats[DBState.db.characters[selIdState]?.chatPage].id])
+                }
+            }
+            saveTimeoutExecute()
+        })
     })
 
-    try {
-        const initialDatabase = nodeDatabaseRuntime
-            ? nodeDatabaseRuntime.makeCanonicalSnapshot(getDatabase({ snapshot: true }))
-            : getDatabase()
-        await encoder.init(initialDatabase, {
-            compression: forageStorage.isAccount
-        })
-    } catch (error) {
-        requiresFullEncoderReload.state = true
-        requestSave()
-        console.error(error)
-    }
-
-    let nodeRetryPayload: {
-        data: Uint8Array
-        kind: NodeDatabaseSaveAttempt['kind']
-        idempotencyKey: string
-    } | null = null
-    const sameBytes = (left: Uint8Array, right: Uint8Array) => {
-        if (left.byteLength !== right.byteLength) {
-            return false
-        }
-        for (let index = 0; index < left.byteLength; index += 1) {
-            if (left[index] !== right[index]) {
-                return false
-            }
-        }
-        return true
-    }
+    let savetrys = 0
+    let lastDbData = new Uint8Array(0)
     await sleep(1000)
     while (true) {
         if (!changed) {
-            if (nodeDatabaseRuntime) await saveWake.wait()
-            else await sleep(500)
-            continue
-        }
-
-        if (nodeDatabaseRuntime?.persistenceError) {
             await sleep(500)
-            continue
-        }
-
-        if (gotChannel) {
-            // Data is saved in another tab.
-            await sleep(1000)
             continue
         }
 
         saving.state = true
         changed = false
-        const pendingSave = cloneChangeTracker(changeTracker)
-        changeTracker = createChangeTracker()
-        const toSave = cloneChangeTracker(pendingSave)
-        let nodeSaveAttempt: NodeDatabaseSaveAttempt | null = null
-        let nodeCanonicalCommitted = false
-        let nodeDbData: Uint8Array | null = null
         try {
-            if (nodeDatabaseRuntime && pendingNodeEncoderSnapshot) {
-                const snapshot = pendingNodeEncoderSnapshot
-                pendingNodeEncoderSnapshot = null
-                if (encoder.initFromSnapshot(snapshot.data, snapshot.characterIds, forageStorage.isAccount)) {
-                    requiresFullEncoderReload.state = false
-                }
-            }
-            const captured = nodeDatabaseRuntime && !requiresFullEncoderReload.state
-                ? snapshotDatabaseForSave(getDatabase(), toSave, (value) => $state.snapshot(value) as typeof value,
-                    (id) => encoder.hasCharacterBlock(id))
-                : null
-            const db = nodeDatabaseRuntime
-                ? nodeDatabaseRuntime.makeCanonicalSnapshot(
-                    captured?.database ?? getDatabase({ snapshot: true }), captured?.characterIds)
-                : getDatabase()
-            const nodeCommitKind = nodeDatabaseRuntime ? getNodeDatabaseCommitKind(db) : null
-            const nodeSaveEpoch = nodeDatabaseRuntime?.captureSaveEpoch()
 
             if (requiresFullEncoderReload.state) {
-                requiresFullEncoderReload.state = false
                 encoder = new RisuSaveEncoder()
-                try {
-                    await encoder.init(db, {
-                        compression: forageStorage.isAccount,
-                        skipRemoteSavingOnCharacters: false
-                    })
-                } catch (error) {
-                    requiresFullEncoderReload.state = true
-                    throw error
-                }
+                await encoder.init(getDatabase(), {
+                    compression: forageStorage.isAccount,
+                    skipRemoteSavingOnCharacters: false
+                })
+                requiresFullEncoderReload.state = false
             }
 
+            let toSave = safeStructuredClone(changeTracker)
+            changeTracker.character = changeTracker.character.length === 0 ? [] : [changeTracker.character[0]]
+            changeTracker.chat = changeTracker.chat.length === 0 ? [] : [changeTracker.chat[0]]
+            changeTracker.botPreset = false
+            changeTracker.modules = false
+            if (gotChannel) {
+                //Data is saved in other tab
+                await sleep(1000)
+                continue
+            }
             if (channel) {
                 channel.postMessage(sessionID)
             }
-
+            let db = getDatabase()
             if (!db.characters) {
-                throw new Error('Database has no character list')
+                await sleep(1000)
+                continue
             }
 
             await encoder.set(db, toSave)
             const encoded = encoder.encode()
             if (!encoded) {
-                throw new Error('Database encoding failed')
+                await sleep(1000)
+                continue
             }
             const dbData = new Uint8Array(encoded)
-            nodeDbData = dbData
-            if (nodeDatabaseRuntime && nodeCommitKind) {
-                const retryKey = nodeRetryPayload
-                    && nodeRetryPayload.kind === nodeCommitKind
-                    && sameBytes(nodeRetryPayload.data, dbData)
-                    ? nodeRetryPayload.idempotencyKey
-                    : undefined
-                nodeSaveAttempt = nodeDatabaseRuntime.beginSave(
-                    nodeCommitKind,
-                    retryKey,
-                    nodeSaveEpoch,
-                )
-            }
             if (isTauri) {
                 await writeFile('database/database.bin', dbData, { baseDir: BaseDirectory.AppData });
                 await writeFile(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData, { baseDir: BaseDirectory.AppData });
             }
             else {
 
-                const executionFence = getActiveRuntimeExecutionFence()
-                await forageStorage.setItem(
-                    'database/database.bin',
-                    dbData,
-                    nodeSaveAttempt ? {
-                        kind: nodeSaveAttempt.kind,
-                        idempotencyKey: nodeSaveAttempt.idempotencyKey,
-                        ...(executionFence ? {
-                            generationId: executionFence.commandId,
-                            executorId: executionFence.executorId,
-                            fencingToken: executionFence.fencingToken,
-                        } : {}),
-                    } : undefined,
-                )
-                if (nodeSaveAttempt) {
-                    nodeDatabaseRuntime?.finishSave(nodeSaveAttempt)
-                    nodeRetryPayload = null
-                    nodeSaveAttempt = null
-                    nodeCanonicalCommitted = true
-                    // The canonical CAS is durable. Backup housekeeping must
-                    // not hold up a button's completion/revision barrier.
-                    saving.state = false
-                }
+                await forageStorage.setItem('database/database.bin', dbData)
                 if (!forageStorage.isAccount) {
                     await forageStorage.setItem(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData)
                 }
@@ -752,93 +483,14 @@ export async function saveDb() {
             }
             savetrys = 0
             await saveDbKei()
-            if (!nodeDatabaseRuntime) await sleep(500)
+            await sleep(500)
         } catch (error) {
-            if (nodeCanonicalCommitted) {
-                // The authoritative CAS already succeeded. A best-effort
-                // backup/cleanup failure must not create another DB revision.
-                console.error(error)
-                nodeRetryPayload = null
-                saving.state = false
-                continue
-            }
-            mergeChangeTrackers(changeTracker, pendingSave)
-            const nodeHttpErrorCode = error instanceof NodeDatabaseHttpError
-                && typeof error.body === 'object'
-                && error.body !== null
-                && typeof (error.body as { code?: unknown }).code === 'string'
-                ? (error.body as { code: string }).code
-                : null
-            if (
-                nodeSaveAttempt
-                && error instanceof NodeDatabaseHttpError
-                && error.status === 423
-                && nodeHttpErrorCode === 'GENERATION_WRITE_LEASE_ACTIVE'
-            ) {
-                nodeDatabaseRuntime?.failSave(nodeSaveAttempt)
-                if (nodeDbData) {
-                    nodeRetryPayload = {
-                        data: new Uint8Array(nodeDbData),
-                        kind: nodeSaveAttempt.kind,
-                        idempotencyKey: nodeSaveAttempt.idempotencyKey,
-                    }
-                }
-                nodeSaveAttempt = null
-                savetrys = 0
-                console.info('[Database Sync] Resident generation owns the write lease; retrying after it advances.')
-                await sleep(1000)
-                changed = true
-                saving.state = false
-                continue
-            }
-            if (
-                nodeSaveAttempt
-                && error instanceof NodeDatabaseHttpError
-                && error.status === 409
-                && nodeHttpErrorCode === 'STALE_EXECUTOR_FENCE'
-            ) {
-                nodeDatabaseRuntime?.failSaveTerminal(nodeSaveAttempt, error)
-                nodeRetryPayload = null
-                nodeSaveAttempt = null
-                changed = false
-                console.error('[Database Sync] Discarding output from a stale resident executor.', error)
-                saving.state = false
-                window.setTimeout(() => window.location.reload(), 1000)
-                continue
-            }
-            if (nodeSaveAttempt && error instanceof NodeDatabaseConflictError) {
-                nodeDatabaseRuntime?.failSaveWithConflict(nodeSaveAttempt, error)
-                nodeRetryPayload = null
-                nodeSaveAttempt = null
-                changed = false
-                alertError(
-                    `Database save conflict ${error.conflictId}: server revision `
-                    + `${error.currentRevision}. The stale local save was preserved on the server; `
-                    + `this device is reloading the canonical version.`,
-                )
-                nodeDatabaseRuntime?.recoverFromConflict(error)
-                saving.state = false
-                continue
-            }
-            if (nodeSaveAttempt) {
-                nodeDatabaseRuntime?.failSave(nodeSaveAttempt)
-                if (nodeDbData) {
-                    nodeRetryPayload = {
-                        data: new Uint8Array(nodeDbData),
-                        kind: nodeSaveAttempt.kind,
-                        idempotencyKey: nodeSaveAttempt.idempotencyKey,
-                    }
-                }
-                nodeSaveAttempt = null
-            }
             savetrys += 1
             if (savetrys > 4) {
                 alertError(error)
             }
             else {
                 console.error(error)
-                await sleep(1000)
-                requestSave()
             }
         }
 
@@ -978,8 +630,6 @@ export interface GlobalFetchArgs {
     interceptor?: string;
     requestTimeoutMs?: number;
     networkRoute?: 'auto' | 'local_network';
-    /** Exclude sensitive request/response data from the in-app fetch log. */
-    logFetch?: boolean;
 }
 
 /**
@@ -1111,9 +761,6 @@ export async function globalFetch(url: string, arg: GlobalFetchArgs = {}): Promi
  * @param {GlobalFetchArgs} arg - The arguments for the fetch request.
  */
 function addFetchLogInGlobalFetch(response: any, success: boolean, url: string, arg: GlobalFetchArgs, status?: number) {
-    if (arg.logFetch === false) {
-        return
-    }
     try {
         fetchLog.unshift({
             body: JSON.stringify(arg.body, null, 2),
@@ -1444,7 +1091,64 @@ export function replaceDbResources(db: Database, replacer: { [key: string]: stri
  */
 export function checkCharOrder() {
     DBState.db.characterOrder = DBState.db.characterOrder ?? []
-    reconcileCharacterOrderInPlace(DBState.db.characters, DBState.db.characterOrder)
+    const ordered = new Set<string>()
+    for (let i = 0; i < DBState.db.characterOrder.length; i++) {
+        const folder = DBState.db.characterOrder[i]
+        if (typeof (folder) !== 'string' && folder) {
+            for (const f of folder.data) {
+                ordered.add(f)
+            }
+        }
+        if (typeof (folder) === 'string') {
+            ordered.add(folder)
+        }
+    }
+
+    const charIdSet = new Set<string>()
+
+    for (let i = 0; i < DBState.db.characters.length; i++) {
+        const char = DBState.db.characters[i]
+        const charId = char.chaId
+        if (!char.trashTime) {
+            charIdSet.add(charId)
+        }
+        if (!ordered.has(charId)) {
+            if (charId !== '§temp' && charId !== '§playground' && !char.trashTime) {
+                DBState.db.characterOrder.push(charId)
+            }
+        }
+    }
+
+
+    for (let i = 0; i < DBState.db.characterOrder.length; i++) {
+        const data = DBState.db.characterOrder[i]
+        if (typeof (data) !== 'string') {
+            if (!data) {
+                DBState.db.characterOrder.splice(i, 1)
+                i--;
+                continue
+            }
+            if (data.data.length === 0) {
+                DBState.db.characterOrder.splice(i, 1)
+                i--;
+                continue
+            }
+            for (let i2 = 0; i2 < data.data.length; i2++) {
+                const data2 = data.data[i2]
+                if (!charIdSet.has(data2)) {
+                    data.data.splice(i2, 1)
+                    i2--;
+                }
+            }
+            DBState.db.characterOrder[i] = data
+        }
+        else {
+            if (!charIdSet.has(data)) {
+                DBState.db.characterOrder.splice(i, 1)
+                i--;
+            }
+        }
+    }
 }
 
 /**
@@ -1830,35 +1534,176 @@ async function fetchViaProxyJobWs(url: string, arg: {
     chatId?: string,
     fetchLogIndex?: number | null
 }): Promise<Response> {
+    const auth = await getNodeServerProxyAuth();
+
+    const requestSignal = arg.signal;
     const baseUrl = getProxyStreamJobBaseUrl();
+
+    let jobId = '';
+    const createRes = await fetch(`${baseUrl}/proxy-stream-jobs`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'risu-auth': auth
+        },
+        body: JSON.stringify({
+            url,
+            method: arg.method,
+            headers: arg.headers ?? {},
+            bodyBase64: Buffer.from(arg.body).toString('base64'),
+            timeoutMs: arg.requestTimeoutMs,
+            heartbeatSec: defaultProxyJobHeartbeatSec
+        }),
+        signal: requestSignal
+    });
+
+    if (!createRes.ok) {
+        const errText = await createRes.text();
+        throw new Error(`Proxy stream job creation failed: ${createRes.status} ${errText}`);
+    }
+
+    const created = await createRes.json() as { jobId?: string };
+    if (!created.jobId) {
+        throw new Error('Proxy stream job creation returned no jobId');
+    }
+    jobId = created.jobId;
+
     const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const responseDecoder = arg.fetchLogIndex == null ? null : new TextDecoder();
-    return await fetchDurableProxyJob({
-        baseUrl,
-        webSocketBaseUrl: `${wsProtocol}//${location.host}`,
-        getAuth: getNodeServerProxyAuth,
-        url,
-        method: arg.method,
-        body: arg.body,
-        headers: arg.headers,
-        signal: arg.signal,
-        requestTimeoutMs: arg.requestTimeoutMs,
-        heartbeatSec: defaultProxyJobHeartbeatSec,
-        chatId: arg.chatId,
-        onChunk: responseDecoder && arg.fetchLogIndex != null ? (bytes) => {
-            const entry = fetchLog[arg.fetchLogIndex!];
-            if (entry) {
-                const prefix = entry.response === 'Streamed Fetch' ? '' : entry.response;
-                entry.response = prefix + responseDecoder.decode(bytes, { stream: true });
+    const wsUrl = `${wsProtocol}//${location.host}/proxy-stream-jobs/${encodeURIComponent(jobId)}/ws?risu-auth=${encodeURIComponent(auth)}`;
+
+    let headersReady = false;
+    let status = 200;
+    let responseHeaders: HeadersInit = { 'content-type': 'text/event-stream' };
+    let settled = false;
+    let resolveHeaders: () => void = () => {};
+    const waitHeaders = new Promise<void>((resolve) => {
+        resolveHeaders = resolve;
+    });
+    let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const encoder = new TextEncoder();
+
+    const ws = new WebSocket(wsUrl);
+    const readable = new ReadableStream<Uint8Array>({
+        start(controller) {
+            streamController = controller;
+        },
+        cancel() {
+            try {
+                ws.close();
+            } catch {
+                // no-op
             }
-        } : undefined,
-        onTerminal: responseDecoder && arg.fetchLogIndex != null ? () => {
-            const entry = fetchLog[arg.fetchLogIndex!];
-            if (entry) {
-                const prefix = entry.response === 'Streamed Fetch' ? '' : entry.response;
-                entry.response = prefix + responseDecoder.decode();
+        }
+    });
+    const pipedReadable = arg.fetchLogIndex != null ? pipeFetchLog(arg.fetchLogIndex, readable) : readable;
+
+    const ensureHeadersReady = () => {
+        if (!headersReady) {
+            headersReady = true;
+            resolveHeaders();
+        }
+    };
+
+    const closeAndEnd = () => {
+        if (settled) {
+            return;
+        }
+        settled = true;
+        if (streamController) {
+            try {
+                streamController.close();
+            } catch {
+                // no-op
             }
-        } : undefined,
+        }
+        try {
+            ws.close();
+        } catch {
+            // no-op
+        }
+    };
+
+    ws.onmessage = (event) => {
+        const parsed = parseProxyJobWsEvent(typeof event.data === 'string' ? event.data : '');
+        if (!parsed || !streamController) {
+            return;
+        }
+        switch (parsed.type) {
+            case 'job_accepted':
+            case 'ping':
+                return;
+            case 'upstream_headers':
+                status = parsed.status;
+                responseHeaders = parsed.headers ?? {};
+                ensureHeadersReady();
+                return;
+            case 'chunk':
+                ensureHeadersReady();
+                streamController.enqueue(decodeProxyJobWsChunk(parsed.dataBase64));
+                return;
+            case 'error': {
+                status = parsed.status ?? 502;
+                responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
+                ensureHeadersReady();
+                const msg = formatProxyStreamErrorMessage(parsed.status, parsed.message);
+                streamController.enqueue(encoder.encode(msg));
+                closeAndEnd();
+                return;
+            }
+            case 'done':
+                ensureHeadersReady();
+                closeAndEnd();
+                return;
+        }
+    };
+
+    ws.onerror = () => {
+        if (!streamController) {
+            return;
+        }
+        status = 502;
+        responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
+        ensureHeadersReady();
+        streamController.enqueue(encoder.encode('Proxy WebSocket stream error'));
+        closeAndEnd();
+    };
+
+    ws.onclose = () => {
+        if (!headersReady) {
+            status = 502;
+            responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
+            ensureHeadersReady();
+        }
+        closeAndEnd();
+    };
+
+    const abortHandler = () => {
+        status = 499;
+        responseHeaders = { 'content-type': 'text/plain; charset=utf-8' };
+        ensureHeadersReady();
+        if (streamController && !settled) {
+            streamController.enqueue(encoder.encode('Aborted'));
+        }
+        void fetch(`${baseUrl}/proxy-stream-jobs/${encodeURIComponent(jobId)}`, {
+            method: 'DELETE',
+            headers: {
+                'risu-auth': auth
+            }
+        }).catch(() => {});
+        closeAndEnd();
+    };
+    if (requestSignal?.aborted) {
+        abortHandler();
+    }
+    else {
+        requestSignal?.addEventListener('abort', abortHandler, { once: true });
+    }
+
+    await waitHeaders;
+    requestSignal?.removeEventListener('abort', abortHandler);
+    return new Response(pipedReadable, {
+        status,
+        headers: new Headers(responseHeaders)
     });
 }
 
@@ -1892,6 +1737,7 @@ export async function fetchNative(url: string, arg: {
 }): Promise<Response> {
 
     const useInterceptor = !!arg.interceptor
+    console.log(arg.body, 'body')
     if (arg.body === undefined && (arg.method === 'POST' || arg.method === 'PUT')) {
         throw new Error('Body is required for POST and PUT requests')
     }
@@ -2073,27 +1919,25 @@ export async function fetchNative(url: string, arg: {
     }
     else if (throughProxy) {
         const useProxyJobWs = isNodeServer
-            && isDurableOpenAIProxyInterceptor(arg.interceptor)
+            && arg.interceptor === 'openai_streaming'
             && arg.method === 'POST'
             && useLocalNetworkRoute;
         const nodeProxyAuth = isNodeServer ? await getNodeServerProxyAuth() : null;
 
         if (useProxyJobWs) {
-            // Once selected, the durable route owns this logical request. A
-            // fallback POST could create a second upstream generation when the
-            // job-creation response was merely lost in transit.
-            return await fetchViaProxyJobWs(url, {
-                body: realBody,
-                headers,
-                method: arg.method,
-                // Keep the caller's explicit abort connected for the entire
-                // response body. The server enforces requestTimeoutMs for the
-                // durable upstream job itself.
-                signal: arg.signal,
-                requestTimeoutMs: arg.requestTimeoutMs,
-                chatId: arg.chatId,
-                fetchLogIndex
-            });
+            try {
+                return await fetchViaProxyJobWs(url, {
+                    body: realBody,
+                    headers,
+                    method: arg.method,
+                    signal: requestSignal,
+                    requestTimeoutMs: arg.requestTimeoutMs,
+                    chatId: arg.chatId,
+                    fetchLogIndex
+                });
+            } catch (wsErr) {
+                console.warn('[ProxyJobWS] fallback to /proxy2 due to error:', wsErr);
+            }
         }
 
         const r = await fetch(getProxy2Url(), {
@@ -2350,8 +2194,11 @@ export function getLanguageCodes() {
 
 export function getVersionString(): string {
     let versionString = appVer
-    if (window.location.hostname === 'nightly.risuai.xyz') {
-        versionString = 'Nightly Build'
+    if(appSubVer) {
+        versionString += '-' + appSubVer
+    }
+    if (import.meta.env.VITE_RISU_NIGHTLY_BUILD === 'TRUE') {
+        versionString = 'Nightly Build ' + import.meta.env.VITE_RISU_BUILD_TIME
     }
     if (window.location.hostname === 'stable.risuai.xyz') {
         versionString += ' (Stable)';
@@ -2577,6 +2424,12 @@ export function foldChatToMessage(targetMessageIdOrIndex: string | number) {
 }
 
 export function changeChatTo(IdOrIndex: string | number) {
+    if (entityRuntimeEnabled) {
+        const character = getCurrentCharacter();
+        const chatId = typeof IdOrIndex === 'string' ? IdOrIndex : character?.chats[IdOrIndex]?.id;
+        if (chatId) void browserRuntime().selectCharacter(character.chaId, chatId).catch(reportRuntimeError);
+        return;
+    }
     let index = -1
     if (typeof IdOrIndex === 'number') {
         index = IdOrIndex

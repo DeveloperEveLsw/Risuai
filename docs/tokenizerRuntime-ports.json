@@ -1,0 +1,85 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/tokenizer.ts",
+  "core": "src/ts/tokenizerRuntime.ts",
+  "factory": "createTokenizerRuntime",
+  "functions": [
+    "getHash",
+    "encodeWithTokenizer",
+    "encode",
+    "tokenizeGoogleCloud",
+    "gemmaTokenize",
+    "tikJS",
+    "geminiTokenizer",
+    "tokenizeWebTokenizers",
+    "tokenizerChar",
+    "tokenize",
+    "tokenizeAccurate",
+    "tokenizeNum",
+    "strongBan",
+    "getCharToken",
+    "getChatToken"
+  ],
+  "classes": ["ChatTokenizer"],
+  "ports": [
+    {
+      "name": "LRUMap",
+      "specifier": "mnemonist",
+      "original": "LRUMap"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "./storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "getModelInfo",
+      "specifier": "./model/modellist",
+      "original": "getModelInfo"
+    },
+    {
+      "name": "pluginV2",
+      "specifier": "./plugins/plugins.svelte",
+      "original": "pluginV2"
+    },
+    {
+      "name": "LLMTokenizer",
+      "specifier": "./model/modellist",
+      "original": "LLMTokenizer"
+    },
+    {
+      "name": "tokenizeGGUFModel",
+      "specifier": "./process/models/local",
+      "original": "tokenizeGGUFModel"
+    },
+    {
+      "name": "globalFetch",
+      "specifier": "./globalApi.svelte",
+      "original": "globalFetch"
+    },
+    {
+      "name": "risuChatParser",
+      "specifier": "./parser/parser.svelte",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "supportsInlayImage",
+      "specifier": "./process/files/inlays",
+      "original": "supportsInlayImage"
+    },
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "./storage/database.svelte",
+      "original": "getCurrentCharacter"
+    }
+  ],
+  "globals": ["fetch", "localStorage"],
+  "nativeHostIntegrated": false,
+  "importLoaders": [
+    {
+      "name": "loadWebTokenizers",
+      "specifier": "@mlc-ai/web-tokenizers",
+      "reason": "The Node host must supply module-local CommonJS bindings for the installed ESM-declared UMD package; browser loader retains dynamic import."
+    }
+  ]
+}

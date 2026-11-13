@@ -1,19 +1,23 @@
-import { svelte } from "@sveltejs/vite-plugin-svelte"
-import { configDefaults, defineConfig } from 'vitest/config'
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [
-    svelte(),
-  ],
+  plugins: [svelte()],
   resolve: {
     alias: {
-      src: '/src',
+      src: "/src",
     },
-    conditions: ['browser'],
+    conditions: ["browser"],
   },
   test: {
-    environment: 'happy-dom',
-    setupFiles: ['vitest.setup.ts'],
-    exclude: [...configDefaults.exclude, 'server/node/**/*.test.cjs'],
+    exclude: [
+      ...configDefaults.exclude,
+      "server/entity/**",
+      "server/native/**",
+      "server/runtime/**",
+      "server/browser/**",
+    ],
+    environment: "happy-dom",
+    setupFiles: ["vitest.setup.ts"],
   },
-})
+});

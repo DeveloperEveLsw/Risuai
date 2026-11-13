@@ -1,0 +1,1365 @@
+{
+  "verifiedAt": "2026-10-04T15:09:58.809994+00:00",
+  "scope": "local_public_code_and_synthetic_data",
+  "candidateBaseCommit": "fccac3fa515151c6445f77b1790cede8540480e9",
+  "schemaVersion": 21,
+  "node": "v22.21.0",
+  "application": {
+    "path": "evidence/local-display-native-packet-app-20261004.log",
+    "sha256": "8c0a7edb051035a6a7647d89578e2da7623e765e0e6ff0fe581e1a6400257383",
+    "pass": 546,
+    "skipped": 3,
+    "files": 64,
+    "exitCode": 0,
+    "fresh": true
+  },
+  "backend": {
+    "path": "evidence/local-display-native-packet-backend-serial-20261004.log",
+    "sha256": "6a4ffa23659d7d9671f9a338cf6c54211249d8ab1d43602b4fe730711047969f",
+    "tests": 402,
+    "pass": 402,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "fresh": true
+  },
+  "browser": {
+    "path": "evidence/local-display-native-packet-browser-serial-final-20261004.log",
+    "sha256": "4d286d5d60193334bcde05fb8c0863b9bf98a26b6aa5065d75810b99dbd45c67",
+    "tests": 23,
+    "pass": 23,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "fresh": true
+  },
+  "types": {
+    "path": "evidence/local-display-native-packet-type-20261004.log",
+    "sha256": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "errors": 0,
+    "warnings": 0,
+    "exitCode": 0
+  },
+  "focused": {
+    "path": "evidence/local-display-native-packet-focused-20261004.log",
+    "sha256": "0ad2ab9f72d885bff0dec632b1c610c5ec0ba6a1e61857fccd83107e187f86f5",
+    "files": 4,
+    "pass": 28,
+    "fresh": true
+  },
+  "builds": [
+    {
+      "path": "evidence/local-display-native-packet-native-build-20261004.log",
+      "sha256": "d05c9654cedaf60bc0cab45a1d6d6368b7d4aa820a5e8a71973146958ff499f2",
+      "kind": "native",
+      "exitCode": 0,
+      "fresh": true
+    },
+    {
+      "path": "evidence/local-display-native-packet-entity-build-20261004.log",
+      "sha256": "a25aa1a7bc925964e5f449480e84cc78541dcd0fdfd58d3ade639ffe8f6a0b7d",
+      "kind": "entity",
+      "exitCode": 0,
+      "fresh": true
+    },
+    {
+      "path": "evidence/local-display-native-packet-ordinary-build-20261004.log",
+      "sha256": "ef5b9270588b0aa5db66ccd14b9ed3a17ad81786eb9ca14d0c990822782bf6cf",
+      "kind": "ordinary",
+      "exitCode": 0,
+      "fresh": true
+    }
+  ],
+  "gateExecution": {
+    "path": "evidence/local-display-native-packet-gates-final-20261004.json",
+    "sha256": "634ac4ede40a0c726ae26dd412bb2df93f60de447a78272d7a558be82ca7dc9c"
+  },
+  "preservedInitialGateExecution": {
+    "path": "evidence/local-display-native-packet-gates-20261004.json",
+    "sha256": "929eb8c0354db7dcbcd96005037d121af9e60c8659923c58bfc31a5558c99498"
+  },
+  "preservedInitialBrowserFailure": {
+    "path": "evidence/local-display-native-packet-browser-serial-20261004.log",
+    "sha256": "455d146f492c189e066fd55145dc1e8341fb8f55fb1e5529f172b796c70f6720",
+    "pass": 22,
+    "fail": 1,
+    "failure": "CDP timeout: Page.navigate",
+    "cause": "unconfirmed",
+    "assertionsOrTimeoutsChanged": false,
+    "isolatedUnchangedRecheck": {
+      "path": "evidence/local-display-native-packet-browser-isolated-20261004.log",
+      "sha256": "c28d5d2ea45ef27f664b73b9d5b99d1680aad877690e5f6080e474b78831f09a",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "fresh": true
+    }
+  },
+  "audit": {
+    "path": "evidence/local-display-native-packet-engine-audit-20261004.log",
+    "sha256": "49d7c61e408abcc54b4b0733bb11c52d31631e8cc16afd37fd7c7e9d8f27affd",
+    "declarations": 169,
+    "original": 167,
+    "existingExplicitPolicies": 2
+  },
+  "implementation": {
+    "smallOwnedPacketNativeJson": true,
+    "maximumFastPathUtf8Bytes": 1048576,
+    "conservativeBound": "6*inlineStringUnits+64*nodes+32*(drop.length+1)+128",
+    "definitionsRetainTreeCheck": true,
+    "largePacketsRetainTreeCheck": true,
+    "prototypeHooksAndChangedSerializerRetainTreeCheck": true,
+    "freshGetterReadsPreserved": true,
+    "logicalMiB": 16,
+    "packetMiB": 32,
+    "protocolVersionChanged": false,
+    "scriptCallsSkipped": false,
+    "luaResultsCached": false,
+    "privateDecodeChanged": false,
+    "receiverChecksChanged": false
+  },
+  "expectedRemovalControls": {
+    "path": "evidence/local-display-native-packet-removal-controls-20261004.json",
+    "sha256": "66372de7b8d30b2f5167c372bdfb9a4cc6bf45faa8ca6725182edc6e8ab9e7ba",
+    "candidateRestoredSha256": "77277c82bce04b95ce4363a35392f27609d5764868f84f45bd89473295412c8f",
+    "controls": [
+      {
+        "removed": "only native packet branch",
+        "exitCode": 1,
+        "log": "evidence/local-display-native-packet-branch-removal-control-20261004.log",
+        "logSha256": "3240cedf8d2299894d66abeca86ba76f397f22af484e43749056cd0dece8a95a",
+        "assertionsOrBudgetsChanged": false
+      },
+      {
+        "removed": "only1MiB conservative serialization eligibility cap",
+        "exitCode": 1,
+        "log": "evidence/local-display-native-packet-cap-removal-control-20261004.log",
+        "logSha256": "eed1570644e6744b726e4004a3549927992380007c6daf9dd7cb0734991ad269",
+        "assertionsOrBudgetsChanged": false
+      }
+    ],
+    "expectedFailure": true,
+    "candidateRestoredExactly": true
+  },
+  "preservedDiagnosticPreparationFailures": [
+    {
+      "path": "evidence/local-display-phase-probe-prepare-20261004.log",
+      "sha256": "03972cd6e7c5f40b8aa1f544475f0f61f75edac01967da75590d1e7ebf7ff7fe"
+    },
+    {
+      "path": "evidence/local-display-phase-probe-prepare-second-failure-20261004.log",
+      "sha256": "40aa1bccec7cfda2aae7fab1fe49e17e7677babf16ee226b78ceb00fbfa72934"
+    }
+  ],
+  "rawDefinitionHookProbe": {
+    "path": "evidence/local-display-native-packet-raw-hook-20261004.json",
+    "sha256": "fa796888bc77ecc4c7b22096319aab8f0da64e7f1595da647d9f935cac33bd8a",
+    "diagnosticOnly": true,
+    "actualSourceProbe": true,
+    "bodiesRecorded": false,
+    "productSourceChanged": false,
+    "sourceFiles": [
+      {
+        "path": "src/ts/runtime/displayScopeIdentity.ts",
+        "sha256": "3e8004881d787a3512f60721928125b761a15f09c979c6469117c37c0d9dc3f9"
+      },
+      {
+        "path": "src/ts/runtime/displayWireBudget.ts",
+        "sha256": "4e53a67796a2cb35c6dfce4902729b0e1513f9473b94ba555c21ae49ff4ac210"
+      },
+      {
+        "path": "src/ts/runtime/displayCaptureTransport.ts",
+        "sha256": "77277c82bce04b95ce4363a35392f27609d5764868f84f45bd89473295412c8f"
+      }
+    ],
+    "candidate": {
+      "coldTreeCheck": true,
+      "warmNativeCheck": true,
+      "hiddenRawHookNotInvoked": true,
+      "privateReceiverProjection": true,
+      "hookCalls": 0
+    },
+    "removalControl": {
+      "removedOnlyRawDefinitionExclusion": true,
+      "expectedFailure": true,
+      "hookCalls": 1
+    }
+  },
+  "verifiedAstLocations": {
+    "path": "evidence/local-display-phase-ast-verification-20261004.json",
+    "sha256": "cb120f273a0dae3c1f9cbe80014d04c994c3abca7bb50e761eda8bb56d0a3229"
+  },
+  "probes": [
+    {
+      "role": "baseline",
+      "path": "evidence/local-display-phase-probe-summary-20261004.json",
+      "sha256": "f6974a3ffe2ab54fe52a9e20aa72b80badb60be09a3917b8f57c5c57e5182804",
+      "sourceCommit": "fccac3fa515151c6445f77b1790cede8540480e9",
+      "candidateUncommittedNativePacket": false,
+      "diagnosticOnly": true,
+      "bodiesRecorded": false,
+      "build": {
+        "path": "evidence/local-display-phase-probe-build-20261004.json",
+        "sha256": "542ccb3b88944ef37a52a90ff65d1a70f7815c59c9ef51714b670532e7f368ec"
+      },
+      "ui": {
+        "path": "evidence/local-display-phase-probe-ui-20261004.json",
+        "sha256": "ae179de8ec73c8c1cbd9e8cf36873a4e465485de2c10f2b3d9b7f782e0abfe8a"
+      },
+      "sources": [
+        {
+          "path": "evidence/local-display-phase-counters-20261004-desktop.json",
+          "sha256": "27a4dd1b62237d96b52d230fbda8ec0110381b9294dc2d8fd927f495cab22024",
+          "scenario": "desktop",
+          "actualWorkerIdentity": {
+            "name": "risu-display-lua",
+            "url": "http://127.0.0.1:44659/assets/display.worker-D3lyXobB.js"
+          }
+        },
+        {
+          "path": "evidence/local-display-phase-counters-20261004-mobile-emulation-4x.json",
+          "sha256": "e4408203ca905a41ebc1da8cc0122ccccee046fcce2525b2c09b3e14b2d46f2c",
+          "scenario": "mobile-emulation-4x",
+          "actualWorkerIdentity": {
+            "name": "risu-display-lua",
+            "url": "http://127.0.0.1:44659/assets/display.worker-D3lyXobB.js"
+          }
+        }
+      ],
+      "actualWorkers": 2,
+      "clicks": 2,
+      "deltas": [
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "senderLogicalCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 12.200000137090683
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "senderPacketCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 35.19999995827675
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "captureEncode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 59.20000001788139
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "workerPostMessage",
+          "calls": 107,
+          "chars": 0,
+          "ms": 19.899999886751175
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "receiverPacketCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 37.60000014305115
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "definitionSerialize",
+          "calls": 0,
+          "chars": 0,
+          "ms": 0.0
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "referenceParse",
+          "calls": 107,
+          "chars": 116844107,
+          "ms": 52.79999989271164
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "captureDecode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 123.1000000834465
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "luaExecute",
+          "calls": 107,
+          "chars": 0,
+          "ms": 141.29999989271164
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "senderLogicalCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 51.79999998211861
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "senderPacketCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 135.1999998986721
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "captureEncode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 238.59999990463257
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "workerPostMessage",
+          "calls": 107,
+          "chars": 0,
+          "ms": 68.50000011920929
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "receiverPacketCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 40.10000005364418
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "definitionSerialize",
+          "calls": 0,
+          "chars": 0,
+          "ms": 0.0
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "referenceParse",
+          "calls": 107,
+          "chars": 116844107,
+          "ms": 55.500000059604645
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "captureDecode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 131.59999999403954
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "luaExecute",
+          "calls": 107,
+          "chars": 0,
+          "ms": 146.2999999821186
+        }
+      ],
+      "packetCallsEachClick": 107,
+      "labelledComputationsEachClick": 106,
+      "independentRowsEachClick": 94,
+      "limits": [
+        "Nested phase wall times overlap and include instrumentation overhead; do not add them or treat them as complete end-to-end attribution.",
+        "Lua execute includes asynchronous VM/API work, not just VM CPU.",
+        "Reference parse characters are processed characters, not retained allocation bytes.",
+        "Candidate native checking includes the nested packetStringify time.",
+        "These four diagnostic clicks are not included in144 uninstrumented warm observations."
+      ],
+      "interpretation": "Actual candidate warm clicks use107 native checks and0 recursive sender packet checks. Receiver validation and independent reference parsing remain. Baseline sender packet check35/135ms; candidate native check19/65ms with nested stringify9/30ms. This is diagnostic phase evidence, not complete end-to-end or population speedup attribution.",
+      "preservedPreparationFailures": [
+        "Initial postMessage matcher depended on whitespace.",
+        "Second matcher accepted string literals only; optimized output used a no-substitution template. Final semantic AST matcher supports literal-like values."
+      ]
+    },
+    {
+      "role": "candidate",
+      "path": "evidence/local-display-native-packet-phase-summary-20261004.json",
+      "sha256": "42f072a3f2454559959403be9ed9a7df43126940caab7299f457e48ec36ac9c8",
+      "sourceCommit": "fccac3fa515151c6445f77b1790cede8540480e9",
+      "candidateUncommittedNativePacket": true,
+      "diagnosticOnly": true,
+      "bodiesRecorded": false,
+      "build": {
+        "path": "evidence/local-display-native-packet-phase-build-20261004.json",
+        "sha256": "36fc71e4856961fa7cb3534f94ca991251051f6730b357cab3fa4f70de3f4687"
+      },
+      "ui": {
+        "path": "evidence/local-display-native-packet-phase-ui-20261004.json",
+        "sha256": "ded5486914613e193c024019c653b27468322657ce104bd4eacc2ff5522bcb26"
+      },
+      "sources": [
+        {
+          "path": "evidence/local-display-native-packet-phase-counters-20261004-desktop.json",
+          "sha256": "d7deb65f9de4e70681f626eda5ebe11ce5a77afb48ca960ffd77a8aceadaaf21",
+          "scenario": "desktop",
+          "actualWorkerIdentity": {
+            "name": "risu-display-lua",
+            "url": "http://127.0.0.1:45405/assets/display.worker-D3lyXobB.js"
+          }
+        },
+        {
+          "path": "evidence/local-display-native-packet-phase-counters-20261004-mobile-emulation-4x.json",
+          "sha256": "b215ca3c756a837599b4fa920f0dfb848ee7ab5f5b0813d0d4b0d15bc3f436b0",
+          "scenario": "mobile-emulation-4x",
+          "actualWorkerIdentity": {
+            "name": "risu-display-lua",
+            "url": "http://127.0.0.1:45405/assets/display.worker-D3lyXobB.js"
+          }
+        }
+      ],
+      "actualWorkers": 2,
+      "clicks": 2,
+      "deltas": [
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "senderLogicalCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 12.199999928474426
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "senderPacketCheck",
+          "calls": 0,
+          "chars": 0,
+          "ms": 0
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "captureEncode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 44.300000071525574
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "workerPostMessage",
+          "calls": 107,
+          "chars": 0,
+          "ms": 20.599999964237213
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "packetStringify",
+          "calls": 107,
+          "chars": 0,
+          "ms": 8.60000005364418
+        },
+        {
+          "scenario": "desktop",
+          "target": "main",
+          "phase": "senderPacketNativeCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 18.80000004172325
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "receiverPacketCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 40.29999989271164
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "definitionSerialize",
+          "calls": 0,
+          "chars": 0,
+          "ms": 0.0
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "referenceParse",
+          "calls": 107,
+          "chars": 116844107,
+          "ms": 54.199999898672104
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "captureDecode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 127.89999994635582
+        },
+        {
+          "scenario": "desktop",
+          "target": "worker",
+          "phase": "luaExecute",
+          "calls": 107,
+          "chars": 0,
+          "ms": 145.49999994039536
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "senderLogicalCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 45.10000017285347
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "senderPacketCheck",
+          "calls": 0,
+          "chars": 0,
+          "ms": 0.0
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "captureEncode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 165.9000000357628
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "workerPostMessage",
+          "calls": 107,
+          "chars": 0,
+          "ms": 66.30000001192093
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "packetStringify",
+          "calls": 107,
+          "chars": 0,
+          "ms": 29.60000005364418
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "main",
+          "phase": "senderPacketNativeCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 64.7000000178814
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "receiverPacketCheck",
+          "calls": 107,
+          "chars": 0,
+          "ms": 39.69999986886978
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "definitionSerialize",
+          "calls": 0,
+          "chars": 0,
+          "ms": 0.0
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "referenceParse",
+          "calls": 107,
+          "chars": 116844107,
+          "ms": 54.69999983906746
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "captureDecode",
+          "calls": 107,
+          "chars": 0,
+          "ms": 128.0999999642372
+        },
+        {
+          "scenario": "mobile-emulation-4x",
+          "target": "worker",
+          "phase": "luaExecute",
+          "calls": 107,
+          "chars": 0,
+          "ms": 150.29999986290932
+        }
+      ],
+      "packetCallsEachClick": 107,
+      "labelledComputationsEachClick": 106,
+      "independentRowsEachClick": 94,
+      "limits": [
+        "Nested phase wall times overlap and include instrumentation overhead; do not add them or treat them as complete end-to-end attribution.",
+        "Lua execute includes asynchronous VM/API work, not just VM CPU.",
+        "Reference parse characters are processed characters, not retained allocation bytes.",
+        "Candidate native checking includes the nested packetStringify time.",
+        "These four diagnostic clicks are not included in144 uninstrumented warm observations."
+      ],
+      "interpretation": "Actual candidate warm clicks use107 native checks and0 recursive sender packet checks. Receiver validation and independent reference parsing remain. Baseline sender packet check35/135ms; candidate native check19/65ms with nested stringify9/30ms. This is diagnostic phase evidence, not complete end-to-end or population speedup attribution.",
+      "preservedPreparationFailures": [
+        "Initial postMessage matcher depended on whitespace.",
+        "Second matcher accepted string literals only; optimized output used a no-substitution template. Final semantic AST matcher supports literal-like values."
+      ]
+    }
+  ],
+  "performance": {
+    "path": "evidence/local-display-native-packet-performance-20261004.json",
+    "sha256": "2577461516400f00c0c5ce47a3c34365a1a3dc6dda801f6b57231838b4662e4f",
+    "pairedExecutions": 12,
+    "warmObservations": 144,
+    "perRunSamples": 6,
+    "fixtureRows": 100,
+    "labelledComputationsEachClick": 106,
+    "independentRowsEachClick": 94,
+    "unchangedHelperSha256": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "buildIndexHashes": {
+      "baseline": "aae7692ad1dd45ec7bab78f1a3a6bb5f580ba0af4d0c2481159f3528701dcce4",
+      "candidate": "ff620469f8c2ba8bd577d0493723bd27bf829fd3240bd828a5d67cd4b1ce1a76"
+    },
+    "observedLowerPairedSettlementMedians": 11,
+    "pairedMedianComparisons": 12,
+    "candidatePageMetrics": {
+      "feedbackMs": {
+        "minMedian": 26.55000001192093,
+        "maxMedian": 43.3999999910593
+      },
+      "settledMs": {
+        "minMedian": 809.6500000059605,
+        "maxMedian": 1850.550000011921
+      },
+      "maxFrameGapMs": {
+        "minMedian": 100.09999999999945,
+        "maxMedian": 116.65000000000055
+      },
+      "longestLongTaskMs": 139
+    },
+    "consistentOverallSpeedupProven": false,
+    "stutterResolved": false,
+    "workerCpuThrottleVerified": false,
+    "physicalMobileOS": false,
+    "measurements": [
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 21.549999997019768,
+          "p95NearestRank": 29.900000005960464,
+          "min": 19,
+          "max": 29.900000005960464
+        },
+        "settledMs": {
+          "median": 335.69999998807907,
+          "p95NearestRank": 369.09999999403954,
+          "min": 289.5,
+          "max": 369.09999999403954
+        },
+        "maxFrameGapMs": {
+          "median": 33.399999999999864,
+          "p95NearestRank": 50,
+          "min": 16.700000000000728,
+          "max": 50
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 28.599999994039536,
+          "p95NearestRank": 37.19999998807907,
+          "min": 26.200000017881393,
+          "max": 37.19999998807907
+        },
+        "settledMs": {
+          "median": 884.3500000089407,
+          "p95NearestRank": 973.5,
+          "min": 811.5999999940395,
+          "max": 973.5
+        },
+        "maxFrameGapMs": {
+          "median": 100.10000000000036,
+          "p95NearestRank": 116.80000000000018,
+          "min": 99.89999999999964,
+          "max": 116.80000000000018
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 121
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.400000005960464,
+          "p95NearestRank": 25.900000005960464,
+          "min": 19.19999998807907,
+          "max": 25.900000005960464
+        },
+        "settledMs": {
+          "median": 296.84999999403954,
+          "p95NearestRank": 308,
+          "min": 256.7999999821186,
+          "max": 308
+        },
+        "maxFrameGapMs": {
+          "median": 33.399999999999864,
+          "p95NearestRank": 33.5,
+          "min": 16.800000000000182,
+          "max": 33.5
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 26.55000001192093,
+          "p95NearestRank": 33.400000005960464,
+          "min": 25.30000001192093,
+          "max": 33.400000005960464
+        },
+        "settledMs": {
+          "median": 845.9499999880791,
+          "p95NearestRank": 927.3000000119209,
+          "min": 774.2000000178814,
+          "max": 927.3000000119209
+        },
+        "maxFrameGapMs": {
+          "median": 116.59999999999945,
+          "p95NearestRank": 116.69999999999982,
+          "min": 100,
+          "max": 116.69999999999982
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 119
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.399999991059303,
+          "p95NearestRank": 25.399999976158142,
+          "min": 20.099999994039536,
+          "max": 25.399999976158142
+        },
+        "settledMs": {
+          "median": 515.0999999940395,
+          "p95NearestRank": 538.1999999880791,
+          "min": 505.2999999821186,
+          "max": 538.1999999880791
+        },
+        "maxFrameGapMs": {
+          "median": 58.34999999999991,
+          "p95NearestRank": 100,
+          "min": 50,
+          "max": 100
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 43.1000000089407,
+          "p95NearestRank": 62.29999998211861,
+          "min": 40.900000005960464,
+          "max": 62.29999998211861
+        },
+        "settledMs": {
+          "median": 1398.6000000089407,
+          "p95NearestRank": 1551.5999999940395,
+          "min": 1335,
+          "max": 1551.5999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 108.29999999999927,
+          "p95NearestRank": 116.70000000000073,
+          "min": 99.89999999999964,
+          "max": 116.70000000000073
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 123
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.200000017881393,
+          "p95NearestRank": 24.900000005960464,
+          "min": 17,
+          "max": 24.900000005960464
+        },
+        "settledMs": {
+          "median": 503.15000000596046,
+          "p95NearestRank": 568.3999999761581,
+          "min": 488.40000000596046,
+          "max": 568.3999999761581
+        },
+        "maxFrameGapMs": {
+          "median": 66.65000000000032,
+          "p95NearestRank": 66.80000000000018,
+          "min": 50,
+          "max": 66.80000000000018
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 43.3999999910593,
+          "p95NearestRank": 60,
+          "min": 35.19999998807907,
+          "max": 60
+        },
+        "settledMs": {
+          "median": 1337.1000000089407,
+          "p95NearestRank": 1510.2000000178814,
+          "min": 1285,
+          "max": 1510.2000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 116.59999999999854,
+          "p95NearestRank": 116.69999999999891,
+          "min": 100,
+          "max": 116.69999999999891
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 119
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.200000002980232,
+          "p95NearestRank": 21.5,
+          "min": 17.69999998807907,
+          "max": 21.5
+        },
+        "settledMs": {
+          "median": 1021.6500000059605,
+          "p95NearestRank": 1102.0999999940395,
+          "min": 988.0999999940395,
+          "max": 1102.0999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 58.29999999999927,
+          "p95NearestRank": 66.70000000000073,
+          "min": 33.30000000000018,
+          "max": 66.70000000000073
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 31.850000008940697,
+          "p95NearestRank": 47,
+          "min": 26.599999994039536,
+          "max": 47
+        },
+        "settledMs": {
+          "median": 1906.800000011921,
+          "p95NearestRank": 2048.2000000178814,
+          "min": 1845.5999999940395,
+          "max": 2048.2000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 116.70000000000073,
+          "p95NearestRank": 150,
+          "min": 100.10000000000036,
+          "max": 150
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 150
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.5,
+          "p95NearestRank": 21.900000005960464,
+          "min": 20.099999994039536,
+          "max": 21.900000005960464
+        },
+        "settledMs": {
+          "median": 1038.1500000059605,
+          "p95NearestRank": 1088.9000000059605,
+          "min": 1035,
+          "max": 1088.9000000059605
+        },
+        "maxFrameGapMs": {
+          "median": 66.65000000000009,
+          "p95NearestRank": 66.70000000000073,
+          "min": 33.40000000000009,
+          "max": 66.70000000000073
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 36.8500000089407,
+          "p95NearestRank": 50.5,
+          "min": 26.400000005960464,
+          "max": 50.5
+        },
+        "settledMs": {
+          "median": 1850.550000011921,
+          "p95NearestRank": 1961.7000000178814,
+          "min": 1766,
+          "max": 1961.7000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 116.65000000000055,
+          "p95NearestRank": 166.70000000000073,
+          "min": 100,
+          "max": 166.70000000000073
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 139
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.950000002980232,
+          "p95NearestRank": 29.099999994039536,
+          "min": 21.599999994039536,
+          "max": 29.099999994039536
+        },
+        "settledMs": {
+          "median": 274.09999999403954,
+          "p95NearestRank": 356.09999999403954,
+          "min": 256.40000000596046,
+          "max": 356.09999999403954
+        },
+        "maxFrameGapMs": {
+          "median": 16.800000000000182,
+          "p95NearestRank": 66.59999999999991,
+          "min": 16.700000000000273,
+          "max": 66.59999999999991
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 28.849999994039536,
+          "p95NearestRank": 32.5,
+          "min": 26.799999982118607,
+          "max": 32.5
+        },
+        "settledMs": {
+          "median": 809.6500000059605,
+          "p95NearestRank": 885.5,
+          "min": 758.9000000059605,
+          "max": 885.5
+        },
+        "maxFrameGapMs": {
+          "median": 108.34999999999991,
+          "p95NearestRank": 116.69999999999982,
+          "min": 100,
+          "max": 116.69999999999982
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 112
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.099999994039536,
+          "p95NearestRank": 23.600000023841858,
+          "min": 19.69999998807907,
+          "max": 23.600000023841858
+        },
+        "settledMs": {
+          "median": 306.25,
+          "p95NearestRank": 320,
+          "min": 289.80000001192093,
+          "max": 320
+        },
+        "maxFrameGapMs": {
+          "median": 33.30000000000018,
+          "p95NearestRank": 33.399999999999864,
+          "min": 16.700000000000273,
+          "max": 33.399999999999864
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 30.44999998807907,
+          "p95NearestRank": 34.30000001192093,
+          "min": 26.30000001192093,
+          "max": 34.30000001192093
+        },
+        "settledMs": {
+          "median": 852.6000000089407,
+          "p95NearestRank": 976.2000000178814,
+          "min": 779.1999999880791,
+          "max": 976.2000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 100.04999999999973,
+          "p95NearestRank": 116.70000000000073,
+          "min": 100,
+          "max": 116.70000000000073
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 119
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.399999991059303,
+          "p95NearestRank": 31.5,
+          "min": 19.600000023841858,
+          "max": 31.5
+        },
+        "settledMs": {
+          "median": 496.6499999910593,
+          "p95NearestRank": 538.4000000059605,
+          "min": 470.60000002384186,
+          "max": 538.4000000059605
+        },
+        "maxFrameGapMs": {
+          "median": 66.69999999999982,
+          "p95NearestRank": 100,
+          "min": 50,
+          "max": 100
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 41.99999998509884,
+          "p95NearestRank": 56.099999994039536,
+          "min": 37.599999994039536,
+          "max": 56.099999994039536
+        },
+        "settledMs": {
+          "median": 1330.199999988079,
+          "p95NearestRank": 1450.1000000238419,
+          "min": 1250.7999999821186,
+          "max": 1450.1000000238419
+        },
+        "maxFrameGapMs": {
+          "median": 100.09999999999945,
+          "p95NearestRank": 116.70000000000073,
+          "min": 100,
+          "max": 116.70000000000073
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 114
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 19.950000002980232,
+          "p95NearestRank": 21.099999994039536,
+          "min": 18.69999998807907,
+          "max": 21.099999994039536
+        },
+        "settledMs": {
+          "median": 529.5499999970198,
+          "p95NearestRank": 554.5,
+          "min": 505.2999999821186,
+          "max": 554.5
+        },
+        "maxFrameGapMs": {
+          "median": 58.30000000000018,
+          "p95NearestRank": 99.90000000000055,
+          "min": 33.400000000000546,
+          "max": 99.90000000000055
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 43.25,
+          "p95NearestRank": 56.79999998211861,
+          "min": 32.900000005960464,
+          "max": 56.79999998211861
+        },
+        "settledMs": {
+          "median": 1425.3500000089407,
+          "p95NearestRank": 1568.8999999761581,
+          "min": 1400.1000000238419,
+          "max": 1568.8999999761581
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95NearestRank": 100,
+          "min": 100,
+          "max": 100
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 113
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.650000005960464,
+          "p95NearestRank": 22,
+          "min": 19.200000017881393,
+          "max": 22
+        },
+        "settledMs": {
+          "median": 1046.0999999940395,
+          "p95NearestRank": 1105.0999999940395,
+          "min": 1004.6000000238419,
+          "max": 1105.0999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 66.64999999999964,
+          "p95NearestRank": 66.69999999999982,
+          "min": 49.899999999999636,
+          "max": 66.69999999999982
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 35.79999999701977,
+          "p95NearestRank": 46.89999997615814,
+          "min": 23.400000005960464,
+          "max": 46.89999997615814
+        },
+        "settledMs": {
+          "median": 1808.0,
+          "p95NearestRank": 2100.199999988079,
+          "min": 1698.5999999940395,
+          "max": 2100.199999988079
+        },
+        "maxFrameGapMs": {
+          "median": 116.59999999999945,
+          "p95NearestRank": 133.39999999999782,
+          "min": 100,
+          "max": 133.39999999999782
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 119
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 19.75,
+          "p95NearestRank": 21.799999982118607,
+          "min": 17.400000005960464,
+          "max": 21.799999982118607
+        },
+        "settledMs": {
+          "median": 1063.2999999970198,
+          "p95NearestRank": 1088.0999999940395,
+          "min": 1020.5999999940395,
+          "max": 1088.0999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 66.59999999999991,
+          "p95NearestRank": 100.10000000000036,
+          "min": 49.899999999999636,
+          "max": 100.10000000000036
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 30.849999994039536,
+          "p95NearestRank": 49.900000005960464,
+          "min": 26.200000017881393,
+          "max": 49.900000005960464
+        },
+        "settledMs": {
+          "median": 1890.1500000059605,
+          "p95NearestRank": 2145.199999988079,
+          "min": 1830.800000011921,
+          "max": 2145.199999988079
+        },
+        "maxFrameGapMs": {
+          "median": 116.64999999999873,
+          "p95NearestRank": 150,
+          "min": 100,
+          "max": 150
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 124
+      }
+    ]
+  },
+  "sourceFiles": [
+    {
+      "path": "src/ts/runtime/displayCaptureTransport.ts",
+      "sha256": "77277c82bce04b95ce4363a35392f27609d5764868f84f45bd89473295412c8f"
+    },
+    {
+      "path": "src/ts/runtime/displayCaptureTransport.test.ts",
+      "sha256": "01389118d9ed5455cd3705601b8c972c84355b5baa0829b59ae369bbba95d800"
+    },
+    {
+      "path": "docs/display-native-packet.md",
+      "sha256": "773e7d9e63f0e3e167646541403d06f1fbf01315b45717695b53fea86e434c97"
+    },
+    {
+      "path": "docs/engine-extraction-audit.json",
+      "sha256": "49d7c61e408abcc54b4b0733bb11c52d31631e8cc16afd37fd7c7e9d8f27affd"
+    },
+    {
+      "path": "docs/server-runtime-plan.md",
+      "sha256": "ece421967e257a4011477bd955c378a82d81a8b96927b80aedabaa40373f2b84"
+    }
+  ],
+  "all15": {
+    "unchecked": 15,
+    "sha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+    "wholeGoalComplete": false
+  },
+  "freshUniqueRegressionCases": 971,
+  "countsExcluded": [
+    "existing app skips",
+    "focused duplicate tests",
+    "isolated repeated browser test and initial22 passing cases are not counted again",
+    "expected failure control",
+    "instrumented diagnostic clicks",
+    "12 repeated performance executions and144 observations reported separately"
+  ],
+  "boundaryCounts": {
+    "productionAccess": 0,
+    "productionChanges": 0,
+    "privateReads": 0,
+    "realModelCalls": 0,
+    "remotePush": 0
+  },
+  "remaining": [
+    "mixed complete-refresh results",
+    "remaining original callback/DOM/postMessage/receiver/private-decode and cold/large packet costs",
+    "cold/concurrent/physical-mobile/large changed HTML-assets/full resource-extension contracts/storage budgets/full configured trial/all15 conditions"
+  ]
+}

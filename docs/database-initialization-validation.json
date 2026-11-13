@@ -1,0 +1,927 @@
+{
+  "baselineCommit": "8d17ebe017bb62bcad4f63e2c694458869f75e36",
+  "schemaVersion": 21,
+  "verifiedAt": "2026-10-04T10:32:35.195598+00:00",
+  "wholeGoalComplete": false,
+  "all15ConditionsRemainActive": true,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "gates": {
+    "app": {
+      "passed": 508,
+      "existingSkips": 3,
+      "fresh": true
+    },
+    "backend": {
+      "passed": 379,
+      "fresh": true,
+      "node": "v22.21.0"
+    },
+    "browser": {
+      "passed": 19,
+      "fresh": false,
+      "reusedFrom": "4d7cb0dfc68a414d4418c484e1c009164673c4b0",
+      "freshCoreCases": 3,
+      "freshCoreLog": "evidence/hosted-init-lock-browser-final-20261004.log"
+    },
+    "check": {
+      "errors": 0,
+      "warnings": 0,
+      "fresh": false,
+      "unchangedFrontend": true
+    },
+    "builds": {
+      "fresh": false,
+      "kinds": ["native", "entity", "ordinary"],
+      "sameArtifactHashesAs4d": true
+    },
+    "audit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2,
+      "fresh": false,
+      "unchangedSelectedEngine": true
+    }
+  },
+  "backendCompatibility": {
+    "schemaAndCommandBodiesUnchanged": true,
+    "nativeUnchanged": true,
+    "onlyChange": "close/reopen and bounded SQLITE_BUSY retry before schema or command setup"
+  },
+  "frontendValidationReceipt": "evidence/local-display-wire-sizing-20261004.json",
+  "frontendValidationSha256": "b7fd3bceb1a24b44cc9ac27ec71847d2a6a7c2475fed0ee788789661fa4a0b5b",
+  "warmObservations": 192,
+  "measurements": [
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.400000005960464,
+        "p95": 23.099999994039536,
+        "max": 23.099999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 382.29999999701977,
+        "p95": 423.7000000178814,
+        "max": 423.7000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 99.90000000000032,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 45.650000005960464,
+        "p95": 81.5,
+        "max": 81.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1326.5000000149012,
+        "p95": 1407.5,
+        "max": 1407.5
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.74999999999955,
+        "p95": 150,
+        "max": 150
+      },
+      "longestTaskMs": 143
+    },
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.5,
+        "p95": 24.80000001192093,
+        "max": 24.80000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 323.3999999910593,
+        "p95": 323.90000000596046,
+        "max": 323.90000000596046
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 33.34999999999991,
+        "p95": 33.40000000000009,
+        "max": 33.40000000000009
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 30.849999994039536,
+        "p95": 36.599999994039536,
+        "max": 36.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 926.8499999940395,
+        "p95": 1025,
+        "max": 1025
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.04999999999973,
+        "p95": 116.70000000000073,
+        "max": 116.70000000000073
+      },
+      "longestTaskMs": 111
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.25,
+        "p95": 29.399999976158142,
+        "max": 29.399999976158142
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 678.3999999910593,
+        "p95": 714.6999999880791,
+        "max": 714.6999999880791
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 50
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 54.70000000298023,
+        "p95": 73.19999998807907,
+        "max": 73.19999998807907
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1939.5499999970198,
+        "p95": 2055.5999999940395,
+        "max": 2055.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 199.94999999999982,
+        "p95": 216.60000000000218,
+        "max": 216.60000000000218
+      },
+      "longestTaskMs": 218
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.700000002980232,
+        "p95": 33.5,
+        "max": 33.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 592.5499999970198,
+        "p95": 650.2999999821186,
+        "max": 650.2999999821186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 83.34999999999991,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 60
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 41.900000005960464,
+        "p95": 55,
+        "max": 55
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1597.1500000059605,
+        "p95": 1715.7000000178814,
+        "max": 1715.7000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 166.69999999999982,
+        "p95": 183.39999999999964,
+        "max": 183.39999999999964
+      },
+      "longestTaskMs": 199
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 21.900000005960464,
+        "p95": 31,
+        "max": 31
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 935.2999999970198,
+        "p95": 972.2000000178814,
+        "max": 972.2000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 99.94999999999982,
+        "p95": 100.00000000000045,
+        "max": 100.00000000000045
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 36.099999994039536,
+        "p95": 45.599999994039536,
+        "max": 45.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1725.7000000029802,
+        "p95": 1810.699999988079,
+        "max": 1810.699999988079
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 125.0,
+        "p95": 166.59999999999854,
+        "max": 166.59999999999854
+      },
+      "longestTaskMs": 158
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 23.55000001192093,
+        "p95": 70.40000000596046,
+        "max": 70.40000000596046
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 865.3999999910593,
+        "p95": 973.3000000119209,
+        "max": 973.3000000119209
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 25.0,
+        "p95": 33.399999999999636,
+        "max": 33.399999999999636
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 32.5,
+        "p95": 37.20000001788139,
+        "max": 37.20000001788139
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1428.5000000149012,
+        "p95": 1631.4000000059605,
+        "max": 1631.4000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.64999999999964,
+        "p95": 183.30000000000018,
+        "max": 183.30000000000018
+      },
+      "longestTaskMs": 183
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 19.650000005960464,
+        "p95": 31.80000001192093,
+        "max": 31.80000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1178.6500000059605,
+        "p95": 1303.9000000059605,
+        "max": 1303.9000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 53
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 40.20000000298023,
+        "p95": 64,
+        "max": 64
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2395.550000011921,
+        "p95": 2649.9000000059605,
+        "max": 2649.9000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 208.34999999999854,
+        "p95": 216.70000000000073,
+        "max": 216.70000000000073
+      },
+      "longestTaskMs": 210
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.400000020861626,
+        "p95": 22.900000005960464,
+        "max": 22.900000005960464
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1087.7000000178814,
+        "p95": 1188.5999999940395,
+        "max": 1188.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 75.04999999999973,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 51
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 34.5,
+        "p95": 47.599999994039536,
+        "max": 47.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2150.6500000059605,
+        "p95": 2259.800000011921,
+        "max": 2259.800000011921
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 200.0,
+        "p95": 216.60000000000218,
+        "max": 216.60000000000218
+      },
+      "longestTaskMs": 219
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.649999991059303,
+        "p95": 21.80000001192093,
+        "max": 21.80000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1071.4500000029802,
+        "p95": 1088.0999999940395,
+        "max": 1088.0999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 83.40000000000055,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 36.54999999701977,
+        "p95": 48.30000001192093,
+        "max": 48.30000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2125.9500000029802,
+        "p95": 2392.300000011921,
+        "max": 2392.300000011921
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 199.95000000000073,
+        "p95": 283.39999999999964,
+        "max": 283.39999999999964
+      },
+      "longestTaskMs": 303
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.25000001490116,
+        "p95": 21.5,
+        "max": 21.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1204.25,
+        "p95": 1236.2000000178814,
+        "max": 1236.2000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.09999999999991,
+        "max": 100.09999999999991
+      },
+      "longestTaskMs": 52
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 39.69999998807907,
+        "p95": 57.099999994039536,
+        "max": 57.099999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2343.2999999970198,
+        "p95": 2500.7999999821186,
+        "max": 2500.7999999821186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 216.69999999999982,
+        "p95": 233.3000000000011,
+        "max": 233.3000000000011
+      },
+      "longestTaskMs": 220
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.700000002980232,
+        "p95": 27,
+        "max": 27
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 883.1999999880791,
+        "p95": 956.5,
+        "max": 956.5
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 33.299999999999955,
+        "p95": 33.400000000000546,
+        "max": 33.400000000000546
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 27.950000002980232,
+        "p95": 34.5,
+        "max": 34.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1444.25,
+        "p95": 1620.5999999940395,
+        "max": 1620.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 108.30000000000018,
+        "p95": 133.30000000000018,
+        "max": 133.30000000000018
+      },
+      "longestTaskMs": 119
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.649999991059303,
+        "p95": 24.700000017881393,
+        "max": 24.700000017881393
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 889.8999999910593,
+        "p95": 923.2000000178814,
+        "max": 923.2000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.09999999999991,
+        "max": 100.09999999999991
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 36.150000005960464,
+        "p95": 39.29999998211861,
+        "max": 39.29999998211861
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1723.6500000059605,
+        "p95": 1812.7999999821186,
+        "max": 1812.7999999821186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 124.95000000000027,
+        "p95": 133.39999999999964,
+        "max": 133.39999999999964
+      },
+      "longestTaskMs": 132
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.5,
+        "p95": 20.599999994039536,
+        "max": 20.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 578.6000000089407,
+        "p95": 604.6999999880791,
+        "max": 604.6999999880791
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 66.70000000000005,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 44.5,
+        "p95": 55.099999994039536,
+        "max": 55.099999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1618.2000000029802,
+        "p95": 1767.4000000059605,
+        "max": 1767.4000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 183.39999999999964,
+        "p95": 200,
+        "max": 200
+      },
+      "longestTaskMs": 203
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.450000002980232,
+        "p95": 23.5,
+        "max": 23.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 644.0999999940395,
+        "p95": 703.5999999940395,
+        "max": 703.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 50
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 55.04999999701977,
+        "p95": 66.59999999403954,
+        "max": 66.59999999403954
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1897.8500000089407,
+        "p95": 2016.7000000178814,
+        "max": 2016.7000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 183.34999999999945,
+        "p95": 233.29999999999927,
+        "max": 233.29999999999927
+      },
+      "longestTaskMs": 232
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.25,
+        "p95": 22.599999994039536,
+        "max": 22.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 322.70000000298023,
+        "p95": 353.60000002384186,
+        "max": 353.60000002384186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 16.800000000000182,
+        "p95": 33.30000000000018,
+        "max": 33.30000000000018
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 30.700000017881393,
+        "p95": 36,
+        "max": 36
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 993.5499999970198,
+        "p95": 1166.8999999761581,
+        "max": 1166.8999999761581
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.65000000000055,
+        "p95": 133.20000000000073,
+        "max": 133.20000000000073
+      },
+      "longestTaskMs": 129
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.75000001490116,
+        "p95": 23.30000001192093,
+        "max": 23.30000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 373.80000001192093,
+        "p95": 502,
+        "max": 502
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 40.95000000298023,
+        "p95": 52.60000002384186,
+        "max": 52.60000002384186
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1207.4000000059605,
+        "p95": 1392,
+        "max": 1392
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.69999999999982,
+        "p95": 150,
+        "max": 150
+      },
+      "longestTaskMs": 160
+    }
+  ],
+  "artifacts": {
+    "nativeSha256": "fe48443d5d0ecd3dbc94fc811014df57048d30029427ca1333db0363bca0d5aa",
+    "entityIndexSha256": "b8fb9d7dd75ca5488baf4a14ba5442d64580afebe920ff5dcdda3043384faf52",
+    "ordinaryIndexSha256": "fb659aef94100a3f22807b317950d89b5fd022bf3a6d80ff7b953a5e6dcbdb6e"
+  },
+  "sourceFingerprints": {
+    "docs/database-initialization.md": "425daa6efc56788b8a4da2d3055451944ca3865cc8d77f25588c163df82cd29f",
+    "docs/display-wire-sizing.md": "aee4a0ba490cb83abd435246b2b529cdf87bcf7f7bf1990f21c87abcc08f4260",
+    "docs/server-runtime-plan.md": "030fd505d4b898797cb5d85a57dec6ac280a6ee89ef376965ebf9c3e9ff3b589",
+    "server/entity/openDatabase.cjs": "4e623b53f25de3c579824e56d9f7bf82337d52ceb5bc1fa159573f805c51e2f9",
+    "server/entity/openDatabase.test.cjs": "400179129d5c3fec9f4e4557d20d78fe1a1fd04cdc060c2ea996328a59d544c7",
+    "server/entity/store.cjs": "513c1f1a005641bf269fd948ceb155ddc9276353ea8d57e91e02e5ba19f76d13"
+  },
+  "evidenceFingerprints": {
+    "evidence/local-display-wire-sizing-20261004.json": "b7fd3bceb1a24b44cc9ac27ec71847d2a6a7c2475fed0ee788789661fa4a0b5b"
+  },
+  "logFingerprints": {
+    "evidence/hosted-init-lock-final-format-20261004.log": "2a86b4f23413f42b8236878aa3eea9ddd4f60715edbdcaef6ba8a93912c4f83c",
+    "evidence/hosted-init-lock-app-final-20261004.log": "ebfdba6bb885b386a560a2a5a4f45ddec692e243be821aa94d1ad590f10fff2e",
+    "evidence/hosted-init-lock-doc-final-format-20261004.log": "6b115e7520ca5aa4cef7f708fa5b923b419a78dd3fdb8145d706333e306525e5",
+    "evidence/hosted-init-lock-app-20261004.log": "c96923a2b90c9401d21c9e42ba370eda8a3bf8c0e8d5750531be3f17117525e7",
+    "evidence/hosted-init-lock-format-20261004.log": "9ff6c1d10d718ab29106c8fc8e49287f21804671660d3e2f396836a923bbdfa9",
+    "evidence/hosted-init-lock-browser-20261004.log": "cf09f8ea234ecf2d3a2d6728d08853fb5ebd060e0279a9cdf65b9c32e6788150",
+    "evidence/hosted-init-lock-backend-node22-initial-constructor-fixture-failure.log": "0160274b8647a203066abe7719226c9e8c12a7a566ccb30215bf8eabdc327a29",
+    "evidence/hosted-init-lock-doc-format-20261004.log": "1ffcba8e3ff91e5b550e3e7146b00fcee9ea969eede1204afdbfe2c8a3800612",
+    "evidence/hosted-init-lock-browser-final-20261004.log": "c46dd011614dc27e4770e55fada8c99af5a007e2820af5437dd83b8bc2befe57",
+    "evidence/hosted-init-lock-focused-20261004.log": "0c83ad849578b47b727840154bc994c1a8ee7574826a159dff169977b50dce76",
+    "evidence/hosted-init-lock-backend-node22-final-20261004.log": "da9ab394ef87dbe7d3bdfc4382503e727468150f012d30e5f971939fc4383be0",
+    "evidence/hosted-init-lock-backend-node22-20261004.log": "0160274b8647a203066abe7719226c9e8c12a7a566ccb30215bf8eabdc327a29",
+    "evidence/hosted-init-lock-final-focused-20261004.log": "5427c38717ceb3af0d8fbf39f91f9dbaab6ee26764d05e2ed2fa9b93c75e59aa"
+  },
+  "scriptFingerprints": {
+    "scripts/record_hosted_readiness.py": "4ff64bce5a97500a405b1f79d54d738c6e361c1b140a3e72ce24b3728de45676"
+  },
+  "initialFailure": {
+    "firstNode24": {
+      "passed": 376,
+      "failed": 1
+    },
+    "unchangedIsolatedRecheckAlsoFailed": true,
+    "logs": [
+      "evidence/hosted-current-rollout-4d7cb0d-backend-initial-lock-failure.log",
+      "evidence/hosted-current-rollout-4d7cb0d-database-worker-recheck-1.log"
+    ],
+    "oldCandidateNeverDeployed": true,
+    "assertionsOrTimeoutsWeakened": false,
+    "intermediateMigrationFixture": {
+      "passed": 378,
+      "failed": 1,
+      "cause": "A cached helper constructor bypassed the existing reloaded-Store SQLite subclass fault injection.",
+      "correction": "Pass the original Store-captured DatabaseSync constructor into setup; original SQLITE_FULL assertion remains unchanged.",
+      "log": "evidence/hosted-init-lock-backend-node22-initial-constructor-fixture-failure.log"
+    }
+  },
+  "newRegressions": {
+    "coldDatabases": 8,
+    "simultaneousWorkersEach": 4,
+    "durableCommandDeduplication": true,
+    "persistentExclusiveLockBudgetMs": 50,
+    "noPartialWriteAndRecoveredPragmas": true
+  },
+  "limits": [
+    "The historical first-visit user DB error cause remains unconfirmed.",
+    "Private Nexus gsub cause remains unknown; all15 conditions and performance/full-trial limits persist."
+  ],
+  "scope": {
+    "explicitDeploymentAuthorized": true,
+    "syntheticOnly": true,
+    "privateReads": false,
+    "realModelCalls": 0,
+    "pushes": 0
+  }
+}

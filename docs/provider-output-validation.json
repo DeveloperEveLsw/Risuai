@@ -1,0 +1,150 @@
+{
+  "baselineCommit": "ac4ca8586ddda96bf4160dd757502c1b4c9ac24a",
+  "verifiedAt": "2026-10-04T07:55:23.431172+00:00",
+  "schemaVersion": 20,
+  "schemaChanged": false,
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateSourceReads": false,
+    "realModelCalls": 0,
+    "deployments": 0,
+    "remotePushes": 0
+  },
+  "all15ConditionsRemainActive": true,
+  "wholeGoalComplete": false,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "gates": {
+    "node": "22.21.0",
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 494,
+      "skipped": 3,
+      "fresh": true
+    },
+    "backend": {
+      "passed": 369,
+      "skipped": 0,
+      "fresh": true,
+      "fileConcurrency": 2
+    },
+    "browser": {
+      "passed": 14,
+      "skipped": 0,
+      "serial": true,
+      "originalBuiltUi": 10,
+      "displayCases": 4
+    },
+    "actualNativeLua": 8,
+    "parsedStreamUnits": 7,
+    "storeBudgetCases": 7,
+    "builds": ["native", "entity", "ordinary"],
+    "ordinary": {
+      "exitCode": 0,
+      "temporaryOutput": "/tmp/risu-provider-output-ordinary-kvl9gvn8",
+      "bothRuntimeFlagsRemoved": true,
+      "indexSha256": "5839ae6e5408af267d7ff44d891694da1f598bce53856e60a217281fd56156a8",
+      "temporaryOutputRemoved": true
+    },
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    },
+    "candidateNode24Fresh": false
+  },
+  "reproduction": {
+    "before": "actual native output Lua failed after one loopback call; preview lacks raw response",
+    "after": "same original failure; raw output retained, no canonical partial writes or automatic provider replay",
+    "streamMidProcessing": "complete=false",
+    "streamAfterEOF": "complete=true",
+    "twoBrowserCase": "API admission in authenticated original UI; all-tab exit, native failure, service reopen, explicit readonly preview",
+    "crashAndCancel": "checkpoint remains partial; process kill/restart and HTTP cancel; no replay",
+    "diskFull": "real SQLite primary13 preserves earlier raw checkpoint and canonical state/cursor"
+  },
+  "budgets": {
+    "semanticRequestsPerJob": 64,
+    "candidatesPerResponse": 64,
+    "aggregateJsonUtf8Bytes": 4194304,
+    "streamCheckpointIntervalMs": 250,
+    "globalStorageBudget": false,
+    "heapBound": false
+  },
+  "reportedUserError": {
+    "character": "주식회사 넥서스v2.5",
+    "action": "send message",
+    "category": "Lua nil method gsub",
+    "chunkLine": 6703,
+    "messageContentStored": false,
+    "exactCauseVerified": false,
+    "scriptFixed": false,
+    "privateCodeInspected": false
+  },
+  "initialFailures": {
+    "storeFixture": "15pass/1fail: SQL uses type instead of entity_type; corrected",
+    "streamFixture": "12pass/1fail: off-mode Lua runs before EOF; test split into partial and strong-mode EOF cases",
+    "uiFixture": "0pass/1fail: cursor is not a DB-worker method; use snapshot cursor, no production allowlist relaxation",
+    "typeCheck": "3errors: success/fail shared union narrowing; explicit streaming branch fixed",
+    "formatter": "Svelte plugin initially omitted; reran with installed plugin before successful UI build"
+  },
+  "sourceFingerprints": {
+    "src/ts/runtime/providerOutputRuntime.ts": "a970b594367d883687356948f6a3e7fafd243461361a3f408cdf5c61725890b7",
+    "src/ts/runtime/providerOutputRuntime.test.ts": "e5cd3d75b31db1440e1b1b981858320190c1ced4688f35bca6e77da2c846b0c3",
+    "src/ts/runtime/nativeGenerationRuntime.ts": "affe8cae66f4556f26eb407ae20db0c2e2bca9a2e159cfed32cac2d54bd36926",
+    "src/ts/runtime/nativeExtensionJob.ts": "b0480f49e19bda2856431f81635bce046847f0a7a015171535f9d179fa0e18ca",
+    "src/ts/runtime/jobResults.ts": "deec084e33742d4f44b8527ed6ad3b4990a36f715f9225447c655882cfc66058",
+    "src/lib/Others/RuntimeStatus.svelte": "5433f3b5b49f8860bdbb1234ebc326ff5abb0eecda26226436b984eb3e52dc5f",
+    "server/native/extensionWorker.cjs": "22a42cf80689cbcb788b3bd2a219185513fa3212f32f4a5890c5774b657ea16a",
+    "server/native/progress.cjs": "90536c8f46172208be13d56cb695f8523912dda2eb8e57adf4078ab6ef702d66",
+    "server/native/luaValueContracts.test.cjs": "cb9894ae6337754b94b4557271a5420276e154eee28e757bd186ea806fa1ba3e",
+    "server/native/providerOutputs.test.cjs": "0dd10c2bd8a08d2f9b14cfa50885bc711502d331bda90fd5c64fb43ea8a6c825",
+    "server/entity/providerOutputs.cjs": "bbb04a17879c1ad2f48ff6a17ddd9cb65e9e75a3d9bd40aaa44248e29757ab0e",
+    "server/entity/jobResults.cjs": "57590af13dc5d63c76a573da821f39860a26617f398e8259940df9223b7d67bd",
+    "server/entity/store.cjs": "24262ee877c513a7042d15436b329b1ffb069da0a1ce46d894c5c433988e7586",
+    "server/runtime/service.cjs": "688af5e9462c3104a1a02bb9ef917a6854d0a6ff79aa3cad7fd2718851325093",
+    "server/runtime/service.test.cjs": "3273712a1ca51ac91ebcfd6192de64f030e58f633099fed338dfb8fefb8d8710",
+    "server/browser/providerOutputUi.test.cjs": "7677f9e233dec52227404f19ee94540a4e042379665174c520d622a892fcec73",
+    "docs/provider-output-retention.md": "10fa1e7641bbd0ed73ebec42ee2a2f2b344b734cfdae9f77c4305f8ef4846847",
+    "docs/server-runtime-plan.md": "22b9b3f0770db1a15e6ebbfe7f57facecad0ddbe2557af9a723de0c8d5c03e96",
+    "docs/engine-extraction-audit.json": "615ec0b2ebfeb22cbba0a6b86cd2bc773c4a4bdf380df18ffaa38fbec163b256"
+  },
+  "artifacts": {
+    "nativeSha256": "fe48443d5d0ecd3dbc94fc811014df57048d30029427ca1333db0363bca0d5aa",
+    "entityIndexSha256": "1358cd6baf83d9ec8a1126f9063f75ab020ce2fc30e9811a7a468cfc2ad299f4"
+  },
+  "logFingerprints": {
+    "evidence/local-provider-output-app.log": "3c3c419f95e48994e1d1e9e35447b66210ab33cc05f0ed00ac83a93d3721638e",
+    "evidence/local-provider-output-audit.log": "615ec0b2ebfeb22cbba0a6b86cd2bc773c4a4bdf380df18ffaa38fbec163b256",
+    "evidence/local-provider-output-backend-before-api-projection.log": "e46596d6c6d58600de3c2665918a47e807a645038c7047a38edf0e8bbf956c65",
+    "evidence/local-provider-output-backend.log": "341b6e67b1f50f47808f5b7c98eb37047200fcaa13c50be7c0cd02d1c51ce0a7",
+    "evidence/local-provider-output-before.log": "fce091b2d7ddfcf0eac999c6c01be65d42b1edd6811bf3163202783471fa9bdf",
+    "evidence/local-provider-output-browser-first.log": "7e8ae6b99f9231b4050e85ea45a3f6915f30df3940c8d08693e2ddc698207b4c",
+    "evidence/local-provider-output-browser-fixed.log": "f3ba53d295fdbaaad5ca16a3ee0ca266b2ea4c6aa06eac7c526c6e9f6ca4fa7e",
+    "evidence/local-provider-output-browser.log": "f371848c25b71b5836a2b6e4ccdbe91c543614f7a7c65723092d0f9161a9ca85",
+    "evidence/local-provider-output-check-initial.log": "0740cfbd4bfc0186dc982fc3df1e495ff39454baed7342ef15c91dcfe04da99b",
+    "evidence/local-provider-output-check.log": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "evidence/local-provider-output-entity-build.log": "714448fbd1f126d0334dc9bfc4bdc323386498397837d74ab6ceca83ed230e82",
+    "evidence/local-provider-output-native-build.log": "9019320c898c6e016d96bc69331e01763a168d09334e2c5e7b60aba55ace0e45",
+    "evidence/local-provider-output-native-cases-initial.log": "171f7d643f72e9af4063e7b205d75cd086da6e060b1dea671c620af20ae72d06",
+    "evidence/local-provider-output-native-cases.log": "e2af4dedbee5c0f1eef20f545aeff2365b2279c04ca0d159cd18429cffd6e9e6",
+    "evidence/local-provider-output-native-initial.log": "e951407da41d4c3b1cd863d2e1c72e7c82b965fadff4298d957e84275f17424d",
+    "evidence/local-provider-output-ordinary-build.log": "db9cd9877e7bc7e90580abd8ddd76d14e31208466ac6b074457530ca3a302bc5",
+    "evidence/local-provider-output-store-budget.log": "0145c2519e03d08b665a28d4e10cf122d2f04fbd34f252e6fb9e1cb3b6e66871",
+    "evidence/local-provider-output-store-final.log": "6fcb0e484832d970b82622d887192098aed7ca26aa002ad0c3f7a9826c0c4b7f",
+    "evidence/local-provider-output-store-initial.log": "00b02ea1c92312508bc7a9b59bdf21c3a7c0db9a2a384ed094a8fe08606e9eeb",
+    "evidence/local-provider-output-unit-final.log": "ae89833b3a918036fa020bd1a11074d33c1fc6c94bd36e86e55ea4893526ce11",
+    "evidence/local-provider-output-unit-initial.log": "608d9d1415f790c766802339c476095f021f6be76ade92445a3b5f5909de8368"
+  },
+  "limits": [
+    "Private card cause/script remains unknown; no past-output backfill",
+    "Parsed text/candidates only, not universal provider reasoning/image/tool output",
+    "No automatic postprocessing resume or promotion of raw text into a complete transaction",
+    "Before first successful checkpoint, full disk or hard kill can lose output; budget overflow fails processing",
+    "New checkpoint/JSON projection latency and physical-device performance not measured",
+    "No fresh Node24 candidate validation; full read/extension/import-export/storage/trial scope remains open"
+  ]
+}

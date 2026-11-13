@@ -1,0 +1,329 @@
+{
+  "baselineCommit": "e9dfac407e180bdb01d1817ddc6fc0296db4fd02",
+  "schemaVersion": 20,
+  "all15ConditionsRemainActive": true,
+  "gates": {
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 467,
+      "skipped": 3
+    },
+    "backend": {
+      "passed": 354
+    },
+    "browserRegressions": {
+      "passed": 11,
+      "originalBuiltUI": 9,
+      "additionalBuiltWorker": 1,
+      "clientCompiledSvelteCache": 1
+    },
+    "builds": ["native", "entity", "ordinary"],
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    }
+  },
+  "performance": {
+    "unprofiledOptimizedSamples": 72,
+    "comparison": "evidence/local-responsiveness-comparison.json",
+    "profiles": "evidence/local-responsiveness-profile-summary.json",
+    "stableOriginalRowsAndIndependentHtml": true,
+    "semanticBreadthPerClick": {
+      "small": 56,
+      "large": 106
+    },
+    "materialSpeedupEstablished": false,
+    "stutteringSolved": false
+  },
+  "comparison": {
+    "quantileMethod": "nearest rank",
+    "syntheticOnly": true,
+    "unprofiledOptimizedRuns": true,
+    "scenarios": [
+      {
+        "run": "built50-before",
+        "scenario": "desktop",
+        "samples": 6,
+        "rows": 50,
+        "htmlCells": 2400,
+        "sourceBytes": 269190,
+        "buildIndexHash": "69472309eff1e1f6616691fb95cb71ec08ef2f6221e96392c2061ff45596c647",
+        "allComputations": [56],
+        "independentRowsRecomputed": [44],
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0
+        },
+        "feedbackMs": {
+          "median": 27.2,
+          "p95": 84.7,
+          "max": 84.7
+        },
+        "settledMs": {
+          "median": 527.2,
+          "p95": 568.3,
+          "max": 568.3
+        },
+        "maxFrameGapMs": {
+          "median": 49.95,
+          "p95": 50,
+          "max": 50
+        }
+      },
+      {
+        "run": "built50-before",
+        "scenario": "mobile-emulation-4x",
+        "samples": 6,
+        "rows": 50,
+        "htmlCells": 2400,
+        "sourceBytes": 269190,
+        "buildIndexHash": "69472309eff1e1f6616691fb95cb71ec08ef2f6221e96392c2061ff45596c647",
+        "allComputations": [56],
+        "independentRowsRecomputed": [44],
+        "longTasks": {
+          "count": 6,
+          "maxMs": 121
+        },
+        "feedbackMs": {
+          "median": 38.6,
+          "p95": 48,
+          "max": 48
+        },
+        "settledMs": {
+          "median": 1054.1,
+          "p95": 1089,
+          "max": 1089
+        },
+        "maxFrameGapMs": {
+          "median": 116.75,
+          "p95": 133.3,
+          "max": 133.3
+        }
+      },
+      {
+        "run": "built100-before",
+        "scenario": "desktop",
+        "samples": 12,
+        "rows": 100,
+        "htmlCells": 9600,
+        "sourceBytes": 1068010,
+        "buildIndexHash": "69472309eff1e1f6616691fb95cb71ec08ef2f6221e96392c2061ff45596c647",
+        "allComputations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 11,
+          "maxMs": 60
+        },
+        "feedbackMs": {
+          "median": 22.0,
+          "p95": 28.4,
+          "max": 28.4
+        },
+        "settledMs": {
+          "median": 1279.65,
+          "p95": 1421,
+          "max": 1421
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.1,
+          "max": 100.1
+        }
+      },
+      {
+        "run": "built100-before",
+        "scenario": "mobile-emulation-4x",
+        "samples": 12,
+        "rows": 100,
+        "htmlCells": 9600,
+        "sourceBytes": 1068010,
+        "buildIndexHash": "69472309eff1e1f6616691fb95cb71ec08ef2f6221e96392c2061ff45596c647",
+        "allComputations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 12,
+          "maxMs": 278
+        },
+        "feedbackMs": {
+          "median": 45.35,
+          "p95": 56.6,
+          "max": 56.6
+        },
+        "settledMs": {
+          "median": 2534.1,
+          "p95": 2782.6,
+          "max": 2782.6
+        },
+        "maxFrameGapMs": {
+          "median": 258.3,
+          "p95": 283.4,
+          "max": 283.4
+        }
+      },
+      {
+        "run": "built100-after",
+        "scenario": "desktop",
+        "samples": 12,
+        "rows": 100,
+        "htmlCells": 9600,
+        "sourceBytes": 1068010,
+        "buildIndexHash": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+        "allComputations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 11,
+          "maxMs": 63
+        },
+        "feedbackMs": {
+          "median": 22.25,
+          "p95": 26,
+          "max": 26
+        },
+        "settledMs": {
+          "median": 1255.75,
+          "p95": 1305.9,
+          "max": 1305.9
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.1,
+          "max": 100.1
+        }
+      },
+      {
+        "run": "built100-after",
+        "scenario": "mobile-emulation-4x",
+        "samples": 12,
+        "rows": 100,
+        "htmlCells": 9600,
+        "sourceBytes": 1068010,
+        "buildIndexHash": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+        "allComputations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 12,
+          "maxMs": 277
+        },
+        "feedbackMs": {
+          "median": 42.0,
+          "p95": 55.3,
+          "max": 55.3
+        },
+        "settledMs": {
+          "median": 2476.4,
+          "p95": 2702.7,
+          "max": 2702.7
+        },
+        "maxFrameGapMs": {
+          "median": 250.1,
+          "p95": 283.4,
+          "max": 283.4
+        }
+      },
+      {
+        "run": "built50-after",
+        "scenario": "desktop",
+        "samples": 6,
+        "rows": 50,
+        "htmlCells": 2400,
+        "sourceBytes": 269190,
+        "buildIndexHash": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+        "allComputations": [56],
+        "independentRowsRecomputed": [44],
+        "longTasks": {
+          "count": 0,
+          "maxMs": 0
+        },
+        "feedbackMs": {
+          "median": 26.25,
+          "p95": 90.6,
+          "max": 90.6
+        },
+        "settledMs": {
+          "median": 526.9,
+          "p95": 575.2,
+          "max": 575.2
+        },
+        "maxFrameGapMs": {
+          "median": 50.05,
+          "p95": 66.7,
+          "max": 66.7
+        }
+      },
+      {
+        "run": "built50-after",
+        "scenario": "mobile-emulation-4x",
+        "samples": 6,
+        "rows": 50,
+        "htmlCells": 2400,
+        "sourceBytes": 269190,
+        "buildIndexHash": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+        "allComputations": [56],
+        "independentRowsRecomputed": [44],
+        "longTasks": {
+          "count": 6,
+          "maxMs": 114
+        },
+        "feedbackMs": {
+          "median": 37.05,
+          "p95": 46.2,
+          "max": 46.2
+        },
+        "settledMs": {
+          "median": 1013.15,
+          "p95": 1055.6,
+          "max": 1055.6
+        },
+        "maxFrameGapMs": {
+          "median": 116.7,
+          "p95": 133.4,
+          "max": 133.4
+        }
+      }
+    ],
+    "matched100Fixture": {
+      "count": true,
+      "dependent": true,
+      "sourceBytes": true,
+      "htmlCells": true,
+      "regexCount": true,
+      "loopIterations": true,
+      "computationObserver": true
+    },
+    "same100HelperHash": true
+  },
+  "negativeControl": {
+    "path": "evidence/local-responsiveness-no-body-cache.json",
+    "onlyImmutableSizeRecognitionDisabled": true,
+    "actualOverrideLoaded": true,
+    "sourceFilesNeverMutated": true,
+    "all106InvocationsAndStableDOMPass": true
+  },
+  "workspaceReceipt": "evidence/local-responsiveness-20261004.json",
+  "limits": [
+    "Desktop headless Chromium and mobile viewport/CDP CPU throttling are not physical mobile acceptance.",
+    "Worker CPU throttling is not verified.",
+    "Unprofiled optimized comparisons are separate from exploratory dev CPU profiles.",
+    "Original Lua globals and invocation breadth/order must be preserved; whole-product zero-stutter is not proven.",
+    "Full compatibility, import/export/assets/storage budgets, physical lifecycle and practical user trial remain incomplete."
+  ],
+  "artifacts": {
+    "dist/index.html": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+    "server/native/dist/extensionJob.mjs": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411"
+  },
+  "sourceFingerprints": {
+    "src/ts/runtime/displayScopeIdentity.ts": "0a5d09ba606ae78bd80dd8b30a6df8e391ba7886b1a74c19cfc4d81af0b164b2",
+    "src/ts/runtime/displayWireBudget.ts": "d1fe817792b9630fc662e7ce659ac0c30429bb21f10eefefcca04b841b6a4ec6",
+    "src/ts/runtime/displayWireBudget.test.ts": "afa18eb224aa9abd07c8a70302f1d4226d43dd62716c9a94612aa7636762efb8",
+    "src/ts/runtime/display.worker.ts": "f002ee3badce19052cc82ad513689a87c8dd57f615789cc88f1fbceb3438a2bf",
+    "src/ts/runtime/displayWorkerExecutor.ts": "8e0e51f9c03c920022f7525d877a3915bfd77b952b3098d0fcd58a3f03da831a",
+    "src/ts/runtime/browserDisplayLua.ts": "169380b611e7dd4b20db3d77f9d10d1d884d9062fdfc7300949024d9dfbedd61",
+    "server/browser/chromium.cjs": "4f03356ed5f1fe819e1959adee7372af56a0e2dc90899f9148cd5fb1aa42cf89",
+    "server/browser/displayPerformance.test.cjs": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176"
+  },
+  "sourceCommitRecordedIn": "Workspace evidence/local-responsiveness-20261004.json"
+}

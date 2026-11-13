@@ -1,0 +1,28 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/request/shared.ts",
+  "core": "src/ts/process/request/parameterRuntime.ts",
+  "factory": "createParameterRuntime",
+  "functions": [
+    "isReasoningCapabilityParameter",
+    "setObjectValue",
+    "getAdditionalParameters",
+    "applyAdditionalParameters",
+    "applyParameters"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "parseAdditionalParamJsonValue",
+      "specifier": "./additionalParams",
+      "original": "parseAdditionalParamJsonValue"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

@@ -1,0 +1,35 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/stringlize.ts",
+  "core": "src/ts/process/stringlizeRuntime.ts",
+  "factory": "createStringlizeRuntime",
+  "functions": [
+    "multiChatReplacer",
+    "stringlizeChat",
+    "appendWhitespace",
+    "stringlizeChatOba",
+    "toTitleCase",
+    "getStopStrings",
+    "unstringlizeChat",
+    "getUnstringlizerChunks",
+    "stringlizeAINChat",
+    "extractAINOutputStrings",
+    "unstringlizeAIN",
+    "formatToAIN"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "getUserName",
+      "specifier": "../util",
+      "original": "getUserName"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": true
+}

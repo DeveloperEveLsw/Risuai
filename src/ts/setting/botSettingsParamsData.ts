@@ -6,7 +6,13 @@
  */
 
 import type { SettingItem } from './types';
-import { LLMFlags } from '../model/types';
+import { LLMFlags, resolveClaudeThinkingType, type LLMModel } from '../model/types';
+
+/** Gemini models with this capability accept LOW/MEDIUM/HIGH only. */
+export function allowsMinimalReasoningEffort(modelInfo: LLMModel): boolean {
+    return !modelInfo.parameters.includes('reasoning_effort_min_medium') &&
+        !modelInfo.flags.includes(LLMFlags.geminiThinkingNoMinimal);
+}
 
 /**
  * Basic parameter settings that are always visible
@@ -162,7 +168,7 @@ export const modelSpecificParameterItems: SettingItem[] = [
         bindKey: 'thinkingTokens',
         condition: (ctx) =>
             ctx.modelInfo.parameters.includes('thinking_tokens') &&
-            ctx.db.thinkingType === 'budget',
+            resolveClaudeThinkingType(ctx.modelInfo.flags, ctx.db.thinkingType) === 'budget',
         options: {
             min: -1,
             max: 64000,
@@ -178,7 +184,7 @@ export const modelSpecificParameterItems: SettingItem[] = [
         bindKey: 'adaptiveThinkingEffort',
         condition: (ctx) =>
             ctx.modelInfo.flags.includes(LLMFlags.claudeAdaptiveThinking) &&
-            ctx.db.thinkingType === 'adaptive',
+            resolveClaudeThinkingType(ctx.modelInfo.flags, ctx.db.thinkingType) === 'adaptive',
         options: {
             segmentOptions: [
                 { value: 'low', label: 'Low' },
@@ -277,7 +283,7 @@ export const modelSpecificParameterItems: SettingItem[] = [
             ctx.modelInfo.parameters.includes('reasoning_effort_xhigh'),
         options: {
             segmentOptions: [
-                { value: -1, label: 'Minimal', condition: (ctx) => !ctx.modelInfo.parameters.includes('reasoning_effort_none') && !ctx.modelInfo.parameters.includes('reasoning_effort_min_medium') },
+                { value: -1, label: 'Minimal', condition: (ctx) => !ctx.modelInfo.parameters.includes('reasoning_effort_none') && allowsMinimalReasoningEffort(ctx.modelInfo) },
                 { value: -1, label: 'None', condition: (ctx) => ctx.modelInfo.parameters.includes('reasoning_effort_none') },
                 { value: 0, label: 'Low', condition: (ctx) => !ctx.modelInfo.parameters.includes('reasoning_effort_min_medium') },
                 { value: 1, label: 'Medium' },

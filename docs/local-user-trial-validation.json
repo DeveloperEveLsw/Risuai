@@ -1,0 +1,238 @@
+{
+  "verifiedAt": "2026-10-04T16:17:32.473162+00:00",
+  "scope": "local_public_code_and_authored_synthetic_fixtures",
+  "candidateBaseCommit": "ee017a2a79a383d997777f844fe79b96ea30b9fd",
+  "schemaVersion": 21,
+  "application": {
+    "pass": 546,
+    "skipped": 3,
+    "files": 64
+  },
+  "backend": {
+    "tests": 407,
+    "pass": 407,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "browser": {
+    "tests": 24,
+    "pass": 24,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "uniqueRegressionPasses": 977,
+  "finalSelectedBundleWitness": {
+    "tests": 5,
+    "pass": 5,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "log": {
+      "path": "evidence/local-trial-focused-final-bundle-confirmed-20261005.log",
+      "sha256": "95b245886b16c963bb47fde1abbafbbc0fb84ed5a0d545d9c698f1f835b5296f"
+    },
+    "execution": {
+      "path": "evidence/local-trial-focused-final-bundle-confirmed-20261005-exit.json",
+      "sha256": "18ea6174ef0973c0af8430c600b69849a22ce2465c029ac3ba4d1876e30d75eb"
+    },
+    "duplicateRegressionContribution": 0,
+    "testStrengthenedAfterFullGate": true,
+    "originalEngineForwardedWithoutAlgorithmChanges": true,
+    "noProductCodeChangedAfterFullGate": true
+  },
+  "initialFocusedWitness": {
+    "path": "evidence/local-trial-focused-final-bundle-20261005.log",
+    "sha256": "13f2cb5b6c034f3f4d0c7b7524ebe02f74d1db4dd27f1dcb28e0ffab98726bc4"
+  },
+  "audit": {
+    "declarations": 169,
+    "original": 167,
+    "existingExplicitPolicies": 2,
+    "freshInvocation": true,
+    "documentTimestampFromFreshAuditInvocation": "2026-10-04T16:15:06.662Z"
+  },
+  "defaultUserCliRecheck": {
+    "tests": 1,
+    "pass": 1,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "sameBrowserCaseCountedAgain": false
+  },
+  "gateExecution": {
+    "path": "evidence/local-trial-gates-20261005.json",
+    "sha256": "cbf0c4d708de7097006fdc1819dce7831ee78a544220010962ed5a26e8880c8b"
+  },
+  "gates": [
+    {
+      "name": "native-build",
+      "exitCode": 0,
+      "path": "evidence/local-trial-native-build-20261005.log",
+      "sha256": "2e2b3651b810537a4b8d776f067ca30a5ff353145072574ff5f9369e22866515"
+    },
+    {
+      "name": "app",
+      "exitCode": 0,
+      "path": "evidence/local-trial-app-20261005.log",
+      "sha256": "c570f806e362f7917292ad73c6e7cf5d3209102aef9e6727e8b5f6834872ae35"
+    },
+    {
+      "name": "backend-serial",
+      "exitCode": 0,
+      "path": "evidence/local-trial-backend-serial-20261005.log",
+      "sha256": "fa8941b45aee9bc370b52a655a46cd4caa9885db2985c8bcaebc1e5102c645b8"
+    },
+    {
+      "name": "type",
+      "exitCode": 0,
+      "path": "evidence/local-trial-type-20261005.log",
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    {
+      "name": "entity-build",
+      "exitCode": 0,
+      "path": "evidence/local-trial-entity-build-20261005.log",
+      "sha256": "d9fff854777f27d9ee9bf791c31a1bd60108c1913a312f20235dc7048b9b984a"
+    },
+    {
+      "name": "ordinary-build",
+      "exitCode": 0,
+      "path": "evidence/local-trial-ordinary-build-20261005.log",
+      "sha256": "41d72f6293ee0920d8d8969ddf6727cfee71262017e2261514ca2c7cfeba0ce5"
+    },
+    {
+      "name": "browser-serial",
+      "exitCode": 0,
+      "path": "evidence/local-trial-browser-serial-20261005.log",
+      "sha256": "54ec6c6a98dd814b5821a50a61d6b8da7f5e541caf05c1dba22f396625d3112f"
+    },
+    {
+      "name": "default-cli-browser-final",
+      "exitCode": 0,
+      "path": "evidence/local-trial-default-cli-browser-final-20261005.log",
+      "sha256": "0e3df7490f8de298ddcc70f4ce37049d9e783c208db46be6178ba2ceb80a8b49"
+    },
+    {
+      "name": "engine-audit",
+      "exitCode": 0,
+      "path": "evidence/local-trial-engine-audit-20261005.log",
+      "sha256": "975b1b61a2400b7eb20fc3f860a4f130a99e735ec11d555c027c713485974c5c"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "package.json",
+      "sha256": "abef97cde577910089f681e8b467cebec8ef820576b49a6d573bd6ebf2edbdc3"
+    },
+    {
+      "path": "server/native/extensionWorker.cjs",
+      "sha256": "59fe1c75d3741599cd89cc531dc21e305d393dd88b2f559eb8f827c3d22d977e"
+    },
+    {
+      "path": "server/runtime/localTrial.cjs",
+      "sha256": "a62fed66f4ba879369e585de7cfc305facce95fba75e353f228eb605b8466f9f"
+    },
+    {
+      "path": "server/runtime/localTrialProvider.cjs",
+      "sha256": "1daf5876ff97927780f539371af174943703c4af063533e718cc353caffb39e5"
+    },
+    {
+      "path": "server/runtime/localTrial.test.cjs",
+      "sha256": "6ebbe35620d69345dd9025214cc4b5032fd057a2569dec1844b9b6e65cb67bc1"
+    },
+    {
+      "path": "server/browser/localTrialUi.test.cjs",
+      "sha256": "a5298c220b35277cd04b6382db48415b12aa9dc080cf0e58892552f69cd49690"
+    }
+  ],
+  "all15": {
+    "unchangedSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+    "unchecked": 15,
+    "wholeGoalComplete": false
+  },
+  "trial": {
+    "command": "pnpm trial:local",
+    "defaultPort": 5176,
+    "freshDatabasePerInvocation": true,
+    "isolatedDefaultBuilds": true,
+    "loopbackOnly": true,
+    "deterministicProvider": true,
+    "delayMs": 8000,
+    "streamingMode": "strong",
+    "historyWindow": 30,
+    "nativeButtonAndOutputLua": true,
+    "independentBrowserContexts": 2,
+    "allTabExit": true,
+    "stableRowAndDecodedImage": true,
+    "twoUiProviderCalls": 2,
+    "twoBackendConcurrentProviderCalls": 2,
+    "dataRetainedAfterShutdown": true
+  },
+  "wrapperDiagnostic": {
+    "path": "evidence/local-display-scope-wrapper-probe-20261005.json",
+    "sha256": "a6ae5423ff278ed2fa6efdaa1df6a6563f153079c0d0df39eaa3d8117dce0edd",
+    "cases": 9,
+    "diagnosticOnly": true,
+    "regressionCountContribution": 0,
+    "conclusion": "Existing frozen effect arrays already omit Lua bodies from scope keys. Large shallow trigger comments/unknown scalar metadata remain inline. Do not infer duplicated Lua body hashing from an unbound trigger wrapper.",
+    "limits": "Authored direct source/transport diagnostic only; not actual UI latency, Lua execution or arbitrary card compatibility."
+  },
+  "preservedInitialBrowserFailures": [
+    {
+      "path": "evidence/local-trial-default-cli-browser-20261005.log",
+      "sha256": "35785dfe4804b1674fbf0a92be54d64281704f3bd953c4e1bb05e17506b506df"
+    },
+    {
+      "path": "evidence/local-trial-ui-diagnostic-recheck-20261005.log",
+      "sha256": "61067549c5cf02292066f4ce999dda302ec55a17b49a4448256a233a03d64a19"
+    },
+    {
+      "path": "evidence/local-trial-ui-window-corrected-20261005.log",
+      "sha256": "f523ca7849189574032cfe779cee44fd8890b6ad09a61c97b4588557db41f47a"
+    },
+    {
+      "path": "evidence/local-trial-stream-diagnostic-20261005.log",
+      "sha256": "3f3f19b27c09d6caa7bd761e83779d70de1eb9f6f93e5684157857847554b049"
+    },
+    {
+      "path": "evidence/local-trial-stream-ui-diagnostic-20261005.log",
+      "sha256": "888369de5ab493e8a5865a7427f6333532bb8529d11dd70ef2e2c85a132722eb"
+    }
+  ],
+  "pngDiagnostic": {
+    "path": "evidence/local-trial-png-diagnostic-20261005.json",
+    "sha256": "c070317639565190694f0321e50fa5f3b76520181611d244f3257cf5a3fce1a5"
+  },
+  "nativeStreamDiagnostic": {
+    "path": "evidence/local-trial-native-stream-diagnostic-20261005.log",
+    "sha256": "f0f875d57dc0919ea9adcb7dca8845c5c1ee6828c2a0bcc242501aea2889f7c7"
+  },
+  "correctedShortcutRecheck": {
+    "path": "evidence/local-trial-ui-strong-20261005.log",
+    "sha256": "ccf7192853590d2883e08e7f000b0b3f230a5c358870fc59242241a8ac8abf1e"
+  },
+  "failureInterpretation": [
+    "The initial two-row window evicted the prefix; fixture window changed to30 with identical DOM criteria.",
+    "Both PNG fixtures decode in Chromium; the preliminary image-cause explanation was disproved.",
+    "Native partial progress arrives while the provider is active; off-mode canonical display preparation delays the visible body. Explicit original strong mode solves the configured trial only.",
+    "Job-list type access was corrected to the observed compact type field; timeout and provider-active/DOM assertions were not weakened."
+  ],
+  "performance": {
+    "newLatencyAcceptanceObservations": 0,
+    "speedupClaimed": false,
+    "prior144WarmObservationsArePreviousEvidence": true,
+    "physicalMobileVerified": false,
+    "stutteringResolved": false
+  },
+  "productionAccess": false,
+  "privateReads": false,
+  "realModelCalls": false,
+  "remotePush": false,
+  "deployed": false
+}

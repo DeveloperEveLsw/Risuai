@@ -1,0 +1,84 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/scripts.ts",
+  "factory": "createScriptRuntime",
+  "functions": [
+    "processScript",
+    "generateScriptCacheKey",
+    "cacheScript",
+    "getScriptCache",
+    "resetScriptCache",
+    "processScriptFull"
+  ],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "runLuaEditTrigger",
+      "specifier": "./scriptings",
+      "original": "runLuaEditTrigger"
+    },
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentCharacter"
+    },
+    {
+      "name": "runTrigger",
+      "specifier": "./triggers",
+      "original": "runTrigger"
+    },
+    {
+      "name": "getCurrentChat",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentChat"
+    },
+    {
+      "name": "pluginV2",
+      "specifier": "../plugins/plugins.svelte",
+      "original": "pluginV2"
+    },
+    {
+      "name": "getModuleRegexScripts",
+      "specifier": "./modules",
+      "original": "getModuleRegexScripts"
+    },
+    {
+      "name": "CharEmotion",
+      "specifier": "../stores.svelte",
+      "original": "CharEmotion"
+    },
+    {
+      "name": "selectedCharID",
+      "specifier": "../stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "getModuleAssets",
+      "specifier": "./modules",
+      "original": "getModuleAssets"
+    },
+    {
+      "name": "HypaProcesser",
+      "specifier": "./memory/hypamemory",
+      "original": "HypaProcesser"
+    },
+    {
+      "name": "assetRegex",
+      "specifier": "../parser/parser.svelte",
+      "original": "assetRegex"
+    },
+    {
+      "name": "risuChatParserOrg",
+      "specifier": "../parser/parser.svelte",
+      "original": "risuChatParser"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Native regex/CBS/Lua composition tested; browser plugin/assets/embedding capabilities remain explicit"
+}

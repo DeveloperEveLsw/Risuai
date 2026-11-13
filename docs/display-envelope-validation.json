@@ -1,0 +1,840 @@
+{
+  "verifiedAt": "2026-10-04T13:55:20.885653+00:00",
+  "scope": "local_public_code_and_synthetic_data",
+  "candidateBaseCommit": "c9e96b4dd68a7cce7785f01adafa58ed580efdc4",
+  "schemaVersion": 21,
+  "node": "v22.21.0",
+  "application": {
+    "path": "evidence/local-display-envelope-app-final-20261004.log",
+    "sha256": "a39125737fe54e87a5d2b72b73d839dc6a4f3005b5d9eacd4305b046942b3682",
+    "pass": 541,
+    "skipped": 3,
+    "files": 64,
+    "exitCode": 0,
+    "fresh": true
+  },
+  "backend": {
+    "path": "evidence/local-display-envelope-backend-serial-20261004.log",
+    "sha256": "3a849242b1d1b67997bdbbad2763050c003c92259d7ab8c3b784015d7032ffa7",
+    "tests": 402,
+    "pass": 402,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "fresh": true
+  },
+  "browser": {
+    "path": "evidence/local-display-envelope-browser-serial-20261004.log",
+    "sha256": "3b65f4a93337cf8d0288df3dd5477ad7154f47fb15452d732d81ff8355827614",
+    "tests": 23,
+    "pass": 23,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "fresh": true
+  },
+  "types": {
+    "path": "evidence/local-display-envelope-type-final-20261004.log",
+    "sha256": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "errors": 0,
+    "warnings": 0,
+    "exitCode": 0
+  },
+  "builds": [
+    {
+      "path": "evidence/local-display-envelope-native-build-20261004.log",
+      "sha256": "910de452631bdcf08353cfff01184d1add0302921b9028b5786d371703c91fc5",
+      "kind": "native",
+      "exitCode": 0,
+      "fresh": true
+    },
+    {
+      "path": "evidence/local-display-envelope-entity-build-20261004.log",
+      "sha256": "09651cdadf680619401beafd532b52d1fe7ee8cc71cf5d06f2a27a349e20dea3",
+      "kind": "entity",
+      "exitCode": 0,
+      "fresh": true
+    },
+    {
+      "path": "evidence/local-display-envelope-ordinary-build-20261004.log",
+      "sha256": "f855a01d4086b285facc661a918a286ab1b0149bd9585db46a80e11b8c3bb4a6",
+      "kind": "ordinary",
+      "exitCode": 0,
+      "fresh": true
+    }
+  ],
+  "audit": {
+    "path": "evidence/local-display-envelope-engine-audit-20261004.log",
+    "sha256": "92e44663b7b6e44bad23c4610d52c36f566b83242e6a91b4b03bceb46f1a4bda",
+    "declarations": 169,
+    "original": 167,
+    "existingExplicitPolicies": 2
+  },
+  "validationChecks": {
+    "completeEnvelopeBefore": 1,
+    "completeCaptureBefore": 1,
+    "completeEnvelopeAfter": 1,
+    "completeCaptureAfter": 0,
+    "dictionaryRootAndPacketChecksRetained": true,
+    "logicalMiB": 16,
+    "packetMiB": 32,
+    "protocolVersionChanged": false,
+    "scriptCallsSkipped": false
+  },
+  "focused": {
+    "path": "evidence/local-cbs-preparation-transport-focused-final-20261004.log",
+    "sha256": "32e60f82e0ad90c92f44df478be2a5c422f3e6d1182f2084ddcea1af92008cbf"
+  },
+  "expectedRemovalControl": {
+    "path": "evidence/local-display-envelope-executor-removal-control-20261004.log",
+    "sha256": "35dad85dc7ccfbdf3fa8298c574279d7c1db3f2cb356aaa0cae64ed57c81c34d",
+    "removed": "full envelope argument only",
+    "expectedFailure": "oversized outer content unexpectedly resolved",
+    "exitCode": 1,
+    "candidateRestoredSha256": "1106f1e70c40ae2cef54429166bda9e913710fdcb2e4cbd04150a6fed4851e7c",
+    "assertionsOrTimeoutsChanged": false,
+    "productionAccess": false
+  },
+  "preservedInitialFailure": {
+    "path": "evidence/local-cbs-preparation-transport-focused-20261004.log",
+    "sha256": "6e3ff6d23514b116da2a6660ee52f1c3ae4cb69b93a24e9ced03af3b475d6b09",
+    "reason": "The test initially counted legitimate immutable dictionary-root admission as a duplicate full-capture check. Assertion now counts the envelope plus that root explicitly; no production check was removed to make it pass."
+  },
+  "profiles": {
+    "path": "evidence/local-cbs-preparation-profile-summary-20261004.json",
+    "sha256": "8bf1879ed24c66774564166398d0207ab1f63978f9a2436e066a126ff2be61f6",
+    "main": 2,
+    "actualWorkers": 2,
+    "diagnosticOnly": true,
+    "inclusiveCategoriesOverlap": true,
+    "completeWallAttribution": false
+  },
+  "performance": {
+    "path": "evidence/local-display-envelope-performance-20261004.json",
+    "sha256": "d278adeaa61f9e43ff6cdae41476185f01b7a0ef53f985b287d2bc7e04ca818b",
+    "pairedExecutions": 12,
+    "warmObservations": 144,
+    "perRunSamples": 6,
+    "fixtureRows": 100,
+    "labelledComputationsEachClick": 106,
+    "independentRowsEachClick": 94,
+    "unchangedHelperSha256": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "buildIndexHashes": {
+      "baseline": "66a73836d81621d133d188ffad0c5ab26edd5c59f960c26b953d8e51d47cbed6",
+      "candidate": "e68f107e5072b09f3c2f3ed418aabdfb03aaca2a66053dde83e4589d1dacda39"
+    },
+    "consistentOverallSpeedupProven": false,
+    "stutterResolved": false,
+    "workerCpuThrottleVerified": false,
+    "physicalMobileOS": false,
+    "measurements": [
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.950000002980232,
+          "p95NearestRank": 61.69999998807907,
+          "min": 20.899999976158142,
+          "max": 61.69999998807907
+        },
+        "settledMs": {
+          "median": 323.8999999910593,
+          "p95NearestRank": 342.09999999403954,
+          "min": 321.89999997615814,
+          "max": 342.09999999403954
+        },
+        "maxFrameGapMs": {
+          "median": 33.399999999999864,
+          "p95NearestRank": 50,
+          "min": 33.29999999999973,
+          "max": 50
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 31.649999991059303,
+          "p95NearestRank": 43.900000005960464,
+          "min": 28.5,
+          "max": 43.900000005960464
+        },
+        "settledMs": {
+          "median": 998.9999999850988,
+          "p95NearestRank": 1053.5,
+          "min": 909.5,
+          "max": 1053.5
+        },
+        "maxFrameGapMs": {
+          "median": 108.29999999999927,
+          "p95NearestRank": 133.29999999999927,
+          "min": 100,
+          "max": 133.29999999999927
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 124
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.299999997019768,
+          "p95NearestRank": 23.299999982118607,
+          "min": 20.5,
+          "max": 23.299999982118607
+        },
+        "settledMs": {
+          "median": 306.79999999701977,
+          "p95NearestRank": 339.19999998807907,
+          "min": 290.09999999403954,
+          "max": 339.19999998807907
+        },
+        "maxFrameGapMs": {
+          "median": 33.30000000000018,
+          "p95NearestRank": 33.40000000000009,
+          "min": 16.700000000000273,
+          "max": 33.40000000000009
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 30.25,
+          "p95NearestRank": 38.599999994039536,
+          "min": 28.80000001192093,
+          "max": 38.599999994039536
+        },
+        "settledMs": {
+          "median": 919.5,
+          "p95NearestRank": 1026.7000000178814,
+          "min": 839.9000000059605,
+          "max": 1026.7000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 108.34999999999991,
+          "p95NearestRank": 133.39999999999964,
+          "min": 100,
+          "max": 133.39999999999964
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 125
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.299999997019768,
+          "p95NearestRank": 25,
+          "min": 19.900000005960464,
+          "max": 25
+        },
+        "settledMs": {
+          "median": 523.7999999970198,
+          "p95NearestRank": 586.7999999821186,
+          "min": 504.5,
+          "max": 586.7999999821186
+        },
+        "maxFrameGapMs": {
+          "median": 50.100000000000364,
+          "p95NearestRank": 66.69999999999982,
+          "min": 50,
+          "max": 66.69999999999982
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 49.20000001788139,
+          "p95NearestRank": 54.599999994039536,
+          "min": 26.299999982118607,
+          "max": 54.599999994039536
+        },
+        "settledMs": {
+          "median": 1465.7000000178814,
+          "p95NearestRank": 1610.7999999821186,
+          "min": 1413.5,
+          "max": 1610.7999999821186
+        },
+        "maxFrameGapMs": {
+          "median": 108.39999999999873,
+          "p95NearestRank": 133.1999999999989,
+          "min": 100,
+          "max": 133.1999999999989
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 163
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 21.200000002980232,
+          "p95NearestRank": 35.10000002384186,
+          "min": 20,
+          "max": 35.10000002384186
+        },
+        "settledMs": {
+          "median": 560.4500000029802,
+          "p95NearestRank": 620.2000000178814,
+          "min": 503.80000001192093,
+          "max": 620.2000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 66.64999999999986,
+          "p95NearestRank": 100.10000000000036,
+          "min": 49.90000000000009,
+          "max": 100.10000000000036
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 40.1000000089407,
+          "p95NearestRank": 57,
+          "min": 26.900000005960464,
+          "max": 57
+        },
+        "settledMs": {
+          "median": 1466.800000011921,
+          "p95NearestRank": 1511.4000000059605,
+          "min": 1364.300000011921,
+          "max": 1511.4000000059605
+        },
+        "maxFrameGapMs": {
+          "median": 100.05000000000018,
+          "p95NearestRank": 133.29999999999927,
+          "min": 100,
+          "max": 133.29999999999927
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 144
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.450000002980232,
+          "p95NearestRank": 23.099999994039536,
+          "min": 19.299999982118607,
+          "max": 23.099999994039536
+        },
+        "settledMs": {
+          "median": 1047.7000000029802,
+          "p95NearestRank": 1071,
+          "min": 1037.199999988079,
+          "max": 1071
+        },
+        "maxFrameGapMs": {
+          "median": 50.05000000000018,
+          "p95NearestRank": 66.69999999999982,
+          "min": 49.899999999999636,
+          "max": 66.69999999999982
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 34.6499999910593,
+          "p95NearestRank": 48.599999994039536,
+          "min": 26.799999982118607,
+          "max": 48.599999994039536
+        },
+        "settledMs": {
+          "median": 1958.5999999940395,
+          "p95NearestRank": 2050.5999999940395,
+          "min": 1833.7000000178814,
+          "max": 2050.5999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 116.70000000000073,
+          "p95NearestRank": 133.3000000000011,
+          "min": 100,
+          "max": 133.3000000000011
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 129
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.05000001192093,
+          "p95NearestRank": 22.100000023841858,
+          "min": 19.099999994039536,
+          "max": 22.100000023841858
+        },
+        "settledMs": {
+          "median": 1062.2500000149012,
+          "p95NearestRank": 1121.0999999940395,
+          "min": 1036.5,
+          "max": 1121.0999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 50.05000000000018,
+          "p95NearestRank": 66.60000000000036,
+          "min": 50,
+          "max": 66.60000000000036
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 35.900000005960464,
+          "p95NearestRank": 51.10000002384186,
+          "min": 29,
+          "max": 51.10000002384186
+        },
+        "settledMs": {
+          "median": 1889.6500000208616,
+          "p95NearestRank": 1946.7999999821186,
+          "min": 1851.4000000059605,
+          "max": 1946.7999999821186
+        },
+        "maxFrameGapMs": {
+          "median": 116.69999999999982,
+          "p95NearestRank": 116.70000000000073,
+          "min": 99.89999999999782,
+          "max": 116.70000000000073
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 120
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.799999997019768,
+          "p95NearestRank": 21.5,
+          "min": 17.100000023841858,
+          "max": 21.5
+        },
+        "settledMs": {
+          "median": 321.55000001192093,
+          "p95NearestRank": 371.69999998807907,
+          "min": 289.2000000178814,
+          "max": 371.69999998807907
+        },
+        "maxFrameGapMs": {
+          "median": 33.29999999999984,
+          "p95NearestRank": 50,
+          "min": 33.20000000000027,
+          "max": 50
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 32.04999999701977,
+          "p95NearestRank": 38.69999998807907,
+          "min": 27.599999994039536,
+          "max": 38.69999998807907
+        },
+        "settledMs": {
+          "median": 986.6000000089407,
+          "p95NearestRank": 1012.1999999880791,
+          "min": 925.4000000059605,
+          "max": 1012.1999999880791
+        },
+        "maxFrameGapMs": {
+          "median": 116.64999999999964,
+          "p95NearestRank": 133.30000000000018,
+          "min": 100,
+          "max": 133.30000000000018
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 133
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 22.400000005960464,
+          "p95NearestRank": 29.399999976158142,
+          "min": 21.5,
+          "max": 29.399999976158142
+        },
+        "settledMs": {
+          "median": 323.84999999403954,
+          "p95NearestRank": 357.30000001192093,
+          "min": 322.09999999403954,
+          "max": 357.30000001192093
+        },
+        "maxFrameGapMs": {
+          "median": 33.25,
+          "p95NearestRank": 33.40000000000009,
+          "min": 16.799999999999955,
+          "max": 33.40000000000009
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 29.650000005960464,
+          "p95NearestRank": 42.099999994039536,
+          "min": 27.5,
+          "max": 42.099999994039536
+        },
+        "settledMs": {
+          "median": 940.9500000029802,
+          "p95NearestRank": 1021.9000000059605,
+          "min": 893.5,
+          "max": 1021.9000000059605
+        },
+        "maxFrameGapMs": {
+          "median": 108.40000000000009,
+          "p95NearestRank": 133.30000000000018,
+          "min": 100,
+          "max": 133.30000000000018
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 124
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 21.25,
+          "p95NearestRank": 25,
+          "min": 20.100000023841858,
+          "max": 25
+        },
+        "settledMs": {
+          "median": 515.7499999850988,
+          "p95NearestRank": 556.1999999880791,
+          "min": 504.80000001192093,
+          "max": 556.1999999880791
+        },
+        "maxFrameGapMs": {
+          "median": 58.29999999999973,
+          "p95NearestRank": 66.69999999999982,
+          "min": 49.90000000000009,
+          "max": 66.69999999999982
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 40.349999994039536,
+          "p95NearestRank": 66.69999998807907,
+          "min": 24.5,
+          "max": 66.69999998807907
+        },
+        "settledMs": {
+          "median": 1383.25,
+          "p95NearestRank": 1553.8999999761581,
+          "min": 1317.199999988079,
+          "max": 1553.8999999761581
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95NearestRank": 100.10000000000036,
+          "min": 99.89999999999964,
+          "max": 100.10000000000036
+        },
+        "longTaskCount": 7,
+        "longestLongTaskMs": 108
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.850000008940697,
+          "p95NearestRank": 27.700000017881393,
+          "min": 19.899999976158142,
+          "max": 27.700000017881393
+        },
+        "settledMs": {
+          "median": 538.5999999940395,
+          "p95NearestRank": 571,
+          "min": 504.5,
+          "max": 571
+        },
+        "maxFrameGapMs": {
+          "median": 49.950000000000045,
+          "p95NearestRank": 66.60000000000036,
+          "min": 33.30000000000018,
+          "max": 66.60000000000036
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 42.54999999701977,
+          "p95NearestRank": 54.80000001192093,
+          "min": 27.30000001192093,
+          "max": 54.80000001192093
+        },
+        "settledMs": {
+          "median": 1509.0,
+          "p95NearestRank": 1532.7000000178814,
+          "min": 1416,
+          "max": 1532.7000000178814
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95NearestRank": 100.09999999999854,
+          "min": 100,
+          "max": 100.09999999999854
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 119
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.400000005960464,
+          "p95NearestRank": 21.099999994039536,
+          "min": 19,
+          "max": 21.099999994039536
+        },
+        "settledMs": {
+          "median": 1095.5999999940395,
+          "p95NearestRank": 1155.9000000059605,
+          "min": 1036.9000000059605,
+          "max": 1155.9000000059605
+        },
+        "maxFrameGapMs": {
+          "median": 50.04999999999927,
+          "p95NearestRank": 66.70000000000073,
+          "min": 49.899999999999636,
+          "max": 66.70000000000073
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 37.0,
+          "p95NearestRank": 45.80000001192093,
+          "min": 24.5,
+          "max": 45.80000001192093
+        },
+        "settledMs": {
+          "median": 1941.2000000029802,
+          "p95NearestRank": 2154.7999999821186,
+          "min": 1868.7999999821186,
+          "max": 2154.7999999821186
+        },
+        "maxFrameGapMs": {
+          "median": 116.70000000000073,
+          "p95NearestRank": 166.59999999999854,
+          "min": 100,
+          "max": 166.59999999999854
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 166
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "desktop",
+        "n": 6,
+        "feedbackMs": {
+          "median": 20.450000002980232,
+          "p95NearestRank": 26.099999994039536,
+          "min": 19.80000001192093,
+          "max": 26.099999994039536
+        },
+        "settledMs": {
+          "median": 1058.0999999940395,
+          "p95NearestRank": 1154.300000011921,
+          "min": 1004.4000000059605,
+          "max": 1154.300000011921
+        },
+        "maxFrameGapMs": {
+          "median": 50.0,
+          "p95NearestRank": 66.60000000000036,
+          "min": 49.899999999999636,
+          "max": 66.60000000000036
+        },
+        "longTaskCount": 0,
+        "longestLongTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "large-extra-lua",
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "n": 6,
+        "feedbackMs": {
+          "median": 32.80000001192093,
+          "p95NearestRank": 38.099999994039536,
+          "min": 28.299999982118607,
+          "max": 38.099999994039536
+        },
+        "settledMs": {
+          "median": 1975.5499999821186,
+          "p95NearestRank": 2011.0999999940395,
+          "min": 1881.2000000178814,
+          "max": 2011.0999999940395
+        },
+        "maxFrameGapMs": {
+          "median": 116.64999999999873,
+          "p95NearestRank": 116.70000000000073,
+          "min": 100,
+          "max": 116.70000000000073
+        },
+        "longTaskCount": 6,
+        "longestLongTaskMs": 115
+      }
+    ]
+  },
+  "sourceFiles": [
+    {
+      "path": "src/ts/runtime/displayCaptureTransport.ts",
+      "sha256": "1947433e439767909eb348dc8f8563e5a6e2218d47726caed1f4cb7ca7524568"
+    },
+    {
+      "path": "src/ts/runtime/displayCaptureTransport.test.ts",
+      "sha256": "c144aaa08a529c695ccaf3097e88ca8fe0a8cecac0c97c7594602c686efc2e8a"
+    },
+    {
+      "path": "src/ts/runtime/displayWorkerExecutor.ts",
+      "sha256": "1106f1e70c40ae2cef54429166bda9e913710fdcb2e4cbd04150a6fed4851e7c"
+    },
+    {
+      "path": "src/ts/runtime/displayWorkerExecutor.test.ts",
+      "sha256": "9ee7fd03e09cf3e006b66771fc239903bc7df086a9f7c392ee932364da3ec692"
+    },
+    {
+      "path": "docs/engine-extraction-audit.json",
+      "sha256": "92e44663b7b6e44bad23c4610d52c36f566b83242e6a91b4b03bceb46f1a4bda"
+    },
+    {
+      "path": "docs/display-envelope-validation.md",
+      "sha256": "46f1ba95034873f6f786d4fde2da7c3bf1b8856e62dc3d23f6221dc956bedc56"
+    },
+    {
+      "path": "docs/server-runtime-plan.md",
+      "sha256": "ed7f3ce3b1b2fb6b0342b70d1e0f3ef153d86cdbf5191ffe70485dfbc91e606c"
+    }
+  ],
+  "all15": {
+    "unchecked": 15,
+    "sha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+    "wholeGoalComplete": false
+  },
+  "freshUniqueRegressionCases": 966,
+  "countsExcluded": [
+    "existing app skips",
+    "focused duplicate tests",
+    "expected failure control",
+    "profiled diagnostics",
+    "12 repeated performance executions and 144 observations are reported separately"
+  ],
+  "boundaryCounts": {
+    "productionAccess": 0,
+    "productionChanges": 0,
+    "privateReads": 0,
+    "realModelCalls": 0,
+    "remotePush": 0
+  },
+  "remaining": [
+    "mixed complete-refresh results",
+    "about1.4–1.5s large pageCPU4x settlement/about1.9s with extra Lua",
+    "100–116.7ms candidate pageCPU4x median per-click maximum gaps/166ms observed long task",
+    "exact sizing/cache/allocation/private-decode and original callback costs",
+    "cold/concurrent/physical-mobile/large changed HTML-assets/full resource-extension contracts/storage budgets/full configured trial/all15 conditions"
+  ]
+}

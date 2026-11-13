@@ -1,0 +1,32 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/templates/jsonSchema.ts",
+  "core": "src/ts/process/templates/jsonSchemaRuntime.ts",
+  "factory": "createJsonSchemaRuntime",
+  "functions": [
+    "convertInterfaceToSchema",
+    "getOpenAIJSONSchema",
+    "getGeneralJSONSchema",
+    "extractJSON"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "risuChatParser",
+      "specifier": "src/ts/parser/parser.svelte",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "jsonOutputTrimmer",
+      "specifier": "src/ts/util",
+      "original": "jsonOutputTrimmer"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

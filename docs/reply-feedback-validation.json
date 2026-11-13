@@ -1,0 +1,140 @@
+{
+  "verifiedAt": "2026-10-04T03:42:43.025337+00:00",
+  "baseCommit": "9e8972718112f5582a64db055c07188526260b55",
+  "schema": 19,
+  "scope": "local public original source and authored synthetic fixtures only",
+  "all15Preserved": true,
+  "completionBlockHash": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "wholeGoalComplete": false,
+  "app": {
+    "passed": 447,
+    "existingSkipped": 3
+  },
+  "backend": {
+    "passed": 305,
+    "failed": 0
+  },
+  "builtBrowser": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "independentAuthenticatedContexts": 2,
+    "preparationVisibleBeforeHeader": true,
+    "receiptLossAndAllTabExit": true,
+    "sharedConfirmedSelection": true,
+    "chatNavigationRestoresActivity": true,
+    "adjacentRejectedRequestDiscard": true,
+    "prefixDomStable": true,
+    "syntheticFallbackProviderCalls": 1,
+    "syntheticSeedProviderCalls": 1
+  },
+  "feedbackObservation": {
+    "elapsedMs": 1.699999988079071,
+    "disabled": true,
+    "phase": "preparing",
+    "text": "응답 선택 확인 중…",
+    "visible": true,
+    "oldBodyRetained": true,
+    "attemptedClicks": 20,
+    "admittedCommands": 1,
+    "earlyHeaders": 1,
+    "navigationRestoresPending": true
+  },
+  "restoredFeedbackObservation": {
+    "elapsedMs": 1.9000000059604645,
+    "disabled": true,
+    "phase": "preparing",
+    "text": "응답 선택 확인 중…",
+    "visible": true,
+    "oldBodyRetained": true,
+    "attemptedClicks": 20,
+    "admittedCommands": 1,
+    "earlyHeaders": 1,
+    "navigationRestoresPending": true
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed"
+  },
+  "format": "passed for authored TS/controller/state/browser fixture; original Svelte rerolls snippet formatted in isolation",
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorExplicitPolicies": 2
+  },
+  "negativeControl": {
+    "intervention": "Use the prior committed controller without reactive reply-choice feedback; retain candidate UI and actual built browser fixture.",
+    "candidateHash": "59f7a946a60f1c2b6221415f3ac59c675f2d1a1283bd5f93fa6f0b52673462e9",
+    "negativeBuildExitCode": 0,
+    "negativeExitCode": 1,
+    "restoredHash": "59f7a946a60f1c2b6221415f3ac59c675f2d1a1283bd5f93fa6f0b52673462e9",
+    "verifiedFailure": "Initial disabled=false at firstFeedback.disabled assertion",
+    "harnessCorrection": "Node assertion reports the source line, not expression text; inspected the exact fixture line after candidate bytes were restored.",
+    "restoredExitCode": 0
+  },
+  "sourceFileHashes": {
+    "docs/engine-extraction-audit.json": "93f0bb7dc661718d85a2e4f9435bf2199fdcde3f3a9f37caaf0243612fd0e209",
+    "docs/reply-feedback-runtime.md": "14a567ee7640b3c6d9fbf73b3a4728590d142152e5e6cca8b0c621194ab9ade7",
+    "docs/server-runtime-plan.md": "2bd3a274a159a68b1cf9a571d95b8828e4de5d744fe8a4e325681a96af5595cc",
+    "server/browser/replyChoicesUi.test.cjs": "01557e1d209bc6b5eff7de32686805756a88c107abc33b3d5de5aa2043cf4f6d",
+    "src/lib/ChatScreens/Chat.svelte": "80e0bc4d960829792ba468e5ff0b3114778a984101bbc3873b51fec9c9275fc0",
+    "src/lib/ChatScreens/DefaultChatScreen.svelte": "fb77aa53fbbdc75688b6d1e74ed2bb2b15d0b22b5b27e4d0183a246e776f5fa8",
+    "src/ts/runtime/browserRuntimeController.svelte.ts": "59f7a946a60f1c2b6221415f3ac59c675f2d1a1283bd5f93fa6f0b52673462e9",
+    "src/ts/runtime/browserRuntimeState.svelte.ts": "0dfc5d97094c045a7323ba377f5bb6c0fca398751b6ff3d00e069c09cc0aa485",
+    "src/ts/runtime/replyChoiceActivity.test.ts": "08317ffbf8373fbf9be2bb0bd6a93985a1d1d1873369152834a463be6165a909",
+    "src/ts/runtime/replyChoiceActivity.ts": "62ccc5a580c17d9c35964945d9c997f6f88368f84223ca4481f92b033fdc6f8d"
+  },
+  "artifactHashes": {
+    "nativeExtensionJob": "80d35148df108ff44a8ae4bb508916404faa63e0d74cc7c9ebc1f7a85824a5ad",
+    "entityWebIndex": "5fdcacb052789563a56370e769bf17d0a0b695cc22c7cab818b099333e47efb8"
+  },
+  "rawLogHashes": {
+    "activity-unit.log": "a51a62f343f16397ad4b789e1d2c29fb7715dbfb54ac6a19f5efd40c33dc38ef",
+    "app-suite.log": "bd5d137f36bd9d3f59bb76ebc4878e05e79b9a9243a0dd179e97c5766317a27c",
+    "backend-final.log": "e35684443a68a3079e2c077fcf68efbe00282f980b174200fccf6bb9aed78d55",
+    "built-ui-final.log": "7847bcc882a8c671d4fd8a8843a6b2a8e46fd6a6f9bc7d7110cfc8f02bee372b",
+    "check-final.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "check-initial.log": "ad80349d4b6ef898ac49033258f2cb7e5eb98640218470d910d1af9b9c0c9826",
+    "check.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "choice-ui-initial.log": "969d6ac4ecc21531dd5f46f8780f5661577a7689f0b3d678a4a33dd399a8fd4a",
+    "engine-audit.log": "b7de4e95eb4b5e8a90be911ae1e82c7bc84c435c9bfea84052f2f1ef9d984529",
+    "entity-build.log": "c3deaa6e8d4c6548bf364bfd308011e68b2b9bef3d0efd11c885cf6c65900a77",
+    "format-check.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "native-build.log": "0f7d35ff0fd3369fa7630d67053690195cec9e841b6a19f9422dc88552ec5b3f",
+    "negative-build.log": "9cf7a0bd914a85075a7124ac97963ea7bdde12523f07eef7da3998672b3d993e",
+    "negative-control.json": "80e190e5531a8aade13ff7417b8a33b791e1a838b049502a5abb2ec11eb64ead",
+    "negative-ui.log": "44088ce62685836e948d438d9eb696dd08caf2a33415d5878346d3dbab76ddf6",
+    "ordinary-build.log": "fb5080fc6a83f9414f67cfa5ed0eea39ca1e0697c243dd68d561a3b30383c788",
+    "restored-ui.log": "8a72e21430be923e9469b9a2fccd8e0b4daf268545d665ee2d66b761fff9377e"
+  },
+  "priorProtocolBrowserEvidence": {
+    "commit": "7bef4987799048a2786910647e5031e16914aa99",
+    "scenariosPassed": 18,
+    "reportedIncludingParent": 19,
+    "rerunInThisMilestone": false
+  },
+  "initialFailuresRetained": [
+    "check-initial.log: request UUID template argument; corrected inferred const UUID without transport API change",
+    "negative-control assertion initially expected expression text; inspected actual source-line stack, candidate already restored; negative-control.json records correction"
+  ],
+  "untouched": {
+    "productionAccess": 0,
+    "productionQueries": 0,
+    "deployments": 0,
+    "remotePushes": 0,
+    "realModelRequests": 0,
+    "privateCardOrScriptReads": 0
+  },
+  "limits": [
+    "One in-flight selection per chat incarnation; rapid clicks are disabled, not queued speculatively.",
+    "Preparation before the existing IndexedDB commit is transient; durable outbox entries and canonical jobs recover.",
+    "A loopback requestAnimationFrame observation is not GPU paint timing, latency percentiles, representative stutter acceptance or physical mobile proof.",
+    "Generic sequential HTTP receipt pump/configuration barriers remain unchanged.",
+    "Complete read dependencies, interactive alerts/general plugins, continuation/structural variants, notification/archive/import-export/storage and physical-device/user trial remain unfinished."
+  ]
+}

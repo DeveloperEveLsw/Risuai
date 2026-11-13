@@ -1,0 +1,137 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/request/openAI/responses.ts",
+  "core": "src/ts/process/request/openAI/responsesRuntime.ts",
+  "factory": "createResponsesRuntime",
+  "functions": [
+    "responseTextContentToString",
+    "decodeRememberedToolCallsForResponses",
+    "buildResponseInputItems",
+    "getResponsesRequestURL",
+    "buildResponsesHeaders",
+    "getResponsesRequestModel",
+    "sanitizeResponsesContinuationItem",
+    "cloneResponsesBodyForRequest",
+    "toExternalResponsesBody",
+    "buildResponsesBody",
+    "collectResponsesReasoningText",
+    "extractResponsesReasoningTexts",
+    "extractResponsesText",
+    "extractResponsesFunctionCalls",
+    "appendResponsesToolOutputs",
+    "requestHTTPResponsesAPI",
+    "getResponsesTranStream",
+    "wrapResponsesToolStream",
+    "requestOpenAIResponseAPI"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "decodeToolCall",
+      "specifier": "../../mcp/mcp",
+      "original": "decodeToolCall"
+    },
+    {
+      "name": "LLMFlags",
+      "specifier": "src/ts/model/modellist",
+      "original": "LLMFlags"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "NANOGPT_SUBSCRIPTION_RESPONSES_ENDPOINT",
+      "specifier": "src/ts/model/providers/nanogpt",
+      "original": "NANOGPT_SUBSCRIPTION_RESPONSES_ENDPOINT"
+    },
+    {
+      "name": "NANOGPT_RESPONSES_ENDPOINT",
+      "specifier": "src/ts/model/providers/nanogpt",
+      "original": "NANOGPT_RESPONSES_ENDPOINT"
+    },
+    {
+      "name": "simplifySchema",
+      "specifier": "src/ts/util",
+      "original": "simplifySchema"
+    },
+    {
+      "name": "isReasoningCapabilityParameter",
+      "specifier": "../shared",
+      "original": "isReasoningCapabilityParameter"
+    },
+    {
+      "name": "applyParameters",
+      "specifier": "../shared",
+      "original": "applyParameters"
+    },
+    {
+      "name": "getOpenAIJSONSchema",
+      "specifier": "../../templates/jsonSchema",
+      "original": "getOpenAIJSONSchema"
+    },
+    {
+      "name": "extractJSON",
+      "specifier": "../../templates/jsonSchema",
+      "original": "extractJSON"
+    },
+    {
+      "name": "callTool",
+      "specifier": "../../mcp/mcp",
+      "original": "callTool"
+    },
+    {
+      "name": "encodeToolCall",
+      "specifier": "../../mcp/mcp",
+      "original": "encodeToolCall"
+    },
+    {
+      "name": "globalFetch",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "globalFetch"
+    },
+    {
+      "name": "language",
+      "specifier": "src/lang",
+      "original": "language"
+    },
+    {
+      "name": "fetchNative",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "fetchNative"
+    },
+    {
+      "name": "alertError",
+      "specifier": "src/ts/alert",
+      "original": "alertError"
+    },
+    {
+      "name": "addFetchLog",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "addFetchLog"
+    },
+    {
+      "name": "applyAdditionalParameters",
+      "specifier": "../shared",
+      "original": "applyAdditionalParameters"
+    },
+    {
+      "name": "getAdditionalParameters",
+      "specifier": "../shared",
+      "original": "getAdditionalParameters"
+    },
+    {
+      "name": "getLocalNetworkRequestOptions",
+      "specifier": "./shared",
+      "original": "getLocalNetworkRequestOptions"
+    },
+    {
+      "name": "textifyReadableStream",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "textifyReadableStream"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

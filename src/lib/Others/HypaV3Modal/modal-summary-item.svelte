@@ -40,7 +40,11 @@
     getCategoryName,
   } from "./utils";
 
+  import type { HypaModalContext } from "./context";
+  import RuntimeMemorySummaryResult from "../RuntimeMemorySummaryResult.svelte";
+  import { reportRuntimeError } from "src/ts/runtime/browserRuntimeState.svelte";
   interface Props {
+    context?: HypaModalContext;
     summaryIndex: number;
     hypaV3Data: SerializableHypaV3Data;
     summaryItemStateMap: WeakMap<SerializableSummary, SummaryItemState>;
@@ -57,6 +61,7 @@
 
   let {
     summaryIndex,
+    context,
     hypaV3Data,
     summaryItemStateMap,
     expandedMessageState = $bindable(),
@@ -78,6 +83,29 @@
     chatMemoRefs: null,
   });
 
+  let rerollJob = $state("");
+  let nativeOrphan = $state(true);
+  let nativeSourceError = $state("");
+  const sourceClock = $derived(context?.sourceClock() ?? "");
+  $effect(() => {
+    if (!context) return;
+    sourceClock;
+    const memos = [...summary.chatMemos];
+    let current = true;
+    nativeOrphan = true;
+    nativeSourceError = "";
+    void context
+      .contains(memos)
+      .then((exists) => {
+        if (current) nativeOrphan = !exists;
+      })
+      .catch((error) => {
+        if (current) nativeSourceError = String(error.message ?? error);
+      });
+    return () => {
+      current = false;
+    };
+  });
   let isTranslating = $state(false);
   let translation = $state<string | null>(null);
   let isRerolling = $state(false);
@@ -94,7 +122,7 @@
 
     untrack(() => {
       summaryItemState.chatMemoRefs = new Array(summary.chatMemos.length).fill(
-        null
+        null,
       );
 
       expandedMessageState = null;
@@ -144,6 +172,7 @@
   }
 
   function isOrphan(): boolean {
+    if (context) return nativeOrphan;
     const char = DBState.db.characters[$selectedCharID];
     const chat = char.chats[DBState.db.characters[$selectedCharID].chatPage];
 
@@ -164,6 +193,17 @@
     if (isRerolling) return;
     if (isOrphan()) return;
 
+    if (context) {
+      isRerolling = true;
+      try {
+        rerollJob = await context.summarize("single", [summaryIndex]);
+      } catch (error) {
+        nativeSourceError = String(error.message ?? error);
+      } finally {
+        isRerolling = false;
+      }
+      return;
+    }
     isRerolling = true;
     rerolled = "Loading...";
 
@@ -178,7 +218,7 @@
               : message.role) as OpenAIChat["role"],
             content: message.data,
           };
-        })
+        }),
       );
 
       const summarizeResult = await summarize(toSummarize);
@@ -192,8 +232,9 @@
   }
 
   async function getMessageFromChatMemo(
-    chatMemo: string | null
+    chatMemo: string | null,
   ): Promise<Message | null> {
+    if (context) return context.message(chatMemo);
     const char = DBState.db.characters[$selectedCharID];
     const chat = char.chats[DBState.db.characters[$selectedCharID].chatPage];
     const shouldProcess = getCurrentHypaV3Preset().settings.processRegexScript;
@@ -216,21 +257,44 @@
   }
 
   async function deleteThis(): Promise<void> {
+    const held = context?.capture();
+    const index = summaryIndex;
     if (await alertConfirm(language.hypaV3Modal.deleteThisConfirmMessage)) {
-      hypaV3Data.summaries = hypaV3Data.summaries.filter(
-        (_, i) => i !== summaryIndex
-      );
+      try {
+        if (held) {
+          const data = held.values.hypaV3Data;
+          data.summaries = data.summaries.filter((_, i) => i !== index);
+          held.commit({ hypaV3Data: data });
+        } else
+          hypaV3Data.summaries = hypaV3Data.summaries.filter(
+            (_, i) => i !== index,
+          );
+      } catch (error) {
+        nativeSourceError = String(error.message ?? error);
+        reportRuntimeError(error);
+      }
     }
   }
 
   async function deleteAfter(): Promise<void> {
+    const held = context?.capture();
+    const index = summaryIndex;
     if (
       await alertConfirmTwice(
         language.hypaV3Modal.deleteAfterConfirmMessage,
-        language.hypaV3Modal.deleteAfterConfirmSecondMessage
+        language.hypaV3Modal.deleteAfterConfirmSecondMessage,
       )
     ) {
-      hypaV3Data.summaries.splice(summaryIndex + 1);
+      try {
+        if (held) {
+          const data = held.values.hypaV3Data;
+          data.summaries.splice(index + 1);
+          held.commit({ hypaV3Data: data });
+        } else hypaV3Data.summaries.splice(index + 1);
+      } catch (error) {
+        nativeSourceError = String(error.message ?? error);
+        reportRuntimeError(error);
+      }
     }
   }
 
@@ -278,7 +342,7 @@
   }
 
   async function toggleTranslateExpandedMessage(
-    regenerate: boolean
+    regenerate: boolean,
   ): Promise<void> {
     if (!expandedMessageState || expandedMessageState.isTranslating) return;
 
@@ -288,7 +352,7 @@
     }
 
     const message = await getMessageFromChatMemo(
-      expandedMessageState.selectedChatMemo
+      expandedMessageState.selectedChatMemo,
     );
 
     if (!message) return;
@@ -351,7 +415,10 @@
 </script>
 
 <div
-  class="flex flex-col p-2 border rounded-lg sm:p-4 border-zinc-700 bg-zinc-800/50 {isSelected() ? 'ring-2 ring-blue-500' : ''}"
+  data-hypa-summary={summaryIndex}
+  class="flex flex-col p-2 border rounded-lg sm:p-4 border-zinc-700 bg-zinc-800/50 {isSelected()
+    ? 'ring-2 ring-blue-500'
+    : ''}"
 >
   <!-- Original Summary Header -->
   <div class="flex items-center justify-between">
@@ -370,7 +437,7 @@
       <span class="text-sm text-zinc-400"
         >{language.hypaV3Modal.summaryNumberLabel.replace(
           "{0}",
-          (summaryIndex + 1).toString()
+          (summaryIndex + 1).toString(),
         )}</span
       >
 
@@ -396,6 +463,7 @@
       <button
         class="px-2 py-1 text-xs rounded-full bg-zinc-600 hover:bg-zinc-500 text-zinc-300 transition-colors"
         onclick={() => onOpenTagManager?.(summaryIndex)}
+        data-hypa-summary-tags={summaryIndex}
         title={language.hypaV3Modal.tagManager}
       >
         + {language.hypaV3Modal.tag}
@@ -455,6 +523,7 @@
           ? 'text-yellow-400 hover:text-yellow-300'
           : 'text-zinc-400 hover:text-zinc-200'}"
         tabindex="-1"
+        data-hypa-summary-important={summaryIndex}
         onclick={toggleImportant}
       >
         <StarIcon class="w-4 h-4" />
@@ -464,7 +533,8 @@
       <button
         class="p-2 transition-colors text-zinc-400 hover:text-zinc-200"
         tabindex="-1"
-        disabled={isOrphan()}
+        data-hypa-summary-reroll={summaryIndex}
+        disabled={isOrphan() || isRerolling}
         onclick={async () => await toggleReroll()}
       >
         <RefreshCw class="w-4 h-4" />
@@ -474,6 +544,7 @@
       <button
         class="p-2 transition-colors text-zinc-400 hover:text-rose-300"
         tabindex="-1"
+        data-hypa-summary-delete={summaryIndex}
         onclick={async () => await deleteThis()}
       >
         <Trash2Icon class="w-4 h-4" />
@@ -483,6 +554,7 @@
       <button
         class="p-2 transition-colors text-zinc-400 hover:text-rose-300"
         tabindex="-1"
+        data-hypa-summary-delete-after={summaryIndex}
         onclick={async () => await deleteAfter()}
       >
         <ScissorsLineDashed class="w-4 h-4" />
@@ -490,9 +562,19 @@
     </div>
   </div>
 
+  {#if nativeSourceError}<p role="alert">{nativeSourceError}</p>{/if}
+  {#if context && rerollJob}
+    <RuntimeMemorySummaryResult
+      bind:jobId={rerollJob}
+      onClose={() => {
+        rerollJob = "";
+      }}
+    />
+  {/if}
   <!-- Original Summary -->
   <div class="mt-2 sm:mt-4">
     <textarea
+      data-hypa-summary-text={summaryIndex}
       class="w-full p-2 transition-colors border rounded-sm sm:p-4 min-h-40 sm:min-h-56 resize-vertical border-zinc-700 focus:outline-hidden focus:ring-2 focus:ring-zinc-500 text-zinc-200 bg-zinc-900"
       bind:this={summaryItemState.originalRef}
       bind:value={summary.text}
@@ -604,10 +686,12 @@
         {:else}
           <ChevronUpIcon class="w-4 h-4" />
         {/if}
-        <span>{language.hypaV3Modal.connectedMessageCountLabel.replace(
-          "{0}",
-          summary.chatMemos.length.toString()
-        )}</span>
+        <span
+          >{language.hypaV3Modal.connectedMessageCountLabel.replace(
+            "{0}",
+            summary.chatMemos.length.toString(),
+          )}</span
+        >
       </button>
 
       <div class="flex items-center gap-2">
@@ -633,7 +717,7 @@
         {#each summary.chatMemos as chatMemo, memoIndex (chatMemo)}
           <button
             class="px-3 py-2 rounded-full text-xs text-zinc-200 hover:bg-zinc-700 transition-colors bg-zinc-900 {isMessageExpanded(
-              chatMemo
+              chatMemo,
             )
               ? 'ring-2 ring-zinc-500'
               : ''}"
@@ -658,7 +742,7 @@
             <div class="mb-2 text-sm sm:mb-4 text-zinc-400">
               {language.hypaV3Modal.connectedMessageRoleLabel.replace(
                 "{0}",
-                expandedMessage.role
+                expandedMessage.role,
               )}
             </div>
 
@@ -678,7 +762,7 @@
           <span class="text-sm text-red-400"
             >{language.hypaV3Modal.connectedMessageLoadingError.replace(
               "{0}",
-              error.message
+              error.message,
             )}</span
           >
         {/await}
@@ -702,5 +786,4 @@
       {/if}
     {/if}
   {/if}
-
 </div>

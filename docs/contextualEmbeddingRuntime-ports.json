@@ -1,0 +1,21 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/contextualEmbedding.ts",
+  "core": "src/ts/process/memory/contextualEmbeddingRuntime.ts",
+  "factory": "createContextualEmbeddingRuntime",
+  "functions": ["isContextModel", "getContextProvider"],
+  "classes": ["VoyageContext3Provider"],
+  "ports": [
+    {
+      "name": "globalFetch"
+    },
+    {
+      "name": "getDatabase"
+    },
+    {
+      "name": "contextHash"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": true
+}

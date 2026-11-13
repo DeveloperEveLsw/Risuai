@@ -1,0 +1,251 @@
+{
+  "verifiedAt": "2026-10-04T05:00:10.822153+00:00",
+  "baseCommit": "1fdf282f2a425d91f9008ed4ae4282d5a6fc9740",
+  "schema": 20,
+  "schemaMigration": false,
+  "scope": "local public original sources and authored synthetic fixtures only",
+  "previousGoalTurn": "verified progress: 1fdf282 with clean committed source, independent controls, full gates and FLRK3 applied/readback",
+  "all15Preserved": true,
+  "completionBlockHash": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "wholeGoalComplete": false,
+  "app": {
+    "passed": 465,
+    "existingSkipped": 3,
+    "filesPassed": 56
+  },
+  "backend": {
+    "tests": 354,
+    "pass": 354,
+    "fail": 0,
+    "skipped": 0
+  },
+  "builtBrowser": {
+    "tests": 9,
+    "pass": 9,
+    "fail": 0,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entity": "passed",
+    "ordinary": "passed"
+  },
+  "audit": {
+    "declarations": 169,
+    "originalBodies": 167,
+    "priorPolicies": 2,
+    "newOriginalDeclaration": "changeToPreset"
+  },
+  "before": {
+    "native": {
+      "tests": 6,
+      "pass": 2,
+      "fail": 4,
+      "skipped": 0
+    },
+    "resourceObservations": [
+      {
+        "scenario": "used-module-delete",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "used-module-recreate",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "used-persona-recreate",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "same-module-edit",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "unused-module-recreate",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      }
+    ],
+    "presetObservation": [
+      {
+        "state": "failed",
+        "code": "ENGINE_ERROR",
+        "providerCalls": 0
+      }
+    ]
+  },
+  "after": {
+    "native": {
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0
+    },
+    "resourceObservations": [
+      {
+        "scenario": "used-module-delete",
+        "state": "failed",
+        "code": "NOT_FOUND",
+        "beforeMessages": 2,
+        "afterMessages": 2,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "used-module-recreate",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "beforeMessages": 2,
+        "afterMessages": 2,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "used-persona-recreate",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "beforeMessages": 2,
+        "afterMessages": 2,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "same-module-edit",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "unused-module-recreate",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "used-preset-recreate",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "beforeMessages": 2,
+        "afterMessages": 2,
+        "providerCalls": 2
+      },
+      {
+        "scenario": "same-preset-edit",
+        "state": "completed",
+        "beforeMessages": 2,
+        "afterMessages": 4,
+        "providerCalls": 2
+      }
+    ],
+    "presetObservation": [
+      {
+        "state": "completed",
+        "providerCalls": 1
+      }
+    ],
+    "newContextUnits": 2,
+    "newSqliteTests": 4,
+    "newBuiltOriginalFixture": 1,
+    "sameBrowserPrefixRowAndBody": true,
+    "allTabsCloseGenerationAndFreshTwoDeviceReads": true,
+    "presetActiveStableIdAndUnknownFieldPreserved": true,
+    "staleRecoveryPreviewBlocked": true
+  },
+  "negativeControls": {
+    "candidateNativeHash": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411",
+    "controls": [
+      {
+        "name": "removed final resource lifetime validation",
+        "exitCode": 1,
+        "observation": {
+          "scenario": "used-module-recreate",
+          "state": "completed",
+          "beforeMessages": 2,
+          "afterMessages": 4,
+          "providerCalls": 2
+        },
+        "failedExpectedly": true
+      },
+      {
+        "name": "removed native preset binding",
+        "exitCode": 1,
+        "observation": {
+          "state": "failed",
+          "code": "ENGINE_ERROR",
+          "providerCalls": 0
+        },
+        "failedExpectedly": true,
+        "alteredNativeHash": "c97ddbd857238130f24992ebf45f3a003ec62ae44684b53feb82d6c143a1bd64"
+      }
+    ],
+    "sourceRestoredByteExact": true,
+    "restoredNativeHash": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411",
+    "nativeRestoredByteExact": true
+  },
+  "initialSamePresetFixtureFailure": "An exact whole-row equality assertion after one warmup incorrectly rejected a newly captured separate-model default. Final assertions retain unchanged peer name/mainPrompt/unknown fields/epoch and permit original unrelated normalization additions; first failure log preserved.",
+  "artifactHashes": {
+    "native": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411",
+    "entityIndex": "69472309eff1e1f6616691fb95cb71ec08ef2f6221e96392c2061ff45596c647"
+  },
+  "sourceHashes": {
+    "server/browser/presetChainUi.test.cjs": "002a94344ba00b14bb35f8429b9e3ce2ed616206a55b03f427ffdcf03663274e",
+    "server/entity/resourceReads.cjs": "1370a047e59ed3e8acf6ce8a8ce1237b02f70b1e47b74c7e3ca19fc0f85d27c1",
+    "server/entity/resourceReads.test.cjs": "e21e8464d4002e049fed4ce5ade63598d8da0310810342d8fbb6dd1ced8618a4",
+    "src/ts/runtime/resourceReadDependencies.test.ts": "6884cca68c9d19a07c627d425bd6af63c08782183d6622c521bfcdb5caf1b87f",
+    "docs/moduleRuntime-ports.json": "ba3817ee79c365202922366215736bfc3954528538b4f1c9c2f7955b157a6ee3",
+    "docs/presetRuntime-ports.json": "78174aaf6166c9d4fa5ecfcb87ef86c9d35a3d7e8f7e638d2c7960ccd18d2342",
+    "docs/utilStateRuntime-ports.json": "455307511a4d7960c3c3bde6d84328e561569c6e2e9d1d4406cfede127eccdb2",
+    "server/entity/librarySelection.cjs": "cbf7eecdd8e37a7a41a85722d3a6a09119fb2e94329c615dd670f4ea43221287",
+    "server/entity/writeSet.cjs": "89f6479d0899eff3b2be41e6c99221beafa5d8ec25b6ce107d45a45017de217e",
+    "server/native/generationWorker.test.cjs": "871153a2d3c05d3e5e4ff4d07f47e8bae21924e6988555156fafa66bbf17bbb3",
+    "src/ts/process/moduleRuntime.test.ts": "a04eb2c77239cde8dd457ace7e364f18f24844f2b6ec9875cc351832a42fe674",
+    "src/ts/process/moduleRuntime.ts": "422055d568ec930fcb5c079ecc039b0e6a84f9b9c6c962a077846510a3c08469",
+    "src/ts/process/modules.ts": "20fd2ba3def9dfd2341a3dee6495e9e3aadbbc39162d2098e23805b60f6047a6",
+    "src/ts/runtime/displayCbsScope.ts": "0f7ade67c1240203e426066a4f72f3c5e654ef9cafccb5ab10b824f8135b2556",
+    "src/ts/runtime/displayLuaContext.ts": "90f94001d8223750a9fe6656fba6a7ed62ab4ed4248a4e83f59d8e1e2ff46f3e",
+    "src/ts/runtime/executionContext.ts": "8a280168969670aa20488a2afb021583f6ca2008cfd79d6650771c9f262de8d7",
+    "src/ts/runtime/nativeGenerationRuntime.ts": "5fe099aff900f9e75f1b7348bf69dc5b8b1ea49e8c41768875e62da972ea6ff1",
+    "src/ts/storage/database.svelte.ts": "e16d6bbb9171d75e4b75451ee4682dc8794022b90b35a7f488f072ed0398c988",
+    "src/ts/storage/presetRuntime.ts": "221134886d1572c95fe243ed4373fb4df9dcf9f45835de4375cd43dac51eb721",
+    "src/ts/util.ts": "0774c643a5b5357b8d81db11d9296ccdb3503083fb2ff00df9a8dd9d1be86c8f",
+    "src/ts/utilStateRuntime.ts": "df8005e66b01d7f20160582a1b7e32f95684155f1e54d7e2751ac467cc5bde07"
+  },
+  "realModelCalls": 0,
+  "productionAccessed": false,
+  "productionModified": false,
+  "privateContentsReadOrImported": false,
+  "remotePushed": false,
+  "priorProtocolBrowserEvidence": {
+    "commit": "7bef4987799048a2786910647e5031e16914aa99",
+    "scenariosPassed": 18,
+    "reportedIncludingParent": 19,
+    "rerunInThisMilestone": false
+  },
+  "limits": [
+    "Selected loaded object identities only; arbitrary raw/cloned resource provenance and complete per-field/map/collection/membership read closure remain incomplete.",
+    "Same-incarnation configuration values retain captured snapshot semantics, separate from field-write CAS and variable revision guards. Selection scans and snapshot/resource-array cost remain.",
+    "Trusted legacy write sets may omit resourceReads and are not proof of old-result provenance.4096 distinct observed rows bound storage, not measured latency.",
+    "Native capture retains stable active ID and unknown fields outside the audited original algorithm, matching the existing library adapter. Same active/target selection still captures current settings first.",
+    "General plugins, continuation/structural extensions, retention/import/export/assets/total-storage budgets, physical mobile, representative latency/long tasks and the whole practical user trial remain incomplete."
+  ],
+  "warnings": "Existing Vite CSS/module/import/bundle warnings and Node experimental SQLite warnings remain.",
+  "activeOwnedValidationSessions": [],
+  "evidenceLogs": "evidence/local-resource-read-logs/"
+}

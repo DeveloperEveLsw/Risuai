@@ -7,23 +7,16 @@
     import { runLuaButtonTrigger } from 'src/ts/process/scriptings'
     import { risuChatParser } from "src/ts/process/scripts"
     import { runTrigger } from 'src/ts/process/triggers'
-    import { doingChat, localGenerationExecutionActive } from 'src/ts/process/index.svelte'
-    import {
-        delegateRuntimeChatInteraction,
-        shouldDelegateGeneration,
-    } from 'src/ts/runtime/generationDelegation.svelte'
-    import { runtimeGenerationActive } from 'src/ts/runtime/generationActivity.svelte'
-    import { admitRuntimeChatInteraction } from 'src/ts/runtime/chatInteractionAdmission'
     import { sayTTS } from "src/ts/process/tts"
     import { DBState, ReloadChatPointer, CurrentTriggerIdStore, popupStore } from 'src/ts/stores.svelte'
     import { ConnectionOpenStore } from "src/ts/sync/multiuser"
     import { capitalize, getUserIcon, getUserName, sleep } from "src/ts/util"
     import { onDestroy, onMount } from "svelte"
-    import { get, type Unsubscriber } from "svelte/store"
+    import { type Unsubscriber } from "svelte/store"
     import { v4 as uuidv4, v4 } from 'uuid'
     import { language } from "../../lang"
-    import { alertClear, alertConfirm, alertError, alertInput, alertNormal, alertRequestData, alertWait } from "../../ts/alert"
-    import { ParseMarkdown, type CbsConditions, type simpleCharacterArgument } from "../../ts/parser/parser.svelte"
+    import { alertClear, alertConfirm, alertInput, alertNormal, alertRequestData, alertWait } from "../../ts/alert"
+    import { ParseMarkdown, type CbsConditions, type simpleCharacterArgument, type MarkdownPresentation } from "../../ts/parser/parser.svelte"
     import { getCurrentCharacter, getCurrentChat, setCurrentChat, type MessageGenerationInfo, type StreamingDisplayOptimizationMode } from "../../ts/storage/database.svelte"
     import { selectedCharID } from "../../ts/stores.svelte"
     import { HideIconStore, ReloadGUIPointer, selIdState } from "../../ts/stores.svelte"
@@ -31,35 +24,25 @@
     import ChatBody from './ChatBody.svelte'
     import PopupButton from "../UI/PopupButton.svelte";
     import PartialEditController from './PartialEditController.svelte';
-    import {
-        getLLMCache,
-        resolveTranslationContext,
-        setLLMCache,
-        subscribeTranslationCacheMutations,
-        type TranslationCacheMutationEvent,
-    } from "../../ts/translator/translator"
-    import { isAbortError, type TranslationContext, type TranslationSourceFormat } from '../../ts/translator/translationPlan'
-    import { shouldShowChatTtsControl } from './chatTtsControl'
-    import { delegateChatMarkupInteraction, resolveChatMarkupInteraction } from './chatMarkupInteraction'
-    import { beginChatMarkupPending } from './chatMarkupPending'
-    import {
-        createChatTranslationIdentityKey,
-        createChatTranslationScopeKey,
-        snapshotChatTranslationSettings,
-        type ChatTranslationCharacter,
-        type ManualTranslationPreparedTarget,
-        type ManualTranslationPresentationHandoff,
-    } from './chatTranslationRun'
+    import { getLLMCache, setLLMCache } from "../../ts/translator/translator"
+    import { RuntimeUIState, entityRuntimeEnabled, browserRuntime, reportRuntimeError, type BookmarkTarget } from 'src/ts/runtime/browserRuntimeState.svelte';
+    import { captureDisplayPresentationIdentity } from 'src/ts/process/scriptings';
+    import { buttonActivities, buttonActivityMessage, buttonNodeKey, markButtonActivity, sameButtonOwner } from 'src/ts/runtime/buttonActivity';
 
     let translating = $state(false)
     let editMode = $state(false)
     let statusMessage:string = $state('')
     let retranslate = $state(false)
     let editTranslationMode = $state(false)
+    let loadingTranslationEdit = $state(false)
     let editTranslationText = $state('')
+    let editTranslationKey: string | null = null
+    let chatBodyRevision = $state(0)
     let bodyRoot:HTMLElement|null = $state(null)
-    let manualTranslationPresentation: ManualTranslationPresentationHandoff | null = $state(null)
-    let manualTranslationPresentationRevision = 0
+    let removing = $state(false)
+    let branching = $state(false)
+    let applyingDisabled = $state(false)
+    let disabledPreview = $state<false | true | 'allBefore' | undefined>(undefined)
     interface Props {
         message?: string;
         name?: string;
@@ -74,7 +57,6 @@
         onReroll?: () => void;
         unReroll?: () => void;
         character?: simpleCharacterArgument|string|null;
-        translationCharacter?: simpleCharacterArgument|string|null;
         firstMessage?: boolean;
         altGreeting?: boolean;
         currentPage?: number;
@@ -84,7 +66,9 @@
         isOptimizedStreamingMessage?: boolean;
         streamingOptimizationMode?: StreamingDisplayOptimizationMode;
         rawStreamingText?: string;
-        readOnlyPresentation?: boolean;
+        displayRevision?: number;
+        messageId?: string;
+        bookmarkSession?: string;
     }
 
     let {
@@ -101,7 +85,6 @@
         onReroll = () => {},
         unReroll = () => {},
         character = null,
-        translationCharacter = undefined,
         firstMessage = false,
         altGreeting = false,
         currentPage = 1,
@@ -111,50 +94,69 @@
         isOptimizedStreamingMessage = false,
         streamingOptimizationMode = 'off',
         rawStreamingText = message,
-        readOnlyPresentation = false,
+        displayRevision = 0,
+        messageId,
+        bookmarkSession,
     }: Props = $props();
 
+    let replyChoice = $derived(!firstMessage && entityRuntimeEnabled ? RuntimeUIState.replyChoice : null)
+    let replyChoiceBusy = $derived(replyChoice?.busy ?? false)
+    let showReplyChoice = $derived(replyChoice && messageId === RuntimeUIState.messages.at(-1)?.chatId)
+    let messageButtonActivities = $derived.by(() => {
+        if (!entityRuntimeEnabled) return [];
+        // Track the captured conversation incarnation, never the newly selected chat.
+        RuntimeUIState.scopeReady;
+        const chat = getCurrentChat();
+        const owner = browserRuntime().jobHistoryOwner();
+        if (!owner || chat?.id !== owner.chatId) return [];
+        const target = { chatId: owner.chatId, epoch: owner.chatEpoch, messageId: messageId ?? `first:${idx}` };
+        return $buttonActivities.filter((activity) => sameButtonOwner(activity, target));
+    });
+    let buttonStatus = $derived(buttonActivityMessage(messageButtonActivities));
+    let activeButtonKeys = $derived(messageButtonActivities.filter((activity) => activity.phase !== 'error').map((activity) => activity.buttonKey));
+
+    let sourceMessage = $derived.by(() => {
+        if (entityRuntimeEnabled && bookmarkSession)
+            return RuntimeUIState.bookmarkList.presentationToken === bookmarkSession
+                ? RuntimeUIState.bookmarkList.items.find(
+                      (item) => item.messageId === messageId,
+                  )?.message
+                : undefined;
+        const chat =
+            DBState.db.characters?.[selIdState.selId]?.chats?.[
+                DBState.db.characters?.[selIdState.selId]?.chatPage
+            ];
+        return entityRuntimeEnabled
+            ? chat?.message.find((item) => item.chatId === messageId)
+            : chat?.message[idx];
+    });
+
+    let branchOrigin = $derived.by(() => {
+        const value = (
+            sourceMessage as unknown as {
+                branchOrigin?: {
+                    characterId: string;
+                    chatId: string;
+                    messageId: string;
+                    name: string;
+                };
+            }
+        )?.branchOrigin;
+        return value &&
+            [value.characterId, value.chatId, value.messageId, value.name].every(
+                (item) => typeof item === "string",
+            )
+            ? value
+            : undefined;
+    });
+
     let msgDisplay = $state('')
+    let sourcePresentation = $state.raw<MarkdownPresentation | undefined>(undefined)
     let translated = $state(false)
     let partialEditEnabled = $state(true)
-    let canonicalTranslationCharacter = $derived(
-        translationCharacter === undefined ? character : translationCharacter
-    )
-
-    interface ManualTranslationSnapshot {
-        identityKey: string
-        scopeKey: string
-        source: string
-        displayCharacter: ChatTranslationCharacter
-        translationCharacter: ChatTranslationCharacter
-        chatId: number
-        context: TranslationContext
-        sourceFormat: TranslationSourceFormat
-        translateBeforeFormatting: boolean
-        legacyTranslation: boolean
-        cbsConditions: CbsConditions
-    }
-
-    interface ManualTranslationSession {
-        snapshot: ManualTranslationSnapshot
-        target: ManualTranslationPreparedTarget
-    }
-
-    let activeManualTranslation: {
-        identityKey: string
-        controller: AbortController
-    } | null = null
-    let manualTranslationSession: ManualTranslationSession | null = null
-    let manualTranslationPreparedTarget: ManualTranslationPreparedTarget | null = null
-
-    interface ManualTranslationTargetWaiter {
-        identityKey: string
-        resolve: (target: ManualTranslationPreparedTarget) => void
-        reject: (error: DOMException) => void
-        signal: AbortSignal
-        onAbort: () => void
-    }
-    const manualTranslationTargetWaiters = new Set<ManualTranslationTargetWaiter>()
+    let translationViewControlsDisabled = $derived(editMode || editTranslationMode || loadingTranslationEdit)
+    let originalEditControlDisabled = $derived(editTranslationMode || loadingTranslationEdit)
+    let translationEditControlDisabled = $derived(editMode || loadingTranslationEdit)
 
     export function updateStreamingDisplay(state: {
         isOptimizedStreamingMessage: boolean
@@ -166,304 +168,294 @@
         rawStreamingText = state.rawStreamingText
     }
 
-    async function rm(e:MouseEvent, rec?:boolean){
-        if(e.shiftKey){
-            let msg = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message
-            msg = msg.slice(0, idx)
-            DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message = msg
-            return
+    async function rm(e: MouseEvent, rec?: boolean) {
+        if (entityRuntimeEnabled) {
+            if (removing) return;
+            removing = true;
+            try {
+                const bridge = browserRuntime();
+                const target = bridge.captureMessageRemoval(messageId);
+                const ask = DBState.db.askRemoval;
+                const instant = DBState.db.instantRemove || rec;
+                let mode: "one" | "from" = "one";
+                if (e.shiftKey) mode = "from";
+                else {
+                    if (ask && !(await alertConfirm(language.removeChat))) return;
+                    if (instant)
+                        mode = (await alertConfirm(language.instantRemoveConfirm))
+                            ? "one"
+                            : "from";
+                }
+                await bridge.removeMessage(target, mode);
+            } catch (error) {
+                reportRuntimeError(error);
+            } finally {
+                removing = false;
+            }
+            return;
+        }
+        if (e.shiftKey) {
+            let msg =
+                DBState.db.characters[selIdState.selId].chats[
+                    DBState.db.characters[selIdState.selId].chatPage
+                ].message;
+            msg = msg.slice(0, idx);
+            DBState.db.characters[selIdState.selId].chats[
+                DBState.db.characters[selIdState.selId].chatPage
+            ].message = msg;
+            return;
         }
 
-        const rm = DBState.db.askRemoval ? await alertConfirm(language.removeChat) : true
-        if(rm){
-            if(DBState.db.instantRemove || rec){
-                const r = await alertConfirm(language.instantRemoveConfirm)
-                let msg = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message
-                if(!r){
-                    msg = msg.slice(0, idx)
+        const rm = DBState.db.askRemoval
+            ? await alertConfirm(language.removeChat)
+            : true;
+        if (rm) {
+            if (DBState.db.instantRemove || rec) {
+                const r = await alertConfirm(language.instantRemoveConfirm);
+                let msg =
+                    DBState.db.characters[selIdState.selId].chats[
+                        DBState.db.characters[selIdState.selId].chatPage
+                    ].message;
+                if (!r) {
+                    msg = msg.slice(0, idx);
+                } else {
+                    msg.splice(idx, 1);
                 }
-                else{
-                    msg.splice(idx, 1)
-                }
-                DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message = msg
-            }
-            else{
-                let msg = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message
-                msg.splice(idx, 1)
-                DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message = msg
+                DBState.db.characters[selIdState.selId].chats[
+                    DBState.db.characters[selIdState.selId].chatPage
+                ].message = msg;
+            } else {
+                let msg =
+                    DBState.db.characters[selIdState.selId].chats[
+                        DBState.db.characters[selIdState.selId].chatPage
+                    ].message;
+                msg.splice(idx, 1);
+                DBState.db.characters[selIdState.selId].chats[
+                    DBState.db.characters[selIdState.selId].chatPage
+                ].message = msg;
             }
         }
+    }
+
+    let removalPending = $derived(
+        entityRuntimeEnabled &&
+            RuntimeUIState.pending.some(
+                (entry) =>
+                    entry.command.type === "remove-message" &&
+                    entry.command.messageId === messageId &&
+                    entry.state !== "blocked",
+            ),
+    );
+    let removalBusy = $derived(removing || removalPending);
+
+    let disabledPending = $derived(
+        entityRuntimeEnabled
+            ? browserRuntime().pendingMessageDisabled(messageId)
+            : undefined,
+    );
+    let disabledBusy = $derived(applyingDisabled || disabledPending !== undefined);
+    let presentedDisabled = $derived(
+        disabledPreview ?? disabledPending ?? disabled,
+    );
+
+    async function toggleDisabled(above: boolean) {
+        if (entityRuntimeEnabled) {
+            if (disabledBusy) return;
+            try {
+                const bridge = browserRuntime(),
+                    target = bridge.captureMessageDisabled(messageId);
+                disabledPreview = above
+                    ? target.disabled === "allBefore"
+                        ? false
+                        : "allBefore"
+                    : !target.disabled;
+                applyingDisabled = true;
+                await bridge.setMessageDisabled(target, disabledPreview);
+            } catch (error) {
+                reportRuntimeError(error);
+            } finally {
+                disabledPreview = undefined;
+                applyingDisabled = false;
+            }
+            return;
+        }
+        await sleep(1);
+        const message =
+            DBState.db.characters[selIdState.selId].chats[
+                DBState.db.characters[selIdState.selId].chatPage
+            ].message[idx];
+        message.disabled = above
+            ? message.disabled === "allBefore"
+                ? false
+                : "allBefore"
+            : !message.disabled;
     }
 
     async function edit(){
+        if (entityRuntimeEnabled) {
+            try { await browserRuntime().editMessage(messageId, message); }
+            catch (error) { reportRuntimeError(error); }
+            return;
+        }
         DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = message
     }
 
-    function handlePartialEditSave(e: CustomEvent<{ newData: string }>) {
-        if (idx >= 0) {
-            message = e.detail.newData
-            DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = e.detail.newData
-            displaya(e.detail.newData)
+    function startOriginalEdit() {
+        if (originalEditControlDisabled) return
+        editMode = true
+    }
+
+    function toggleOriginalEdit() {
+        if (originalEditControlDisabled) return
+
+        if (editMode) {
+            editMode = false
+            edit()
+        } else {
+            startOriginalEdit()
         }
     }
 
-    function getCbsCondition(){
-        if(readOnlyPresentation){
-            return {
-                firstmsg: false,
-                chatRole: role ?? 'user',
-            }
-        }
-        try{
-            const cbsConditions:CbsConditions = {
-                firstmsg: firstMessage ?? false,
-                chatRole: DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage]?.message?.[idx]?.role ?? null,
-            }
-            return cbsConditions
-        }
-        catch(e){
-            return {
-                firstmsg: firstMessage ?? false,
-                chatRole: null,
-            }
-        }
+    function toggleTranslation() {
+        if (translationViewControlsDisabled) return
+        translated = !translated
     }
 
-    function createManualTranslationSnapshot(): ManualTranslationSnapshot {
-        const translateBeforeFormatting = !!DBState.db.translateBeforeHTMLFormatting
-        const legacyTranslation = !!DBState.db.legacyTranslation
-        const context = resolveTranslationContext(canonicalTranslationCharacter, idx)
-        const cbsConditions = getCbsCondition()
-        const currentCharacter = getCurrentCharacter()
-        const settings = snapshotChatTranslationSettings(
-            DBState.db as unknown as Record<string, any>,
-            {
-                userName: getUserName(),
-                currentCharacterName: currentCharacter?.nickname || currentCharacter?.name,
-            },
-        )
-        const sourceFormat: TranslationSourceFormat = translateBeforeFormatting
-            ? 'plain'
-            : 'html-segments-v1'
-        const identityInput = {
-                source: msgDisplay,
-                manualSource: message,
-                displayCharacter: character,
-                translationCharacter: canonicalTranslationCharacter,
-                chatId: idx,
-                firstMessage: !!firstMessage,
-                role: role ?? null,
-                context,
-                settings,
-        }
-        return {
-            identityKey: createChatTranslationIdentityKey({
-                ...identityInput,
-                cacheRevision: 0,
-            }),
-            scopeKey: createChatTranslationScopeKey({
-                ...identityInput,
-                cacheRevision: 0,
-            }),
-            source: msgDisplay,
-            displayCharacter: character,
-            translationCharacter: canonicalTranslationCharacter,
-            chatId: idx,
-            context,
-            sourceFormat,
-            translateBeforeFormatting,
-            legacyTranslation,
-            cbsConditions,
-        }
+    function requestRetranslation() {
+        if (translationViewControlsDisabled) return
+        retranslate = true
     }
 
-    let manualTranslationIdentityKey = $derived.by(
-        () => createManualTranslationSnapshot().identityKey
-    )
+    async function handlePartialEditSave(e: CustomEvent<{ newData: string; target: 'original' | 'translation'; translationKey?: string }>) {
+        if (idx < 0) return
 
-    function cacheMutationTouchesManualTarget(
-        mutation: TranslationCacheMutationEvent,
-        target: ManualTranslationPreparedTarget,
-    ): boolean {
-        const targetKeys = [target.manualKey, target.planKey, target.legacyKey]
-            .filter((key): key is string => typeof key === 'string')
-        return mutation.touchedKeys.some((key) => targetKeys.includes(key))
-    }
+        if (e.detail.target === 'translation') {
+            if (!e.detail.translationKey) return
 
-    const unsubscribeTranslationCacheMutations = subscribeTranslationCacheMutations((mutation) => {
-        if (mutation.reason === 'clear') {
-            manualTranslationPresentation = null
-            translated = false
+            await updateTranslationCache(e.detail.translationKey, e.detail.newData)
             return
         }
-        const target = manualTranslationPresentation?.target
-        if (target && cacheMutationTouchesManualTarget(mutation, target)) {
-            // The child performs the exact-key cache-only adoption. Drop the
-            // parent-local one-shot so a later remount cannot resurrect the
-            // value that this mutation superseded.
-            manualTranslationPresentation = null
-        }
-    })
-    onDestroy(unsubscribeTranslationCacheMutations)
 
-    $effect(() => {
-        const identityKey = manualTranslationIdentityKey
-        if (
-            activeManualTranslation
-            && activeManualTranslation.identityKey !== identityKey
-            && !activeManualTranslation.controller.signal.aborted
-        ) {
-            activeManualTranslation.controller.abort()
-        }
-        if (manualTranslationSession?.snapshot.identityKey !== identityKey) {
-            manualTranslationSession = null
-            editTranslationMode = false
-        }
-        if (manualTranslationPresentation?.identityKey !== identityKey) {
-            manualTranslationPresentation = null
-        }
-        if (manualTranslationPreparedTarget?.identityKey !== identityKey) {
-            manualTranslationPreparedTarget = null
-        }
-    })
+        message = e.detail.newData
+        if (entityRuntimeEnabled) { await edit(); return; }
+        DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = e.detail.newData
+        displaya(e.detail.newData)
+    }
 
-    function acceptManualTranslationPreparedTarget(
-        target: ManualTranslationPreparedTarget,
-    ): void {
-        if (target.identityKey !== manualTranslationIdentityKey) return
-        manualTranslationPreparedTarget = target
-        for (const waiter of [...manualTranslationTargetWaiters]) {
-            if (waiter.identityKey !== target.identityKey || waiter.signal.aborted) continue
-            waiter.signal.removeEventListener('abort', waiter.onAbort)
-            manualTranslationTargetWaiters.delete(waiter)
-            waiter.resolve(target)
+    async function updateTranslationCache(key: string, data: string) {
+        await setLLMCache(key, data)
+        editTranslationText = data
+        chatBodyRevision += 1
+    }
+
+    async function getTranslationPartialEditContext() {
+        if (!translated || DBState.db.translatorType !== 'llm') {
+            return null
+        }
+
+        const key = await getTranslationCacheKey()
+        if (!key) {
+            return null
+        }
+        const data = await getLLMCache(key)
+        if (data === null) {
+            return null
+        }
+
+        return { key, data }
+    }
+
+    function getCbsCondition() {
+        try {
+            const cbsConditions: CbsConditions = {
+                firstmsg: firstMessage ?? false,
+                messageId,
+                bookmarkSession,
+                chatRole:
+                    entityRuntimeEnabled && bookmarkSession
+                        ? role
+                        : (DBState.db.characters[selIdState.selId].chats[
+                              DBState.db.characters[selIdState.selId].chatPage
+                          ]?.message?.[idx]?.role ?? null),
+            };
+            return cbsConditions;
+        } catch (e) {
+            return {
+                firstmsg: firstMessage ?? false,
+                messageId,
+                chatRole: null,
+            };
         }
     }
 
-    function waitForManualTranslationPreparedTarget(
-        snapshot: ManualTranslationSnapshot,
-        signal: AbortSignal,
-    ): Promise<ManualTranslationPreparedTarget> {
-        const current = manualTranslationPreparedTarget
-        if (current?.identityKey === snapshot.identityKey) return Promise.resolve(current)
-        return new Promise((resolve, reject) => {
-            const waiter = {} as ManualTranslationTargetWaiter
-            const onAbort = () => {
-                manualTranslationTargetWaiters.delete(waiter)
-                reject(new DOMException('Superseded manual translation preparation.', 'AbortError'))
-            }
-            Object.assign(waiter, {
-                identityKey: snapshot.identityKey,
-                resolve,
-                reject,
-                signal,
-                onAbort,
-            })
-            manualTranslationTargetWaiters.add(waiter)
-            signal.addEventListener('abort', onAbort, { once: true })
-            if (signal.aborted) onAbort()
-        })
-    }
-
-    function beginManualTranslationOperation(snapshot: ManualTranslationSnapshot): AbortController {
-        activeManualTranslation?.controller.abort()
-        const controller = new AbortController()
-        activeManualTranslation = {
-            identityKey: snapshot.identityKey,
-            controller,
+    async function getTranslationCacheKey(): Promise<string> {
+        if(DBState.db.translateBeforeHTMLFormatting){
+            return msgDisplay
         }
-        return controller
-    }
-
-    function assertManualTranslationCurrent(
-        snapshot: ManualTranslationSnapshot,
-        signal: AbortSignal,
-    ): void {
-        if (
-            signal.aborted
-            || manualTranslationIdentityKey !== snapshot.identityKey
-        ) {
-            throw new DOMException('Superseded manual translation edit.', 'AbortError')
+        if(!DBState.db.legacyTranslation){
+            return await ParseMarkdown(msgDisplay, character, 'pretranslate', idx, getCbsCondition())
         }
+        return await ParseMarkdown(msgDisplay, character, 'notrim', idx, getCbsCondition())
     }
 
     async function loadTranslationForEdit() {
-        const snapshot = createManualTranslationSnapshot()
-        const controller = beginManualTranslationOperation(snapshot)
+        if (translationViewControlsDisabled) return
+
+        loadingTranslationEdit = true
         try {
-            const target = await waitForManualTranslationPreparedTarget(
-                snapshot,
-                controller.signal,
-            )
-            assertManualTranslationCurrent(snapshot, controller.signal)
-            const cached = await getLLMCache(target.translationInput, {
-                signal: controller.signal,
-                context: target.context,
-                sourceFormat: target.sourceFormat,
-                manualSource: target.manualSource,
-            })
-            assertManualTranslationCurrent(snapshot, controller.signal)
-            manualTranslationSession = { snapshot, target }
+            const key = await getTranslationCacheKey()
+            const cached = await getLLMCache(key)
+            editTranslationKey = key
             editTranslationText = cached ?? ''
             editTranslationMode = true
-        }
-        catch (error) {
-            if (!isAbortError(error)) throw error
-        }
-        finally {
-            if (activeManualTranslation?.controller === controller) {
-                activeManualTranslation = null
-            }
+        } catch (error) {
+            editTranslationKey = null
+            throw error
+        } finally {
+            loadingTranslationEdit = false
         }
     }
 
     async function saveTranslationEdit() {
-        const session = manualTranslationSession
-        const snapshot = session?.snapshot ?? createManualTranslationSnapshot()
-        const value = editTranslationText
-        const controller = beginManualTranslationOperation(snapshot)
-        try {
-            assertManualTranslationCurrent(snapshot, controller.signal)
-            const target = session?.target ?? await waitForManualTranslationPreparedTarget(
-                snapshot,
-                controller.signal,
-            )
-            await setLLMCache(target.translationInput, value, {
-                signal: controller.signal,
-                context: target.context,
-                sourceFormat: target.sourceFormat,
-                manualSource: target.manualSource,
-            })
-            assertManualTranslationCurrent(snapshot, controller.signal)
-            manualTranslationPresentationRevision += 1
-            manualTranslationPresentation = {
-                identityKey: snapshot.identityKey,
-                scopeKey: snapshot.scopeKey,
-                revision: manualTranslationPresentationRevision,
-                core: value,
-                target,
-            }
-            manualTranslationSession = null
-            editTranslationMode = false
-            translated = true
-        }
-        catch (error) {
-            if (!isAbortError(error)) throw error
-        }
-        finally {
-            if (activeManualTranslation?.controller === controller) {
-                activeManualTranslation = null
-            }
-        }
+        if (editTranslationKey === null) return
+
+        await updateTranslationCache(editTranslationKey, editTranslationText)
+        editTranslationKey = null
+        editTranslationMode = false
     }
 
-    function displaya(message:string){
-        // An active runtime snapshot is not a canonical chat message. Running
-        // CBS here could read or initialize canonical script state before the
-        // resident's final database revision arrives.
-        msgDisplay = readOnlyPresentation
-            ? message
-            : risuChatParser(message, {chara: name, chatID: idx, rmVar: true, visualize: true, cbsConditions: getCbsCondition()})
+    let lastSourceOwner: { data: string; key: string } | undefined;
+    function displaya(message: string, preserveEquivalentOwner = false) {
+        const presentation: MarkdownPresentation = {};
+        const data = risuChatParser(
+            message,
+            {
+                chara: name,
+                chatID: idx,
+                rmVar: true,
+                visualize: true,
+                cbsConditions: getCbsCondition(),
+            },
+            entityRuntimeEnabled ? presentation : undefined,
+        );
+        let key: string | undefined;
+        if (entityRuntimeEnabled && presentation.capture) {
+            try {
+                key = captureDisplayPresentationIdentity(presentation.capture);
+            } catch {
+                // The renderer retains its existing visible budget/error path.
+            }
+        }
+        if (
+            preserveEquivalentOwner &&
+            key !== undefined &&
+            lastSourceOwner?.key === key &&
+            lastSourceOwner.data === data
+        )
+            return;
+        lastSourceOwner = key === undefined ? undefined : { data, key };
+        msgDisplay = data;
+        sourcePresentation = entityRuntimeEnabled ? presentation : undefined;
     }
 
     const setStatusMessage = (message:string, timeout:number = 0)=>{
@@ -479,15 +471,23 @@
     let displayMessage = $derived(isOptimizedStreamingMessage ? rawStreamingText : message)
     let renderRawStreaming = $derived(isOptimizedStreamingMessage && streamingOptimizationMode === 'strong')
 
-    function updateDisplayedMessage(){
+    function updateDisplayedMessage(preserveEquivalentOwner = false){
         if(renderRawStreaming){
             return
         }
-        displaya(displayMessage)
+        displaya(displayMessage, preserveEquivalentOwner)
     }
 
     $effect.pre(() => {
-        updateDisplayedMessage()
+        displayRevision;
+        if (entityRuntimeEnabled) {
+            // A synchronous CBS pass may be deferred by the projection fence.
+            // Retry that pass when its confirmed scope becomes usable, before
+            // ChatBody receives the preprocessed text again.
+            RuntimeUIState.displayRevision;
+            RuntimeUIState.scopeReady;
+        }
+        updateDisplayedMessage(true)
     });
 
     const unsubscribers:Unsubscriber[] = []
@@ -499,12 +499,6 @@
     })
 
     onDestroy(()=>{
-        activeManualTranslation?.controller.abort()
-        for (const waiter of [...manualTranslationTargetWaiters]) {
-            waiter.signal.removeEventListener('abort', waiter.onAbort)
-            manualTranslationTargetWaiters.delete(waiter)
-            waiter.reject(new DOMException('Manual translation view destroyed.', 'AbortError'))
-        }
         unsubscribers.forEach(u => u())
     })
 
@@ -520,13 +514,8 @@
     }
 
     async function handleButtonTriggerWithin(event: UIEvent) {
-        if (readOnlyPresentation) {
-            event.preventDefault()
-            event.stopPropagation()
-            return
-        }
         const currentChar = getCurrentCharacter()
-        if (!currentChar) {
+        if(!currentChar || currentChar.type === 'group'){
             return
         }
 
@@ -535,146 +524,202 @@
         if (!origin) {
             return
         }
-        const interaction = resolveChatMarkupInteraction(currentChar.type, origin)
-        if (!interaction) {
-            return
-        }
-        const admission = admitRuntimeChatInteraction(
-            {
-                delegated: shouldDelegateGeneration(),
-                generationActive:
-                    get(doingChat) || get(localGenerationExecutionActive),
-                runtimeGenerationActive: get(runtimeGenerationActive),
-            },
-            () => true,
-        )
-        if (!('result' in admission)) {
-            // The resident command is bound to one canonical revision. A
-            // second manual/Lua mutation would be queued against a stale base.
-            event.preventDefault()
-            event.stopPropagation()
-            return
+
+        const triggerName = origin.getAttribute('risu-trigger')
+        const triggerId = origin.getAttribute('risu-id')
+        const btnEvent = origin.getAttribute('risu-btn')
+        if (entityRuntimeEnabled) {
+            const root = event.currentTarget as HTMLElement;
+            const owner = browserRuntime().jobHistoryOwner();
+            if (!owner || !root.contains(origin)) return;
+            const token = buttonActivities.begin(
+                { chatId: owner.chatId, epoch: owner.chatEpoch, messageId: messageId ?? `first:${idx}` },
+                buttonNodeKey(root, origin),
+            );
+            try {
+                const requestId = await browserRuntime().button(btnEvent, triggerName, triggerId);
+                buttonActivities.admitted(token, requestId);
+                buttonActivities.reconcile(RuntimeUIState.pending, RuntimeUIState.jobs);
+            }
+            catch (error) {
+                buttonActivities.fail(token, error);
+                reportRuntimeError(error);
+            }
+            return;
         }
 
-        let triggerResult = null
-        let handledByResident = false
-        const finishPending = beginChatMarkupPending(origin)
-        if (!finishPending) {
-            event.preventDefault()
-            event.stopPropagation()
-            return
-        }
-        try {
-            if (shouldDelegateGeneration()) {
-                if (interaction.action === 'manual-trigger') {
-                    // Preserve {{trigger_id}} rendering in the direct viewer while
-                    // the actual trigger and its parser run in the resident.
-                    CurrentTriggerIdStore.set(interaction.triggerId || null)
-                }
-                const chat = getCurrentChat()
-                handledByResident = await delegateChatMarkupInteraction(
-                    interaction,
-                    {
-                        characterId: currentChar.chaId,
-                        chatId: chat.id,
-                    },
-                    delegateRuntimeChatInteraction,
-                )
-            } else {
-                if (interaction.action === 'manual-trigger') {
-                    if (currentChar.type !== 'character') {
-                        return
-                    }
-                    triggerResult = await runTrigger(currentChar, 'manual', {
-                        chat: getCurrentChat(),
-                        manualName: interaction.manualName,
-                        triggerId: interaction.triggerId,
-                    })
-                } else {
-                    triggerResult = await runLuaButtonTrigger(
-                        currentChar,
-                        interaction.data,
-                    )
-                }
-            }
+        const triggerResult =
+            triggerName ?
+                await runTrigger(currentChar, 'manual', {
+                    chat: getCurrentChat(),
+                    manualName: triggerName,
+                    triggerId: triggerId || undefined,
+                }) :
+            btnEvent ?
+                await runLuaButtonTrigger(currentChar, btnEvent) :
+            null
 
-            if (triggerResult) {
-                setCurrentChat(triggerResult.chat)
-            }
-            if (triggerResult || handledByResident) {
-                ReloadChatPointer.update((v) => {
-                    v[idx] = (v[idx] ?? 0) + 1
-                    return v
-                })
-            }
-        } catch (error) {
-            alertError(error)
-        } finally {
-            finishPending()
-            if (interaction.action === 'manual-trigger' && interaction.triggerId) {
-                setTimeout(() => {
-                    CurrentTriggerIdStore.set(null)
-                }, 100) // Small delay to allow display mode to complete
-            }
+        if(triggerResult) {
+            setCurrentChat(triggerResult.chat)
+            ReloadChatPointer.update((v) => {
+                v[idx] = (v[idx] ?? 0) + 1
+                return v
+            })
+        }
+        
+        if(triggerName && triggerId) {
+            setTimeout(() => {
+                CurrentTriggerIdStore.set(null)
+            }, 100) // Small delay to allow display mode to complete
         }
     }
 
     let isBookmarked = $derived(
-        !readOnlyPresentation && (DBState.db.characters[selIdState.selId]
-            ?.chats[DBState.db.characters[selIdState.selId].chatPage]
-            ?.bookmarks?.includes(DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx]?.chatId) ?? false)
+        entityRuntimeEnabled
+            ? Array.isArray(getCurrentChat()?.bookmarks) &&
+                  getCurrentChat().bookmarks.includes(messageId)
+            : (DBState.db.characters[selIdState.selId]?.chats[
+                  DBState.db.characters[selIdState.selId].chatPage
+              ]?.bookmarks?.includes(
+                  DBState.db.characters[selIdState.selId].chats[
+                      DBState.db.characters[selIdState.selId].chatPage
+                  ].message[idx]?.chatId,
+              ) ?? false),
     );
 
-    async function toggleBookmark() {
-        const chat = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage];
-        
-        if(!chat.message[idx]) return;
+    let bookmarkPending = $derived(
+        entityRuntimeEnabled
+            ? browserRuntime().pendingBookmark(messageId)
+            : undefined,
+    );
+    let bookmarkBusy = $derived(
+        entityRuntimeEnabled &&
+            (!RuntimeUIState.scopeReady || !messageId || !!bookmarkPending),
+    );
+    let presentedBookmarked = $derived(bookmarkPending?.present ?? isBookmarked);
 
-        let messageId = chat.message[idx]?.chatId;
+    function defaultBookmarkName(content: string, sender: string) {
+        const blacklist = [
+            "!",
+            "@",
+            "#",
+            "$",
+            "%",
+            "^",
+            "&",
+            "*",
+            "(",
+            ")",
+            "_",
+            "+",
+            "-",
+            "=",
+            "[",
+            "]",
+            "{",
+            "}",
+            "|",
+            ";",
+            ":",
+            '"',
+            "'",
+            ",",
+            ".",
+            "<",
+            ">",
+            "/",
+            "?",
+        ];
+        const lines = content.split("\n");
+        let defaultName: string;
+        for (const line of lines.slice(Math.floor(lines.length * 0.5))) {
+            if (line && !blacklist.some((char) => line.startsWith(char))) {
+                defaultName = line.trim().slice(0, 50) + "...";
+                break;
+            }
+        }
+        return sender + "| " + (defaultName || content.slice(0, 50) + "...");
+    }
+
+    async function toggleBookmark() {
+        if (entityRuntimeEnabled) {
+            if (bookmarkBusy) return;
+            const bridge = browserRuntime();
+            // Pin default-name inputs before both the header read and name dialog.
+            const saved = sourceMessage;
+            const content = saved?.data ?? message;
+            const sender = saved?.role === "user" ? getUserName() : name;
+            let target: Readonly<BookmarkTarget>;
+            try {
+                target = await bridge.captureBookmark(messageId, "toggle");
+                let chosen: string;
+                if (target.action === "add") {
+                    const input = await alertInput(
+                        language.bookmarkAskNameOrDefault,
+                        [],
+                        typeof target.name === "string" ? target.name : "",
+                    );
+                    chosen =
+                        input && input.trim() !== ""
+                            ? input
+                            : defaultBookmarkName(content, sender);
+                }
+                await bridge.setBookmark(target, chosen);
+            } catch (error) {
+                reportRuntimeError(error);
+            } finally {
+                if (target) bridge.releaseBookmark(target);
+            }
+            return;
+        }
+        const chat =
+            DBState.db.characters[selIdState.selId].chats[
+                DBState.db.characters[selIdState.selId].chatPage
+            ];
+
+        if (!chat.message[idx]) return;
+
+        let legacyMessageId = chat.message[idx]?.chatId;
         const messageContent = chat.message[idx]?.data;
 
-        if (!messageId) {
-            messageId = uuidv4();
-            chat.message[idx].chatId = messageId;
+        if (!legacyMessageId) {
+            legacyMessageId = uuidv4();
+            chat.message[idx].chatId = legacyMessageId;
         }
 
         chat.bookmarks ??= [];
         chat.bookmarkNames ??= {};
 
-        const bookmarkIndex = chat.bookmarks.indexOf(messageId);
+        const bookmarkIndex = chat.bookmarks.indexOf(legacyMessageId);
 
         if (bookmarkIndex > -1) {
             chat.bookmarks.splice(bookmarkIndex, 1);
-            delete chat.bookmarkNames[messageId];
+            delete chat.bookmarkNames[legacyMessageId];
         } else {
-            chat.bookmarks.push(messageId);
+            chat.bookmarks.push(legacyMessageId);
 
-            const msgSender = chat.message[idx]?.role === 'user' ? getUserName() : name;
-            const newName= await alertInput(language.bookmarkAskNameOrDefault, [], chat.bookmarkNames[messageId] || '');
+            const msgSender =
+                chat.message[idx]?.role === "user" ? getUserName() : name;
+            const newName = await alertInput(
+                language.bookmarkAskNameOrDefault,
+                [],
+                chat.bookmarkNames[legacyMessageId] || "",
+            );
 
-            if (newName && newName.trim() !== '') {
-                chat.bookmarkNames[messageId] = newName;
+            if (newName && newName.trim() !== "") {
+                chat.bookmarkNames[legacyMessageId] = newName;
             } else {
-                let defaultName;
-
-                const blacklist = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[', ']', '{', '}', '|', ';', ':', '"', "'", ',', '.', '<', '>', '/', '?'];
-                let lines = messageContent.split('\n');
-                lines = lines.splice(Math.floor(lines.length * 0.5));
-                for (const line of lines) {
-                    if (line && !blacklist.some(char => line.startsWith(char))) {
-                        defaultName = line.trim().slice(0, 50) + '...';
-                        break;
-                    }
-                }
-                if (!defaultName) {
-                    defaultName = messageContent.slice(0, 50) + '...';
-                }
-                chat.bookmarkNames[messageId] = msgSender + '| ' + defaultName;
+                chat.bookmarkNames[legacyMessageId] = defaultBookmarkName(
+                    messageContent,
+                    msgSender,
+                );
             }
         }
 
         chat.bookmarks = [...chat.bookmarks];
     }
+
+
 </script>
 
 
@@ -684,9 +729,9 @@
             <button class="text-sm p-1 text-textcolor2 border-darkborderc float-end mr-2 my-1
                     hover:ring-darkbutton hover:ring-3 rounded-md hover:text-textcolor transition-all flex justify-center items-center" 
                     onclick={() => {
-                        const currentGenerationInfo = !readOnlyPresentation && idx >= 0 ?
-                            DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message[idx]?.generationInfo :
-                            messageGenerationInfo
+                        const currentGenerationInfo = idx >= 0 && !bookmarkSession ?
+                            DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message[idx].generationInfo :
+                    messageGenerationInfo
 
                         alertRequestData({
                             genInfo: currentGenerationInfo,
@@ -701,18 +746,17 @@
             </button>
         {/if}
         {#if DBState.db.translatorType === 'llm' && translated}
-            <button class="text-sm p-1 text-textcolor2 border-darkborderc float-end mr-2 my-1
-                            hover:ring-darkbutton hover:ring-3 rounded-md hover:text-textcolor transition-all flex justify-center items-center"
-                    onclick={() => {
-                        retranslate = true
-                    }}
+            <button class={"text-sm p-1 text-textcolor2 border-darkborderc float-end mr-2 my-1 rounded-md transition-all flex justify-center items-center " + (translationViewControlsDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:ring-darkbutton hover:ring-3 hover:text-textcolor')}
+                    disabled={translationViewControlsDisabled}
+                    onclick={requestRetranslation}
             >
                 <RefreshCcwIcon size={20} />
                 <span class="ml-1">
                     {language.retranslate}
                 </span>
             </button>
-            <button class={"text-sm p-1 border-darkborderc float-end mr-2 my-1 hover:ring-darkbutton hover:ring-3 rounded-md hover:text-textcolor transition-all flex justify-center items-center " + (editTranslationMode ? 'text-blue-400' : 'text-textcolor2')}
+            <button class={"text-sm p-1 border-darkborderc float-end mr-2 my-1 rounded-md transition-all flex justify-center items-center " + (editTranslationMode ? 'text-blue-400 hover:ring-darkbutton hover:ring-3 hover:text-textcolor' : translationEditControlDisabled ? 'text-textcolor2 opacity-50 cursor-not-allowed' : 'text-textcolor2 hover:ring-darkbutton hover:ring-3 hover:text-textcolor')}
+                    disabled={translationEditControlDisabled}
                     onclick={() => {
                         if(editTranslationMode){
                             saveTranslationEdit()
@@ -735,7 +779,8 @@
         <AutoresizeArea bind:value={editTranslationText} handleLongPress={() => {
             saveTranslationEdit()
         }} />
-    {:else if editMode}
+    {/if}
+    {#if editMode}
         <AutoresizeArea bind:value={message} handleLongPress={() => {
             editMode = false
         }} />
@@ -747,15 +792,38 @@
                 {@const type = parts[1]}
 
                 {#if type === 'branchedfrom'}
-                    <button class="text-blue-500 hover:underline"
-                        onclick={() => {
-                            console.log(parts)
-                            changeChatTo(parts[2] ?? '')
-                            foldChatToMessage(parts[4])
+                    <button
+                        class="text-blue-500 hover:underline button-branch-origin"
+                        onclick={async () => {
+                            if (entityRuntimeEnabled) {
+                                try {
+                                    const bridge = browserRuntime();
+                                    const characterId =
+                                        branchOrigin?.characterId ??
+                                        DBState.db.characters[selIdState.selId]?.chaId;
+                                    const chatId = branchOrigin?.chatId ?? parts[2];
+                                    const targetId = branchOrigin?.messageId ?? parts[4];
+                                    if (
+                                        !characterId ||
+                                        !chatId ||
+                                        !targetId ||
+                                        !(await bridge.selectCharacter(characterId, chatId))
+                                    )
+                                        throw new Error("Branch source is unavailable");
+                                    if ((await bridge.jumpToMessage(targetId)) < 0)
+                                        throw new Error("Branch boundary was removed");
+                                    foldChatToMessage(targetId);
+                                } catch (error) {
+                                    reportRuntimeError(error);
+                                }
+                                return;
+                            }
+                            changeChatTo(parts[2] ?? "");
+                            foldChatToMessage(parts[4]);
                         }}
                     >
                         <GitBranch size={20} class="inline-block mr-1" />
-                        {language.branchedText.replace("{}", parts[3] ?? '')}
+                        {language.branchedText.replace("{}", branchOrigin?.name ?? parts[3] ?? "")}
                     </button>
                 {/if}
             {:else}
@@ -767,33 +835,34 @@
             {language.noMessage}
         </div>
     {:else}
-        {@const chatReloadPointer = readOnlyPresentation ? 0 : $ReloadGUIPointer + ($ReloadChatPointer[idx] ?? 0)}
+        {@const chatReloadPointer = $ReloadGUIPointer + ($ReloadChatPointer[idx] ?? 0)}
         {@const totalLengthPointer = (idx > totalLength - 6) ? totalLength : 0}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span class="text chat-width chattext prose minw-0"
+            class:hidden={editTranslationMode}
             class:prose-invert={$ColorSchemeTypeStore}
             bind:this={bodyRoot}
             onclick={() => {
-            if(!readOnlyPresentation && DBState.db.clickToEdit && idx > -1 && !isOptimizedStreamingMessage){
-                editMode = true
+            if(DBState.db.clickToEdit && idx > -1 && !isOptimizedStreamingMessage){
+                startOriginalEdit()
             }
         }}
             style:font-size="{0.875 * (DBState.db.zoomsize / 100)}rem"
             style:line-height="{(DBState.db.lineHeight ?? 1.25) * (DBState.db.zoomsize / 100)}rem"
         >
                 <ChatBody
-                    displayRevision={`${totalLengthPointer}|${chatReloadPointer}`}
                     {character}
-                    translationCharacter={canonicalTranslationCharacter}
-                    {manualTranslationPresentation}
-                    onManualTranslationTargetPrepared={acceptManualTranslationPreparedTarget}
                     {firstMessage}
+                    {messageId}
+                    {bookmarkSession}
                     {idx}
                     {msgDisplay}
-                    translationManualSource={message}
+                    {sourcePresentation}
                     {name}
                     {bodyRoot}
+                    renderRevision={chatBodyRevision}
+                    displayRevision={`${totalLengthPointer}|${chatReloadPointer}`}
                     modelShortName={
                         messageGenerationInfo ? getModelInfo(messageGenerationInfo?.model).shortName : ''
                     }
@@ -802,29 +871,31 @@
                     bind:translating={translating}
                     bind:retranslate={retranslate}
                     {renderRawStreaming}
-                    {rawStreamingText}
-                    {readOnlyPresentation} />
-            {#if !readOnlyPresentation && idx >= 0 && !editMode && !isOptimizedStreamingMessage && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
-                <PartialEditController
-                    messageData={message}
-                    chatIndex={idx}
-                    {bodyRoot}
-                    blockEditEnabled={DBState.db.enableBlockPartialEdit}
-                    dragEditEnabled={DBState.db.enableDragPartialEdit}
-                    on:save={handlePartialEditSave}
-                />
-            {/if}
+                    {rawStreamingText} />
         </span>
+        {#if idx >= 0 && !editMode && !editTranslationMode && !isOptimizedStreamingMessage && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
+            <PartialEditController
+                messageData={message}
+                chatIndex={idx}
+                {bodyRoot}
+                blockEditEnabled={DBState.db.enableBlockPartialEdit}
+                dragEditEnabled={DBState.db.enableDragPartialEdit}
+                translatedView={translated}
+                getTranslationEditContext={getTranslationPartialEditContext}
+                on:save={handlePartialEditSave}
+            />
+        {/if}
     {/if}
 {/snippet}
 
 {#snippet iconButtons(options:{applyTextColors?:boolean} = {})}
     <div class="grow flex items-center justify-end" class:text-textcolor2={options?.applyTextColors !== false}>
-        {#if readOnlyPresentation}
-            <span class="text-xs opacity-60" aria-label="Pending message">…</span>
-        {:else if isComment}
+        {#if isComment}
             <button
                 class="flex items-center hover:text-blue-500 transition-colors button-icon-remove"
+                disabled={removalBusy}
+                aria-busy={removalBusy}
+                class:opacity-50={removalBusy}
                 onclick={async (e) => {
                     await rm(e, true)
                 }}
@@ -1095,16 +1166,8 @@
         {/if}
     </button>    
 {/if}
-
-<style>
-    :global([data-risu-interaction-pending]) {
-        outline: 2px solid var(--risu-theme-textcolor2);
-        outline-offset: 2px;
-        cursor: progress;
-    }
-</style>
 {#if idx > -1}
-    {#if shouldShowChatTtsControl(DBState.db.characters[selIdState.selId])}
+    {#if DBState.db.characters[selIdState.selId].type !== 'group' && DBState.db.characters[selIdState.selId].ttsMode !== 'none' && (DBState.db.characters[selIdState.selId].ttsMode)}
         <button class="flex items-center hover:text-blue-500 transition-colors button-icon-tts" onclick={()=>{
             return sayTTS(null, isOptimizedStreamingMessage ? rawStreamingText : message)
         }}>
@@ -1115,7 +1178,14 @@
         </button>
     {/if}
     {#if !$ConnectionOpenStore}
-        <button class="flex items-center hover:text-blue-500 transition-colors button-icon-remove" onclick={(e) => rm(e, false)} use:longpress={(e) => rm(e, true)}>
+        <button
+            class="flex items-center hover:text-blue-500 transition-colors button-icon-remove"
+            disabled={removalBusy}
+            aria-busy={removalBusy}
+            class:opacity-50={removalBusy}
+            onclick={(e) => rm(e, false)}
+            use:longpress={(e) => rm(e, true)}
+        >
             <TrashIcon size={20}/>
 
             {#if showNames}
@@ -1128,9 +1198,12 @@
 
 {#snippet translationButton(showNames = false)}
     {#if DBState.db.translator !== '' && !blankMessage && !isOptimizedStreamingMessage}
-        <button class={"flex items-center cursor-pointer hover:text-blue-500 transition-colors button-icon-translate " + (translated ? 'text-blue-400':'')} class:translating={translating} onclick={async () => {
-            translated = !translated
-        }}>
+        <button
+            class={"flex items-center transition-colors button-icon-translate " + (translationViewControlsDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-blue-500') + (translated ? ' text-blue-400' : '')}
+            class:translating={translating}
+            disabled={translationViewControlsDisabled}
+            onclick={toggleTranslation}
+        >
             <LanguagesIcon />
             {#if showNames}
                 <span class="ml-1">{language.translate}</span>
@@ -1138,15 +1211,11 @@
         </button>
     {/if}
     {#if idx > -1 && !isOptimizedStreamingMessage}
-        <button class={"flex items-center hover:text-blue-500 transition-colors button-icon-edit "+(editMode?'text-blue-400':'')} onclick={() => {
-            if(!editMode){
-                editMode = true
-            }
-            else{
-                editMode = false
-                edit()
-            }
-        }}>
+        <button
+            class={"flex items-center transition-colors button-icon-edit " + (editMode ? 'text-blue-400 hover:text-blue-500' : originalEditControlDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-blue-500')}
+            disabled={originalEditControlDisabled}
+            onclick={toggleOriginalEdit}
+        >
             <PencilIcon size={20}/>
 
             {#if showNames}
@@ -1159,19 +1228,67 @@
 {#snippet rerolls()}
     {#if rerollIcon || altGreeting}
         {#if DBState.db.swipe || altGreeting}
-            <button class="flex items-center hover:text-blue-500 transition-colors button-icon-unreroll" class:dyna-icon={rerollIcon === 'dynamic'} onclick={unReroll}>
-                <ArrowLeft size={22}/>
+            <button
+                class="flex items-center hover:text-blue-500 transition-colors button-icon-unreroll"
+                class:dyna-icon={rerollIcon === "dynamic"}
+                class:opacity-50={replyChoiceBusy}
+                class:cursor-wait={replyChoiceBusy}
+                disabled={replyChoiceBusy}
+                aria-busy={replyChoiceBusy}
+                title={replyChoiceBusy ? replyChoice.message : undefined}
+                onclick={unReroll}
+            >
+                <ArrowLeft size={22} />
             </button>
             {#if firstMessage && DBState.db.swipe && DBState.db.showFirstMessagePages}
-                <span class="flex items-center text-xs text-textcolor2">{currentPage}/{totalPages}</span>
+                <span class="flex items-center text-xs text-textcolor2"
+                    >{currentPage}/{totalPages}</span
+                >
             {/if}
-            <button class="flex items-center hover:text-blue-500 transition-colors button-icon-reroll" class:dyna-icon={rerollIcon === 'dynamic'} onclick={onReroll}>
-                <ArrowRight size={22}/>
+            <button
+                class="flex items-center hover:text-blue-500 transition-colors button-icon-reroll"
+                class:dyna-icon={rerollIcon === "dynamic"}
+                class:opacity-50={replyChoiceBusy}
+                class:cursor-wait={replyChoiceBusy}
+                disabled={replyChoiceBusy}
+                aria-busy={replyChoiceBusy}
+                title={replyChoiceBusy ? replyChoice.message : undefined}
+                onclick={onReroll}
+            >
+                <ArrowRight size={22} />
             </button>
         {:else}
-            <button class="flex items-center hover:text-blue-500 transition-colors button-icon-reroll" class:dyna-icon={rerollIcon === 'dynamic'} onclick={onReroll}>
-                <RefreshCcwIcon size={20}/>
+            <button
+                class="flex items-center hover:text-blue-500 transition-colors button-icon-reroll"
+                class:dyna-icon={rerollIcon === "dynamic"}
+                class:opacity-50={replyChoiceBusy}
+                class:cursor-wait={replyChoiceBusy}
+                disabled={replyChoiceBusy}
+                aria-busy={replyChoiceBusy}
+                title={replyChoiceBusy ? replyChoice.message : undefined}
+                onclick={onReroll}
+            >
+                <RefreshCcwIcon size={20} />
             </button>
+        {/if}
+        {#if showReplyChoice}
+            <span
+                class="ml-2 max-w-xs text-xs text-textcolor2"
+                role="status"
+                aria-live="polite"
+                data-runtime-reply-phase={replyChoice.phase}
+                >{replyChoice.message}</span
+            >
+            {#if replyChoice.phase === "blocked" && replyChoice.requestId}
+                <button
+                    class="ml-1 rounded bg-darkbutton px-2 py-1 text-xs"
+                    data-runtime-reply-discard
+                    onclick={() =>
+                        browserRuntime()
+                            .discardCommand(replyChoice.requestId)
+                            .catch(reportRuntimeError)}>요청 취소</button
+                >
+            {/if}
         {/if}
     {/if}
 {/snippet}
@@ -1179,10 +1296,11 @@
 {#snippet minorIconButtonsBody(showNames:boolean)}
     
     {#if DBState.db.enableBookmark}
-        <button class="flex items-center hover:text-blue-500 transition-colors button-icon-bookmark {isBookmarked ? 'text-yellow-400' : ''}" onclick={async () => {
-            await sleep(1)
-            toggleBookmark()
-        }}>
+        <button class="flex items-center hover:text-blue-500 transition-colors button-icon-bookmark {presentedBookmarked ? 'text-yellow-400' : ''} {bookmarkBusy ? 'opacity-50 cursor-wait' : ''}"
+            disabled={bookmarkBusy}
+            aria-pressed={presentedBookmarked}
+            aria-busy={bookmarkBusy}
+            onclick={toggleBookmark}>
             <BookmarkIcon size={20}/>
             {#if showNames}
                 <span class="ml-1">{language.bookmark}</span>
@@ -1190,59 +1308,93 @@
         </button>
     {/if}
 
-    <button class="flex items-center hover:text-blue-500 transition-colors" onclick={async () => {
-        await sleep(1)
-        const currentChat = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage]
-        
-        if(DBState.db.createFolderOnBranch && !currentChat.folderId){
-            const folderId = v4()
-            DBState.db.characters[selIdState.selId].chatFolders ??= []
-            DBState.db.characters[selIdState.selId].chatFolders.unshift({
-                id: folderId,
-                name: `Branches of ${currentChat.name}`,
-                folded: false,
-            })
-            currentChat.folderId = folderId
-        }
-        
-        const currentMessage = currentChat.message[idx]
-        const newChat = $state.snapshot(currentChat)
-        newChat.name = createChatCopyName(newChat.name, 'Branch')
-        newChat.id = v4()
-        newChat.message = newChat.message.slice(0, idx + 1)
-        newChat.message.push({
-            role: 'char',
-            data: '{{specialcomment::branchedfrom::' + currentChat.id + '::' + currentChat.name + '::' + currentMessage.chatId + '::}}',
-            isComment: true,
-            disabled: true,
-            chatId: v4(),
-        })
+    <button
+        class="flex items-center hover:text-blue-500 transition-colors button-icon-branch"
+        data-runtime-branch-message={entityRuntimeEnabled ? messageId : undefined}
+        disabled={branching ||
+            (entityRuntimeEnabled &&
+                (!messageId || browserRuntime().pendingBranch(messageId)))}
+        aria-busy={branching ||
+            (entityRuntimeEnabled && browserRuntime().pendingBranch(messageId))}
+        onclick={async () => {
+            if (entityRuntimeEnabled) {
+                branching = true;
+                try {
+                    await browserRuntime().branchMessage(messageId);
+                } catch (error) {
+                    reportRuntimeError(error);
+                } finally {
+                    branching = false;
+                }
+                return;
+            }
+            await sleep(1);
+            const currentChat =
+                DBState.db.characters[selIdState.selId].chats[
+                    DBState.db.characters[selIdState.selId].chatPage
+                ];
 
-        DBState.db.characters[selIdState.selId].chats.unshift(newChat)
-        changeChatTo(0)
-    }}>
-        <SplitIcon size={20}/>
+            if (DBState.db.createFolderOnBranch && !currentChat.folderId) {
+                const folderId = v4();
+                DBState.db.characters[selIdState.selId].chatFolders ??= [];
+                DBState.db.characters[selIdState.selId].chatFolders.unshift({
+                    id: folderId,
+                    name: `Branches of ${currentChat.name}`,
+                    folded: false,
+                });
+                currentChat.folderId = folderId;
+            }
+
+            const currentMessage = currentChat.message[idx];
+            const newChat = $state.snapshot(currentChat);
+            newChat.name = createChatCopyName(newChat.name, "Branch");
+            newChat.id = v4();
+            newChat.message = newChat.message.slice(0, idx + 1);
+            newChat.message.push({
+                role: "char",
+                data:
+                    "{{specialcomment::branchedfrom::" +
+                    currentChat.id +
+                    "::" +
+                    currentChat.name +
+                    "::" +
+                    currentMessage.chatId +
+                    "::}}",
+                isComment: true,
+                disabled: true,
+                chatId: v4(),
+            });
+
+            DBState.db.characters[selIdState.selId].chats.unshift(newChat);
+            changeChatTo(0);
+        }}
+    >
+        <SplitIcon size={20} />
         {#if showNames}
             <span class="ml-1">{language.branch}</span>
         {/if}
     </button>
 
-    <button class="flex items-center hover:text-blue-500 transition-colors" onclick={async () => {
-        await sleep(1)
-        const currentMessage = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx]
-        DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].disabled = !currentMessage.disabled
-    }}>
+    <button
+        class="flex items-center hover:text-blue-500 transition-colors button-icon-disable"
+        disabled={disabledBusy}
+        aria-busy={disabledBusy}
+        aria-pressed={Boolean(presentedDisabled)}
+        onclick={() => toggleDisabled(false)}
+    >
         <PowerOff size={20}/>
         {#if showNames}
             <span class="ml-1">{language.disableMessage}</span>
         {/if}
     </button>
 
-    <button class="flex items-center hover:text-blue-500 transition-colors" onclick={async () => {
-        await sleep(1)
-        const currentMessage = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx]
-        DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].disabled = currentMessage.disabled === 'allBefore' ? false : 'allBefore'
-    }}>
+    <button
+        class="flex items-center hover:text-blue-500 transition-colors button-icon-disable-above"
+        disabled={disabledBusy}
+        aria-busy={disabledBusy}
+        aria-pressed={presentedDisabled === 'allBefore'}
+        onclick={() => toggleDisabled(true)}
+    >
         <Scissors size={20}/>
         {#if showNames}
             <span class="ml-1">{language.disableAbove}</span>
@@ -1419,13 +1571,13 @@
 {/snippet}
 
 
-{#if disabled === true}
+{#if presentedDisabled === true}
 <div class="w-full border-t-2 border-dashed border-blue-500"></div>
 {/if}
 <div class="flex max-w-full justify-center risu-chat"
-     class:runtime-chat-presentation={readOnlyPresentation}
-     data-chat-index={readOnlyPresentation ? undefined : idx}
-     data-chat-id={readOnlyPresentation ? undefined : (DBState.db.characters?.[selIdState.selId]?.chats?.[DBState.db.characters?.[selIdState.selId]?.chatPage]?.message?.[idx]?.chatId ?? '')}
+     use:markButtonActivity={activeButtonKeys}
+     data-chat-index={idx}
+     data-chat-id={entityRuntimeEnabled ? messageId ?? '' : DBState.db.characters?.[selIdState.selId]?.chats?.[DBState.db.characters?.[selIdState.selId]?.chatPage]?.message?.[idx]?.chatId ?? ''}
      style={isLastMemory ? `border-top:${DBState.db.memoryLimitThickness}px solid rgba(98, 114, 164, 0.7);` : ''}
      onclickcapture={handleButtonTriggerWithin}>
     <div class="text-textcolor mt-1 ml-4 mr-4 mb-1 p-2 bg-transparent grow border-t-gray-900 border-opacity/30 border-transparent flexium items-start max-w-full" >
@@ -1440,7 +1592,7 @@
                     class:rounded-tr-none={role === 'user'}
                 >
                     <p class="text-gray-800">{@render textBox()}</p>
-                    {#if DBState.db.characters?.[selIdState.selId]?.chats?.[DBState.db.characters?.[selIdState.selId]?.chatPage]?.message?.[idx]?.time}
+                    {#if sourceMessage?.time}
                         <span class="text-xs text-textcolor2 mt-1 block">
                             {new Intl.DateTimeFormat(undefined, {
                                 hour: '2-digit',
@@ -1449,7 +1601,7 @@
                                 month: '2-digit',
                                 day: '2-digit',
                                 hour12: false
-                            }).format(DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].time)}
+                            }).format(sourceMessage.time)}
                         </span>
                     {/if}
                 </div>
@@ -1481,13 +1633,13 @@
                     {@render iconButtons({applyTextColors: false})}
                 </div>
             </div>
-        {:else if DBState.db.theme === 'customHTML' && !blankMessage && !readOnlyPresentation}
+        {:else if DBState.db.theme === 'customHTML' && !blankMessage}
             {@render renderGuiHtmlPart(RenderGUIHtml(DBState.db.guiHTML))}
         {:else}
             {@render senderIcon({rounded: DBState.db.roundIcons})}
             <span class="flex flex-col ml-4 w-full max-w-full min-w-0 text-black">
                 <div class="flexium items-center chat-width">
-                    {#if !readOnlyPresentation && DBState.db.characters[selIdState.selId]?.chaId === "§playground" && !blankMessage && DBState.db.characters[selIdState.selId]?.chats?.[DBState.db.characters[selIdState.selId]?.chatPage]?.message?.[idx]}
+                    {#if DBState.db.characters[selIdState.selId]?.chaId === "§playground" && !blankMessage && DBState.db.characters[selIdState.selId]?.chats?.[DBState.db.characters[selIdState.selId]?.chatPage]?.message?.[idx]}
                         <span class="chat-width text-xl border-darkborderc flex items-center text-textcolor">
                             <span>{DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].role === 'char' ? 'Assistant' : 'User'}</span>
                             <button class="ml-2 text-textcolor2 hover:text-textcolor" onclick={() => {
@@ -1512,10 +1664,29 @@
     </div>
 </div>
 
-{#if disabled}
+{#if buttonStatus}
+    <div class="mx-6 mb-1 text-xs text-textcolor2" role="status" aria-live="polite" data-runtime-button-status>
+        {buttonStatus}
+    </div>
+{/if}
+{#each messageButtonActivities.filter((activity) => activity.phase === 'error') as activity (activity.token)}
+    <div class="mx-6 mb-1 text-xs text-draculared" role="alert" data-runtime-button-error>
+        {activity.error}
+        <button class="ml-2 underline" onclick={() => buttonActivities.dismiss(activity.token)}>닫기</button>
+    </div>
+{/each}
+
+{#if presentedDisabled}
 <div class={{
     "w-full border-t-2 border-dashed": true,
-    "border-blue-500": disabled === true,
-    "border-amber-500": disabled === 'allBefore',
+    "border-blue-500": presentedDisabled === true,
+    "border-amber-500": presentedDisabled === 'allBefore',
 }}></div>
 {/if}
+
+<style>
+    .risu-chat :global([data-runtime-button-pending]) {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+    }
+</style>

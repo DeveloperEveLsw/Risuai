@@ -1,13 +1,11 @@
 import { getDatabase } from "src/ts/storage/database.svelte";
 import { MCPClient, type JsonRPC, type MCPTool, type RPCToolCallContent } from "./mcplib";
 import { DBState } from "src/ts/stores.svelte";
-import { getModuleMcps } from "../modules";
+import { getModuleMcps, installImportedModule } from "../modules";
 import { alertError, alertInput, alertNormal } from "src/ts/alert";
 import { v4 } from "uuid";
 import type { MCPClientLike } from "./internalmcp";
 import localforage from "localforage";
-import { isNodeServer } from "../../platform";
-import { NodeMcpToolCallStorage } from "../../storage/nodeMcpToolCallStorage";
 import { isTauri } from "src/ts/platform"
 import { sleep } from "src/ts/util";
 import { registeredCustomPluginMCPs } from "./pluginmcp";
@@ -315,8 +313,7 @@ export async function importMCPModule(){
             alertError('MCP module not found or invalid URL');
             return;
         }
-        const db = getDatabase();
-        db.modules.push({
+        await installImportedModule({
             name: meta.serverInfo.name,
             description: "MCP from " + x,
             mcp: {
@@ -354,29 +351,10 @@ const inst = localforage.createInstance({
     name: 'mcp-tool-calls',
     storeName: 'mcp-tool-calls'
 });
-let nodeToolCallStoragePromise: Promise<NodeMcpToolCallStorage<toolCallData>> | null = null;
-
-async function getNodeToolCallStorage() {
-    if (!isNodeServer) {
-        return null;
-    }
-    nodeToolCallStoragePromise ??= import('../../storage/nodeStorage')
-        .then(({ getSharedNodeStorage }) => (
-            new NodeMcpToolCallStorage<toolCallData>(getSharedNodeStorage())
-        ));
-    return await nodeToolCallStoragePromise;
-}
 
 export async function encodeToolCall(call:toolCallData){
     call.call.id = call.call.id || v4();
-    const nodeStorage = await getNodeToolCallStorage();
-    if (nodeStorage) {
-        await nodeStorage.setItem(call.call.id, call);
-        await inst.removeItem(call.call.id);
-    }
-    else {
-        await inst.setItem(call.call.id, call);
-    }
+    await inst.setItem(call.call.id, call)
     return `<tool_call>${call.call.id}\uf100${call.call.name}</tool_call>\n\n`;
 }
 
@@ -392,19 +370,7 @@ export async function decodeToolCall(text:string):Promise<toolCallData|undefined
     if(!callId) {
         return undefined;
     }
-    const nodeStorage = await getNodeToolCallStorage();
-    let call = nodeStorage
-        ? await nodeStorage.getItem(callId)
-        : await inst.getItem<toolCallData>(callId);
-    if (!call && nodeStorage) {
-        // Lazily move details written by an older self-host build out of this
-        // browser's IndexedDB so another device can render the same message.
-        call = await inst.getItem<toolCallData>(callId);
-        if (call) {
-            await nodeStorage.setItem(callId, call);
-            await inst.removeItem(callId);
-        }
-    }
+    const call = await inst.getItem<toolCallData>(callId);
     if(!call) {
         return undefined;
     }

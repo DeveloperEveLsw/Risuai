@@ -1,0 +1,948 @@
+{
+  "verifiedAt": "2026-10-04T10:21:21.146018+00:00",
+  "baselineCommit": "8d17ebe017bb62bcad4f63e2c694458869f75e36",
+  "baselineDocumentationCommit": "e852217da1ba6d168b08b844670145cfc614567a",
+  "schemaVersion": 21,
+  "wholeGoalComplete": false,
+  "all15ConditionsRemainActive": true,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "gates": {
+    "app": {
+      "passed": 508,
+      "existingSkips": 3,
+      "fresh": true
+    },
+    "backend": {
+      "passed": 377,
+      "fresh": false,
+      "reusedNode": "v24.19.0",
+      "unchangedSourceFiles": 115,
+      "nativeBytesIdentical": true,
+      "log": "evidence/hosted-current-rollout-8d17ebe-backend.log",
+      "logSha256": "b7d6ab4f00bef7bbfdda5b3e68ffe9ec5e8cf20afd65bcf7e3cd66567e6c3157"
+    },
+    "browser": {
+      "passed": 19,
+      "serial": true,
+      "fresh": true
+    },
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "builds": {
+      "fresh": true,
+      "kinds": ["native", "entity", "ordinary"]
+    },
+    "audit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    }
+  },
+  "contract": {
+    "ownedSerializedKeyOnly": true,
+    "logicalLimitBytes": 16777216,
+    "encodingScratchBytes": 16384,
+    "rawAdmissionWalkerUnchanged": true,
+    "sourceGetterReadsPreserved": true,
+    "keyAndBoundaryOraclePropertyCases": 1000,
+    "utf8PropertyCases": 1000,
+    "encodeOnlyFallbackTested": true,
+    "luaResultsReused": false,
+    "serverChanged": false
+  },
+  "matrix": "evidence/local-display-wire-sizing-comparison-20261004.json",
+  "warmObservations": 192,
+  "measurements": [
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.400000005960464,
+        "p95": 23.099999994039536,
+        "max": 23.099999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 382.29999999701977,
+        "p95": 423.7000000178814,
+        "max": 423.7000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 99.90000000000032,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 45.650000005960464,
+        "p95": 81.5,
+        "max": 81.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1326.5000000149012,
+        "p95": 1407.5,
+        "max": 1407.5
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.74999999999955,
+        "p95": 150,
+        "max": 150
+      },
+      "longestTaskMs": 143
+    },
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.5,
+        "p95": 24.80000001192093,
+        "max": 24.80000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 323.3999999910593,
+        "p95": 323.90000000596046,
+        "max": 323.90000000596046
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 33.34999999999991,
+        "p95": 33.40000000000009,
+        "max": 33.40000000000009
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 30.849999994039536,
+        "p95": 36.599999994039536,
+        "max": 36.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 926.8499999940395,
+        "p95": 1025,
+        "max": 1025
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.04999999999973,
+        "p95": 116.70000000000073,
+        "max": 116.70000000000073
+      },
+      "longestTaskMs": 111
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.25,
+        "p95": 29.399999976158142,
+        "max": 29.399999976158142
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 678.3999999910593,
+        "p95": 714.6999999880791,
+        "max": 714.6999999880791
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 50
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 54.70000000298023,
+        "p95": 73.19999998807907,
+        "max": 73.19999998807907
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1939.5499999970198,
+        "p95": 2055.5999999940395,
+        "max": 2055.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 199.94999999999982,
+        "p95": 216.60000000000218,
+        "max": 216.60000000000218
+      },
+      "longestTaskMs": 218
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.700000002980232,
+        "p95": 33.5,
+        "max": 33.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 592.5499999970198,
+        "p95": 650.2999999821186,
+        "max": 650.2999999821186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 83.34999999999991,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 60
+    },
+    {
+      "run": 1,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 41.900000005960464,
+        "p95": 55,
+        "max": 55
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1597.1500000059605,
+        "p95": 1715.7000000178814,
+        "max": 1715.7000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 166.69999999999982,
+        "p95": 183.39999999999964,
+        "max": 183.39999999999964
+      },
+      "longestTaskMs": 199
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 21.900000005960464,
+        "p95": 31,
+        "max": 31
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 935.2999999970198,
+        "p95": 972.2000000178814,
+        "max": 972.2000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 99.94999999999982,
+        "p95": 100.00000000000045,
+        "max": 100.00000000000045
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 36.099999994039536,
+        "p95": 45.599999994039536,
+        "max": 45.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1725.7000000029802,
+        "p95": 1810.699999988079,
+        "max": 1810.699999988079
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 125.0,
+        "p95": 166.59999999999854,
+        "max": 166.59999999999854
+      },
+      "longestTaskMs": 158
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 23.55000001192093,
+        "p95": 70.40000000596046,
+        "max": 70.40000000596046
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 865.3999999910593,
+        "p95": 973.3000000119209,
+        "max": 973.3000000119209
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 25.0,
+        "p95": 33.399999999999636,
+        "max": 33.399999999999636
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 1,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 32.5,
+        "p95": 37.20000001788139,
+        "max": 37.20000001788139
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1428.5000000149012,
+        "p95": 1631.4000000059605,
+        "max": 1631.4000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.64999999999964,
+        "p95": 183.30000000000018,
+        "max": 183.30000000000018
+      },
+      "longestTaskMs": 183
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 19.650000005960464,
+        "p95": 31.80000001192093,
+        "max": 31.80000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1178.6500000059605,
+        "p95": 1303.9000000059605,
+        "max": 1303.9000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 53
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 40.20000000298023,
+        "p95": 64,
+        "max": 64
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2395.550000011921,
+        "p95": 2649.9000000059605,
+        "max": 2649.9000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 208.34999999999854,
+        "p95": 216.70000000000073,
+        "max": 216.70000000000073
+      },
+      "longestTaskMs": 210
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.400000020861626,
+        "p95": 22.900000005960464,
+        "max": 22.900000005960464
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1087.7000000178814,
+        "p95": 1188.5999999940395,
+        "max": 1188.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 75.04999999999973,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 51
+    },
+    {
+      "run": 1,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 34.5,
+        "p95": 47.599999994039536,
+        "max": 47.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2150.6500000059605,
+        "p95": 2259.800000011921,
+        "max": 2259.800000011921
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 200.0,
+        "p95": 216.60000000000218,
+        "max": 216.60000000000218
+      },
+      "longestTaskMs": 219
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.649999991059303,
+        "p95": 21.80000001192093,
+        "max": 21.80000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1071.4500000029802,
+        "p95": 1088.0999999940395,
+        "max": 1088.0999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 83.40000000000055,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 36.54999999701977,
+        "p95": 48.30000001192093,
+        "max": 48.30000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2125.9500000029802,
+        "p95": 2392.300000011921,
+        "max": 2392.300000011921
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 199.95000000000073,
+        "p95": 283.39999999999964,
+        "max": 283.39999999999964
+      },
+      "longestTaskMs": 303
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.25000001490116,
+        "p95": 21.5,
+        "max": 21.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1204.25,
+        "p95": 1236.2000000178814,
+        "max": 1236.2000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.09999999999991,
+        "max": 100.09999999999991
+      },
+      "longestTaskMs": 52
+    },
+    {
+      "run": 2,
+      "condition": "large-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 39.69999998807907,
+        "p95": 57.099999994039536,
+        "max": 57.099999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 2343.2999999970198,
+        "p95": 2500.7999999821186,
+        "max": 2500.7999999821186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 216.69999999999982,
+        "p95": 233.3000000000011,
+        "max": 233.3000000000011
+      },
+      "longestTaskMs": 220
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.700000002980232,
+        "p95": 27,
+        "max": 27
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 883.1999999880791,
+        "p95": 956.5,
+        "max": 956.5
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 33.299999999999955,
+        "p95": 33.400000000000546,
+        "max": 33.400000000000546
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 27.950000002980232,
+        "p95": 34.5,
+        "max": 34.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1444.25,
+        "p95": 1620.5999999940395,
+        "max": 1620.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 108.30000000000018,
+        "p95": 133.30000000000018,
+        "max": 133.30000000000018
+      },
+      "longestTaskMs": 119
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.649999991059303,
+        "p95": 24.700000017881393,
+        "max": 24.700000017881393
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 889.8999999910593,
+        "p95": 923.2000000178814,
+        "max": 923.2000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.09999999999991,
+        "max": 100.09999999999991
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-cpu",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 36.150000005960464,
+        "p95": 39.29999998211861,
+        "max": 39.29999998211861
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1723.6500000059605,
+        "p95": 1812.7999999821186,
+        "max": 1812.7999999821186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 124.95000000000027,
+        "p95": 133.39999999999964,
+        "max": 133.39999999999964
+      },
+      "longestTaskMs": 132
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 20.5,
+        "p95": 20.599999994039536,
+        "max": 20.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 578.6000000089407,
+        "p95": 604.6999999880791,
+        "max": 604.6999999880791
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 66.70000000000005,
+        "p95": 100,
+        "max": 100
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 44.5,
+        "p95": 55.099999994039536,
+        "max": 55.099999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1618.2000000029802,
+        "p95": 1767.4000000059605,
+        "max": 1767.4000000059605
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 183.39999999999964,
+        "p95": 200,
+        "max": 200
+      },
+      "longestTaskMs": 203
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.450000002980232,
+        "p95": 23.5,
+        "max": 23.5
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 644.0999999940395,
+        "p95": 703.5999999940395,
+        "max": 703.5999999940395
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 50
+    },
+    {
+      "run": 2,
+      "condition": "large-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 55.04999999701977,
+        "p95": 66.59999999403954,
+        "max": 66.59999999403954
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1897.8500000089407,
+        "p95": 2016.7000000178814,
+        "max": 2016.7000000178814
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 183.34999999999945,
+        "p95": 233.29999999999927,
+        "max": 233.29999999999927
+      },
+      "longestTaskMs": 232
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.25,
+        "p95": 22.599999994039536,
+        "max": 22.599999994039536
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 322.70000000298023,
+        "p95": 353.60000002384186,
+        "max": 353.60000002384186
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 16.800000000000182,
+        "p95": 33.30000000000018,
+        "max": 33.30000000000018
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "candidate",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 30.700000017881393,
+        "p95": 36,
+        "max": 36
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 993.5499999970198,
+        "p95": 1166.8999999761581,
+        "max": 1166.8999999761581
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.65000000000055,
+        "p95": 133.20000000000073,
+        "max": 133.20000000000073
+      },
+      "longestTaskMs": 129
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "desktop",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 22.75000001490116,
+        "p95": 23.30000001192093,
+        "max": 23.30000001192093
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 373.80000001192093,
+        "p95": 502,
+        "max": 502
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 100.0,
+        "p95": 100.10000000000036,
+        "max": 100.10000000000036
+      },
+      "longestTaskMs": 0
+    },
+    {
+      "run": 2,
+      "condition": "small-idle",
+      "role": "baseline",
+      "scenario": "mobile-emulation-4x",
+      "feedbackMs": {
+        "samples": 6,
+        "median": 40.95000000298023,
+        "p95": 52.60000002384186,
+        "max": 52.60000002384186
+      },
+      "settledMs": {
+        "samples": 6,
+        "median": 1207.4000000059605,
+        "p95": 1392,
+        "max": 1392
+      },
+      "maxFrameGapMs": {
+        "samples": 6,
+        "median": 116.69999999999982,
+        "p95": 150,
+        "max": 150
+      },
+      "longestTaskMs": 160
+    }
+  ],
+  "scope": {
+    "syntheticOnly": true,
+    "privateReads": false,
+    "realModelCalls": 0,
+    "remotePushes": 0,
+    "explicitDeploymentAuthorized": true,
+    "thisReceiptCoversLocalValidation": true
+  },
+  "sourceFingerprints": {
+    "docs/display-wire-sizing.md": "df7bf4fc4fd8814f1b828f7ae2cb11ebe55add4ca6c402e0ccdc9968daf5ac91",
+    "docs/engine-extraction-audit.json": "defb12c0ceac05cdc8dc9334f3c279e6f4ae62c2d9fdf1bb7b54069ec01be495",
+    "docs/server-runtime-plan.md": "a391f3a970966506b46d6b4d94b09fa675e96e66413b373f712953f9b119f429",
+    "src/ts/runtime/displayScopeIdentity.test.ts": "e65f9736948a0c128d112c0eb8c00a524bff910e0bcef7120923524a10ddddd7",
+    "src/ts/runtime/displayScopeIdentity.ts": "3e8004881d787a3512f60721928125b761a15f09c979c6469117c37c0d9dc3f9",
+    "src/ts/runtime/displayWireBudget.test.ts": "e8062eadb96b76cc96de3f3429579d1925b4b9116727acccc40844959d1647e8",
+    "src/ts/runtime/displayWireBudget.ts": "4f5121e088a95defc32466cc96c8fcc60e63e36d1b1afd79d429ea369a6dd5ef"
+  },
+  "artifacts": {
+    "nativeSha256": "fe48443d5d0ecd3dbc94fc811014df57048d30029427ca1333db0363bca0d5aa",
+    "entityIndexSha256": "b8fb9d7dd75ca5488baf4a14ba5442d64580afebe920ff5dcdda3043384faf52",
+    "ordinaryIndexSha256": "fb659aef94100a3f22807b317950d89b5fd022bf3a6d80ff7b953a5e6dcbdb6e"
+  },
+  "evidenceFingerprints": {
+    "evidence/local-display-wire-sizing-1-large-cpu-baseline.json": "3b8d0a07b1ede5bd9900ef4c26c9ef0280a8290532f965bdf0b0567ae7d1cab7",
+    "evidence/local-display-wire-sizing-1-large-cpu-candidate.json": "e0886d4c3ff8acd8cb2610981cc73a4eedd8189eb8f83e5b4bf1968fdb6a4a9a",
+    "evidence/local-display-wire-sizing-1-large-idle-baseline.json": "a7ad9940f12079f299a8868d29ad0844c1e27a8c651aefa11bc2ba9577cc6426",
+    "evidence/local-display-wire-sizing-1-large-idle-candidate.json": "d9a773c22e943d78fd265de7e7cdc9e86556cbeed1f5653f1f07d85adee7824b",
+    "evidence/local-display-wire-sizing-1-small-cpu-baseline.json": "0c7bf6818c4fdef9f46fc6952e237ad9e6d3a01b195f8e3f6abf3360920daa76",
+    "evidence/local-display-wire-sizing-1-small-cpu-candidate.json": "753ef6f24a7883e2c16c6f21924fe37fbc2224e9a9c5bfe991085f6ea28abf3f",
+    "evidence/local-display-wire-sizing-1-small-idle-baseline.json": "86434aa34bd706e35add664dda237163f4b4a25cabaabc4c854a55fa9b3161f5",
+    "evidence/local-display-wire-sizing-1-small-idle-candidate.json": "a531159a1be34a98a319c041820bd782112e3e3856a5d40670e6e817f0780d25",
+    "evidence/local-display-wire-sizing-2-large-cpu-baseline.json": "040a57b1461f052cf7842eceb4e02c5ba246103b4344882ae9fc4b2269f9a946",
+    "evidence/local-display-wire-sizing-2-large-cpu-candidate.json": "696d6391ba58364bce4854b9964fb1b5589aaa8c1a7ca7399f1c9247738cef9d",
+    "evidence/local-display-wire-sizing-2-large-idle-baseline.json": "e5662144891e73df1ca66b4a53172ee92ab95fd27f4629d69553e0c7a02537c2",
+    "evidence/local-display-wire-sizing-2-large-idle-candidate.json": "47a80e45d7b12a293ecdd19b94dd5b24a425d670b13b4bfea715af886835e2be",
+    "evidence/local-display-wire-sizing-2-small-cpu-baseline.json": "2057012ae897647ab2869bf9d2e0231118695f45608c5b67eaf69505d5742529",
+    "evidence/local-display-wire-sizing-2-small-cpu-candidate.json": "603bafdb65b86642678a7ce9918de297d4be701c0dabea3cbf3a7c2f9723f753",
+    "evidence/local-display-wire-sizing-2-small-idle-baseline.json": "215d18ddf73d869b85ae94483fa2a039a3b76c798b260c8e83bece7302829107",
+    "evidence/local-display-wire-sizing-2-small-idle-candidate.json": "5b267a6e7c079e0f8a96ee0b4d34de30c3041e1a737f74ca697cc0dc84d11b0a",
+    "evidence/local-display-wire-sizing-baseline-build-20261004.json": "acc63e477361f1b6d857f70562b55a428baaf38dda67945020098539ce06e82f",
+    "evidence/local-display-wire-sizing-comparison-20261004.json": "85f8771f0ff6e8ba1e5ed2f8072889ee5c69cbea2c90fcbd130ef469c11ad876"
+  },
+  "logFingerprints": {
+    "evidence/local-display-wire-sizing-1-large-cpu-baseline.log": "e74a46da369e39ad4fe54b358fa13987981e039f7fd75eae5bea15430723e3c6",
+    "evidence/local-display-wire-sizing-1-large-cpu-candidate.log": "f718b3d9c65fe55d1e14f703508f217f04f0f3695db25858435c06cd4b4581fc",
+    "evidence/local-display-wire-sizing-1-large-idle-baseline.log": "a60fd6b9eba7cb9b4555a95bb0e4474207786b01165dec8a96a3459e664b96a7",
+    "evidence/local-display-wire-sizing-1-large-idle-candidate.log": "39cbe3260e9d334d75fc76913f13e7a384000d6845dad8fc015ae6351c4e5e10",
+    "evidence/local-display-wire-sizing-1-small-cpu-baseline.log": "1d63c7d56ae915e0c82255c0f7db3137d0d14b674400496371879a5482fff600",
+    "evidence/local-display-wire-sizing-1-small-cpu-candidate.log": "42676e90c2518bfb22ef3c62ac1b17a17542a6c993d91b112feeb0c7ea88718e",
+    "evidence/local-display-wire-sizing-1-small-idle-baseline.log": "662b77888366d086a5396266af3aa446e0fb3ab6d907fbaeaf16f3078a9eae0f",
+    "evidence/local-display-wire-sizing-1-small-idle-candidate.log": "d74aa5003150bd269cdb49d3f9d2f571a9d25c75cb70a8d319e55cd09d77bfc3",
+    "evidence/local-display-wire-sizing-2-large-cpu-baseline.log": "8e385ce0dffa5bc984ff6502301da68008823672bd3fbcf94a69891e2073ed87",
+    "evidence/local-display-wire-sizing-2-large-cpu-candidate.log": "302276fbb9f5f244d99b9ce8e323f19a5a4d9daaff62d9c3dc070e7b996fcb96",
+    "evidence/local-display-wire-sizing-2-large-idle-baseline.log": "38e6449173c9bdea20fd4c6be3193fd1f9e17c636c3dc4f012006dd9d27f1407",
+    "evidence/local-display-wire-sizing-2-large-idle-candidate.log": "6c3959c9ef9e70a9f25a9ad4d8e96e3a8c02f8c9655efb9c97777924f343fc48",
+    "evidence/local-display-wire-sizing-2-small-cpu-baseline.log": "dd49c032697bef0197014008d55121749874c313633e7ec391485b02b8c70aab",
+    "evidence/local-display-wire-sizing-2-small-cpu-candidate.log": "2ac4d04618ad1b85ff0c58de5270a1e8f69bb46f6db4072ec64e00b852b0d322",
+    "evidence/local-display-wire-sizing-2-small-idle-baseline.log": "6712f8dbe0df874c5cf5aaf95c45a89eb8a3194d7db3dd63bb5107793531394d",
+    "evidence/local-display-wire-sizing-2-small-idle-candidate.log": "47f50a53b6eec3030ce1991584d5e49299b745ac55ffbaaa34f0c58b440aee2f",
+    "evidence/local-display-wire-sizing-app-20261004.log": "4d6055425f158a52c453f77ebc0c8c8a9f62370bd644cf4de0c211730ec15799",
+    "evidence/local-display-wire-sizing-app-final-20261004.log": "6c0f4f6132f02899de4e7b12eda56fbeb68d8ecc708d389a65cbe32d8894d792",
+    "evidence/local-display-wire-sizing-audit-20261004.log": "defb12c0ceac05cdc8dc9334f3c279e6f4ae62c2d9fdf1bb7b54069ec01be495",
+    "evidence/local-display-wire-sizing-browser-20261004.log": "5e9a28cb40c9bbdc1dc75e2e1097b0b90f79fb84b0220d163bd54fbb06a270af",
+    "evidence/local-display-wire-sizing-check-20261004.log": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "evidence/local-display-wire-sizing-check-final-20261004.log": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "evidence/local-display-wire-sizing-comparison-20261004.log": "5126aa831f90e72c133befdbb3b0742d674a9d460803f8eac207da18a0bdb0ed",
+    "evidence/local-display-wire-sizing-doc-format-20261004.log": "97bec21340ecb7e82e077f1bb898dd5baa7fdde4cfa4c5e6c314c680556ac121",
+    "evidence/local-display-wire-sizing-entity-build-20261004.log": "cf24c1267432b005d96551d069c0b5eed1e807e0cbb6c4b55e085555b08e217d",
+    "evidence/local-display-wire-sizing-entity-build-final-20261004.log": "2a85d87e6800408c4ff85ac3ffe1072bd749bf48c67f85fd6532643df1dbacfd",
+    "evidence/local-display-wire-sizing-focused-20261004.log": "3141f586808e2091121120961b2b1968007f8786e2fe31426b57ff65648a6385",
+    "evidence/local-display-wire-sizing-format-20261004.log": "8e6c19897d972bcc13c9834aac93201c21725f8daf41e755f9fca6929358a6e4",
+    "evidence/local-display-wire-sizing-format-final-20261004.log": "313677204f208fb30df3d7a5b809463934712d2a25f83ec818df8f707706511c",
+    "evidence/local-display-wire-sizing-native-build-20261004.log": "dded1afec620cd28443256cef070a5293a84542baf7ba2223c3cdad3c247e171",
+    "evidence/local-display-wire-sizing-ordinary-build-20261004.log": "88df20f6b524e9c9d24d9a8c2527da554b4e11bfc1d3e4ce4bc63f3be24af081"
+  },
+  "scriptFingerprints": {
+    "scripts/record_display_wire_sizing.py": "885d0d479ed950f7576397972339418881ec149c1fcee9eed86f0626c785cb6f",
+    "scripts/measure_display_wire_sizing.py": "88de9a3b3f447cbccd0bb4ec3520d40873fd38bd9bea5695d6caae9d4dc4546c",
+    "scripts/prepare_display_wire_probe.cjs": "07a9d153759561052467d7c87cdf84cef3131541a25672fc2fe13424b158028e",
+    "scripts/observe_display_wire_budget.cjs": "8b6168915dc02b3a352b765c5d9674e201fa809f3fa75b5f3332e16c4ef6406b"
+  },
+  "limits": [
+    "Profile/counter probes are separate from uninstrumented warm timings and include observer overhead.",
+    "JSON serialization precedes the owned key byte rejection. The unchanged logical limit is not a transient-heap guarantee.",
+    "The fixed scratch may retain its final byte fragment until reuse/close; it retains no source object.",
+    "Page CPU4x is an emulation; physical mobile, verified worker throttling, cold/concurrent/full configured trial remain unverified.",
+    "All original callbacks and Lua work remain. No universal absence of stutter or statistically established speedup is claimed.",
+    "Actual private Nexus gsub cause remains unknown. No supplied message, private scripts or auth values are recorded here."
+  ]
+}

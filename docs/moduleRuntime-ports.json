@@ -1,0 +1,51 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/modules.ts",
+  "factory": "createModuleRuntime",
+  "functions": [
+    "getModuleById",
+    "getModuleByIds",
+    "deduplicateModuleById",
+    "getModules",
+    "getModuleLorebooks",
+    "getModuleAssets",
+    "getModuleTriggers",
+    "getModuleRegexScripts",
+    "getModuleToggles",
+    "getModuleMcps",
+    "refreshModules"
+  ],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "checkPersonaBinded",
+      "specifier": "../util",
+      "original": "checkPersonaBinded"
+    },
+    {
+      "name": "getCurrentChat",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentChat"
+    },
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentCharacter"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Native module selection/cache invalidation composed with extensions; existing activation tests remain",
+  "expressionPorts": [
+    {
+      "name": "readResourceValue",
+      "parameters": ["value"],
+      "expression": "value"
+    }
+  ]
+}

@@ -1,0 +1,214 @@
+{
+  "verifiedAt": "2026-10-04T01:40:17.500222+00:00",
+  "status": "milestone_verified_goal_active",
+  "baseCommit": "0498cc2c922e3dc560698dcf155ae91cb7f45d02",
+  "all15Preserved": true,
+  "wholeGoalComplete": false,
+  "schemaVersion": 15,
+  "schemaMigration": false,
+  "syntheticOnly": true,
+  "productionAccess": false,
+  "privateContentRead": false,
+  "deployment": false,
+  "remotePush": false,
+  "externalProviderCalls": 0,
+  "checks": {
+    "application": {
+      "passed": 431,
+      "skipped": 3,
+      "log": "risu-incarnation-guards-app.log"
+    },
+    "backend": {
+      "passed": 243,
+      "skipped": 0,
+      "nativeGroupTests": 15,
+      "bookkeepingTests": 12,
+      "log": "risu-incarnation-guards-backend.log"
+    },
+    "target": {
+      "passed": 27,
+      "log": "risu-incarnation-guards-target-final.log"
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 0,
+      "log": "risu-incarnation-guards-check.log"
+    },
+    "browser": {
+      "passed": 3,
+      "skipped": 0,
+      "cases": [
+        "built group stream/reroll/native kill/local service restart",
+        "development original group member controls",
+        "built authenticated original group member controls"
+      ],
+      "independentContexts": 2,
+      "runtimeExceptions": 0,
+      "physicalMobile": false,
+      "log": "risu-incarnation-guards-browser.log"
+    },
+    "builds": {
+      "native": "risu-incarnation-guards-native-build.log",
+      "entityWeb": "risu-incarnation-guards-entity-build.log",
+      "ordinaryWeb": "risu-incarnation-guards-ordinary-build.log",
+      "warnings": "existing generated CSS/chunk/import/plugin timing and experimental Node SQLite warnings remain"
+    },
+    "audit": {
+      "declarations": 168,
+      "originalBodies": 166,
+      "priorPolicies": 2,
+      "log": "risu-incarnation-guards-audit.log",
+      "scope": "new native/storage incarnation policy is not an upstream function modification"
+    }
+  },
+  "negativeControls": {
+    "normalizationMaskedPreliminaryPass": {
+      "log": "risu-bookkeeping-incarnation-before.log",
+      "scope": "minimal uninitialized member already conflicted on incidental definition writes; insufficient to establish read-only fencing"
+    },
+    "normalizedReadOnlyBefore": {
+      "log": "risu-bookkeeping-incarnation-normalized-before.log",
+      "expectedState": "failed",
+      "actualState": "completed",
+      "countedPassed": false
+    },
+    "normalizedRecordedValues": {
+      "log": "risu-bookkeeping-incarnation-normalized-details-before.log",
+      "beforeCanonicalMessages": 3,
+      "afterCanonicalMessages": 6,
+      "replacementActivity": {
+        "lastInteraction": 25,
+        "revision": 1
+      },
+      "resultingActivity": {
+        "lastInteraction": 25,
+        "revision": 1
+      },
+      "scopeCorrection": "replacement activity did not change; observed defect is committing a group batch referring to a recreated read-only member",
+      "providerCalls": 4,
+      "countedPassed": false
+    }
+  },
+  "fixtureCorrection": {
+    "log": "risu-incarnation-guards-target.log",
+    "reason": "original statistics count the user input and two replies; exact delta corrected from2 to3",
+    "countedPassed": false
+  },
+  "policy": {
+    "characterReads": "loaded definitions must still exist in the captured incarnation at final transaction; ordinary definition revisions may change",
+    "bookkeeping": "current native statistics/activity writes capture target epoch while counts/timestamps merge within that lifetime",
+    "uncommittedResult": "retain computed output and write set; no automatic provider replay",
+    "legacyInternalWriters": "may omit new guard metadata for compatibility; old retained-output recovery needs reviewed/reconstructed guards"
+  },
+  "remaining": [
+    "complete per-field read dependencies",
+    "narrowing cross-chat admission barriers",
+    "explicit retained-output choose/copy/retry UI",
+    "browser variants and Prereroll caches",
+    "automode/empty/inactive/orphan acceptance",
+    "large group/history cost",
+    "general extensions",
+    "physical mobile lifecycle",
+    "representative latency/long tasks",
+    "all15 configured trial"
+  ],
+  "sourceHashes": {
+    "src/ts/runtime/executionContext.ts": "918f3bac3d4996bcb660c6a33d3aab78f937f80600dd87c7fe5edc35ca2176d4",
+    "server/entity/writeSet.cjs": "619631c3c8754bb5c8e70a9c363668e9547f745acf3ac0d24c2682bf4fc4fcfc",
+    "server/entity/bookkeeping.cjs": "4cf098a426e548482e438211d3da2c0e2f846993cee9eff3a96382fdb7c651f1",
+    "server/entity/bookkeeping.test.cjs": "afdb0c4c97185631686f576c49107fb957564a9c14eb54e582648a5c893c8821",
+    "server/native/groupGeneration.test.cjs": "055ce18f897a95d1231975974299c01cc3246b95933fd1a145460f216d27609c",
+    "server/browser/groupGenerationUi.test.cjs": "14973cd8db4e08798e3921338b5de29f85e8ac911ea626bbcfca9c847e712fc2",
+    "server/browser/groupMembersUi.test.cjs": "8842d6cd8b8ccef0131d9d56a129a686eae5b36019d4d0281caf61ce281bbcb2",
+    "docs/incarnation-guards-runtime.md": "234c9bf24e45d52123f8d124034303752610c8c5db104d5ac7d59aaa8f315a7d",
+    "docs/server-runtime-plan.md": "525e8b31ed4eb37615d49ddf4434a3fdc375d076c8da1a6925dd6b0c579e2cf2",
+    "docs/group-recovery-runtime.md": "033f455a850ee54d08f409710b9d6e0d7912a0cd54330ebaa6561f40237fd8a1",
+    "docs/engine-extraction-audit.json": "50acfedf6d13848e22971141c7ddb91ed31c799a6a990bbcda3ac96b1d4ff77f"
+  },
+  "logHashes": {
+    "risu-incarnation-guards-app.log": {
+      "bytes": 1067,
+      "sha256": "a524e8360f808ecb9490eb0898699c91113a5268c6d0eee64fd43387a71694cf"
+    },
+    "risu-incarnation-guards-audit.log": {
+      "bytes": 56323,
+      "sha256": "265629563cec4f280b682bd83cefa449b8ab90070cb3cfc4d434245b85ea6720"
+    },
+    "risu-incarnation-guards-backend.log": {
+      "bytes": 117986,
+      "sha256": "99f0f91776431bd0346a24ada72b9ad24b8b12b25203cfe51caf25c3aa35eb71"
+    },
+    "risu-incarnation-guards-browser.log": {
+      "bytes": 3308,
+      "sha256": "c961744ec4efc3c805dcc33c4b3108875ed15cb62553f36b53bfbb0dbf9e886f"
+    },
+    "risu-incarnation-guards-check.log": {
+      "bytes": 324,
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    "risu-incarnation-guards-entity-build.log": {
+      "bytes": 36305,
+      "sha256": "a01687eab68dd1c00dc5345cbad5dbd5124ccde152ce983c0999ea6f3f6d71ae"
+    },
+    "risu-incarnation-guards-format.log": {
+      "bytes": 176,
+      "sha256": "54d4cc7c5cd8cdb8504201cc333eddff3f5fdc81f34df3d5d4c24663406c80e9"
+    },
+    "risu-incarnation-guards-native-after.log": {
+      "bytes": 1701,
+      "sha256": "a088a0ccfabc279bccb130b01bbadfc028df5abe4558ae3e379ebbf9eb6f0061"
+    },
+    "risu-incarnation-guards-native-build.log": {
+      "bytes": 633,
+      "sha256": "5f9c892d3b151568030fca3f02105fbf87c32285747395b914531918945e3efa"
+    },
+    "risu-incarnation-guards-native-format2.log": {
+      "bytes": 45,
+      "sha256": "37fc02954755f448a87b09d1588347a28f574507da22a66705c5490db638b1c9"
+    },
+    "risu-incarnation-guards-ordinary-build.log": {
+      "bytes": 40272,
+      "sha256": "5dbdfb619f4cc7258bde3881bacd2a96e9803189ad565b7a4100aad2b3dc0cf2"
+    },
+    "risu-incarnation-guards-target-final.log": {
+      "bytes": 20485,
+      "sha256": "bc216a81f80cad4764e05cae52c5b7a59c870ccc3e18c41fff1bc211086e4f40"
+    },
+    "risu-incarnation-guards-target.log": {
+      "bytes": 19557,
+      "sha256": "4b179d766da15868f030792bd672ae9749b09c9381000e188a22d257da6ca8a9"
+    },
+    "risu-incarnation-guards-tests-format.log": {
+      "bytes": 84,
+      "sha256": "323a30fe7b490b0dbe75ae9c259fab782b75ceec340b2089a34cc3c72c483694"
+    },
+    "risu-bookkeeping-incarnation-before.log": {
+      "bytes": 1358,
+      "sha256": "11c5c0722828f76d7b735f2205615179221f15b1a45ad4ebecadba32def7d301"
+    },
+    "risu-bookkeeping-incarnation-format.log": {
+      "bytes": 44,
+      "sha256": "753a353bdb9d3184596103ee876c5252bd0c5d2de8ea43f9a29208f57f729dc1"
+    },
+    "risu-bookkeeping-incarnation-format2.log": {
+      "bytes": 57,
+      "sha256": "1e64ec908db194cdc1173dd2b875c67a2687ef1dcc406b65a594251866ce6bf9"
+    },
+    "risu-bookkeeping-incarnation-format3.log": {
+      "bytes": 44,
+      "sha256": "c0c24c061bf8de590b741ee1a8a06da3661972047a1fbf210de0115a068051f3"
+    },
+    "risu-bookkeeping-incarnation-normalized-before.log": {
+      "bytes": 2056,
+      "sha256": "0f8ece4ced74adf55a53ef5f15e3a010010890df3b1564cad10b1cba4993b1e1"
+    },
+    "risu-bookkeeping-incarnation-normalized-details-before.log": {
+      "bytes": 2138,
+      "sha256": "26ca687824310e1713aa1d4eca027b5e5ba8c7ec55b6d62b088cec1d01fdada7"
+    }
+  },
+  "artifactHashes": {
+    "nativeBundleSha256": "28ebccd39548151675bdc15c3b54f040a5d5ab80f987578ad131eed282976245",
+    "entityIndexSha256": "7eb0b57e362548595b4f07793346912562946db46f7fbf074a33c6f6451f30aa"
+  }
+}

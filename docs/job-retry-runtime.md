@@ -1,0 +1,40 @@
+# Explicit native retry and durable child admission
+
+Follow-up to `7e4b02e` retained-output recovery. All15 conditions in [the runtime plan](server-runtime-plan.md) remain active. This work uses public code and synthetic local data/providers; production access, private data reads, deployment and push are zero.
+
+## Behavior
+
+The result dialog now offers **새 요청 보내기** alongside eligible full-result recovery. It displays the original input/button invocation or the currently reviewed tail reply, and explains the new request's possible API cost and repeated external script effects. Retry is never automatic.
+
+`retry-job-result` is a durable entity command. Within one SQL transaction it verifies the captured source/chat incarnation and review content revision, reconstructs the supported invocation from the stored original command, admits a new native job and records its child ID in schema16 `job_result_actions`. `admitJob` contains the original job-admission body and is called inside the existing transaction, avoiding nested `BEGIN` or a separately committed orphan child. Normal `/jobs` admission and idempotency retain their prior contract.
+
+- Send repeats the original input with a fresh user-message ID. The old provisional output is never placed in the new prompt or silently committed.
+- Button repeats its stored data/manual trigger invocation using the current server execution context. Existing native capability/group-button restrictions still apply.
+- Continue/reroll bind the current reviewed final assistant ID/revision. They require an idle chat at admission; stale or changed targets are rejected before any new provider request.
+- Send/button can queue behind admitted same-chat jobs. The server builds their context when execution begins; other chats retain independent scheduling.
+- Original failures/progress remain immutable and inspectable, including after disposition. Each source permits one recovery-or-retry disposition across different request IDs and devices. The already-selected disposition is returned if a competing action lost; no second side effect/job is created.
+- Same-request replay returns the original receipt/child after reload. A failed child is not reclaimed automatically: the user may explicitly review/retry that child as a new source.
+
+The browser submits through its persistent IndexedDB outbox and waits for confirmed projection. New child commands/progress hydrate through the existing job feed. Dialog navigation retains the captured source owner. Retry admission also respects the existing pending configuration, variable and field barriers: the command transport must not bypass a native generation's device-side intent ordering.
+
+## Validation
+
+| Check                   | Evidence                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQL                     | 13 cases: two DB workers, distinct request IDs, reopen/idempotency, recovery-vs-retry race, fresh continuation/reroll target, original button invocation, stale content/epoch/owner/input injection/tail/busy rejection, atomic disposition failure rollback, failed-child chain and per-chat ordering/independent claim                                                                                        |
+| Native group            | Force actual final INSERT failure after two original provider calls. Change a prompt variable, then retry once. New requests read the fresh value, source failure remains unchanged, only new message IDs/results/regex-trigger-Lua effects and statistics persist; provider count2→4, not6                                                                                                                     |
+| Original built browsers | Two isolated authenticated contexts retry the same interrupted source while one navigates elsewhere. Both parent receipts are held, their IndexedDB pending IDs are verified, one native child streams, all tabs close, completion persists, and reopened clients replay the same immutable parent requests. Provider count stays1; old partial text is absent from the prompt and the other chat remains empty |
+| Device intent barrier   | Actual Chromium protocol fixture: the previous client posts retry despite a blocked group configuration; candidate retains it pending. Clean negative has exactly the targeted subtest failure plus its parent failure. Positive17 scenarios/18 reported results pass                                                                                                                                           |
+| Gates                   | App433 pass/3 existing skips, backend269 pass, original built UI3 pass/0 skips, protocol17 scenarios/18 reported results, types0 errors/warnings, native/entity/ordinary web builds and original168-declaration audit166 bodies+2 prior explicit Lua policies                                                                                                                                                   |
+
+Root `evidence/local-job-retry-20261004.json` pins the local commit and retained logs; [machine-readable results](job-retry-validation.json) records the scope. An initial receipt-loss fixture released old responses before reopen and did not guarantee both expected replays; the final fixture keeps them held until replay is observed. The first negative protocol fixture lacked failure cleanup and contaminated later scenarios; final controls add unconditional cleanup. An added regex assertion initially expected member text although this fixture uses the original group regex; it now checks group-processed module output and all Lua variables. These failed logs remain distinct from the clean negative and final positive. Existing build/Node warnings remain.
+
+## Limits and trial
+
+Retry is a new invocation at execution time, not resumption of an uncertain provider request or a promise of the original reply. Already-performed external effects cannot be undone. A first disposition stays selected even if its retry child later fails; inspect/retry the failed child or copy the older raw output rather than silently switching the original decision.
+
+Content changed after review requires **다시 확인** before resubmitting. Button scripts/resources changed since the original request follow the current native context and existing policies. Current recent-job listing remains capped at50; physical-device performance, complete field read dependencies, reply variants, general extensions and all15 configured-trial conditions remain unfinished. Schema stays16; the forward-only rollback limitation in [recovery](job-result-recovery-runtime.md) remains.
+
+Local trial: select an unsuccessful synthetic job, inspect its raw output, choose **새 요청 보내기**, close all tabs, then reopen and check that only one new job/result exists. Inspect a completed disposition to see its child ID and the unchanged old output. If a peer changes the reviewed history, expect rejection and use **다시 확인**; discard any blocked stale command with the existing status action before a new same-chat intent when needed.
+
+Continue with durable reply variants and their original variable/metadata semantics, remaining compatibility and group behavior, physical devices, representative latency/long tasks and the complete user trial. This milestone does not complete the overall goal.

@@ -23,9 +23,11 @@
         return styleString;
     });
 
-    const close = (() => {
+    const close = () => {
         popupStore.children = null;
-    });
+        popupStore.openId = 0;
+    };
+
 
     onMount(async () => {
         await sleep(0)

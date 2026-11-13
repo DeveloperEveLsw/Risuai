@@ -1,0 +1,171 @@
+{
+  "baselineCommit": "3367bd32519dcdcafb0fb84e7f1927c9380b39bd",
+  "verifiedAt": "2026-10-04T07:30:28.457491+00:00",
+  "schemaVersion": 20,
+  "schemaChanged": false,
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateSourceReads": false,
+    "realModelCalls": 0,
+    "deployments": 0,
+    "remotePushes": 0
+  },
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "all15ConditionsRemainActive": true,
+  "wholeGoalComplete": false,
+  "gates": {
+    "node": "22.21.0",
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 487,
+      "skipped": 3,
+      "fresh": true
+    },
+    "backend": {
+      "passed": 360,
+      "skipped": 0,
+      "fresh": true,
+      "fileConcurrency": 2
+    },
+    "browser": {
+      "passed": 13,
+      "skipped": 0,
+      "serial": true,
+      "originalBuiltUi": 9,
+      "displayCases": 4
+    },
+    "focusedContext": {
+      "passed": 27,
+      "newResourceCases": 8
+    },
+    "actualNativeLuaCases": 6,
+    "builds": [
+      "native",
+      "entity",
+      "ordinary"
+    ],
+    "ordinary": {
+      "exitCode": 0,
+      "temporaryOutput": "/tmp/risu-resource-copy-ordinary-t1uitam2",
+      "bothRuntimeFlagsRemoved": true,
+      "indexSha256": "00ac130be58f02e5f04d32ce0d60091455ce7f8699de95714dcbb4617086295c",
+      "temporaryOutputRemoved": true
+    },
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    },
+    "candidateNode24Fresh": false
+  },
+  "copyControl": {
+    "candidate": {
+      "scope": "Public execution-context copy port and real synthetic SQLite finalization; no generation/provider/browser claim",
+      "metadataDisabled": false,
+      "overrideLoads": 1,
+      "sourceSha256": "afc818516317660e76d376bd395c30f5bb1570a04a6f8e8d390d308d727e8c92",
+      "loadedSourceSha256": "afc818516317660e76d376bd395c30f5bb1570a04a6f8e8d390d308d727e8c92",
+      "error": "NOT_FOUND",
+      "staleDerivedPersisted": false,
+      "originalModuleAbsent": true,
+      "resourceReads": [
+        {
+          "kind": "settings",
+          "id": "global",
+          "expectedEpoch": 0
+        },
+        {
+          "kind": "module",
+          "id": "module",
+          "expectedEpoch": 0
+        }
+      ],
+      "sourceUnchanged": true,
+      "productionAccess": false,
+      "realModelCalls": 0
+    },
+    "metadataRemoval": {
+      "scope": "Public execution-context copy port and real synthetic SQLite finalization; no generation/provider/browser claim",
+      "metadataDisabled": true,
+      "overrideLoads": 1,
+      "sourceSha256": "afc818516317660e76d376bd395c30f5bb1570a04a6f8e8d390d308d727e8c92",
+      "loadedSourceSha256": "0823a24993385443e1278f7cea372cf8fadf3f89d1d758c84dbe2ad7ce5c2dce",
+      "error": null,
+      "staleDerivedPersisted": true,
+      "originalModuleAbsent": true,
+      "resourceReads": [
+        {
+          "kind": "settings",
+          "id": "global",
+          "expectedEpoch": 0
+        }
+      ],
+      "sourceUnchanged": true,
+      "productionAccess": false,
+      "realModelCalls": 0
+    }
+  },
+  "reportedUserError": {
+    "character": "주식회사 넥서스v2.5",
+    "action": "send message",
+    "category": "Lua nil method gsub",
+    "chunkLine": 6703,
+    "messageContentStored": false,
+    "exactCauseVerified": false,
+    "fixedByCopyMetadata": false,
+    "privateCodeInspected": false
+  },
+  "initialFailures": {
+    "luaFixture": "1pass/5fail; omitted trigger conditions; corrected6pass",
+    "copyBefore": "2missing-origin assertions;2snapshot admission failures;2missing proposed-method failures",
+    "copyAfterFirstEdit": "2snapshot admission failures; corrected single-character fixture; final27pass"
+  },
+  "sourceFingerprints": {
+    "src/ts/runtime/executionContext.ts": "afc818516317660e76d376bd395c30f5bb1570a04a6f8e8d390d308d727e8c92",
+    "src/ts/runtime/extensionRuntime.ts": "31e21ba2945cc46526c834c543dafd7c93251e526162deef64c91a60ef06b5c7",
+    "src/ts/runtime/nativeGenerationRuntime.ts": "05e811cf048e8a5943182b3b3055bb1d64562f9075f5e7a6ac00dd2997a87e9b",
+    "src/ts/runtime/resourceReadDependencies.test.ts": "f0771ee64e1d6fcdf9c5c18dae711efdefa213da563afb64206175127375291c",
+    "server/native/luaValueContracts.test.cjs": "9ee9095a7374094f09c515c563358f40f977823c1c1a4dc9db572f2817d48ec5",
+    "server/entity/resourceReads.cjs": "1370a047e59ed3e8acf6ce8a8ce1237b02f70b1e47b74c7e3ca19fc0f85d27c1",
+    "src/ts/process/scriptingRuntime.ts": "aec3325eab6e6db93e7e9728f5de679b92484747fba39378f45d36aeab0972a5",
+    "docs/resource-copy-runtime.md": "bc4464b036f2d4483e8ed19bdc243f77650addba07cd42da41533f22e9671ac0",
+    "docs/resource-read-runtime.md": "a21d8b35c8a2b8864b2055102a327f369db3b280f791a8795ec0835122074f18",
+    "docs/server-runtime-plan.md": "1682cf832eb407d014fa0462c9cebe834fc93f00e95398dbc135dc8c084b6ee0",
+    "docs/engine-extraction-audit.json": "8280652f64c2cf75268347ddaac2349dff104c9cf6b7b5eb8ef8dc7f059a187d"
+  },
+  "artifacts": {
+    "nativeSha256": "506d87203386783d1135f089a71547d2d4f83e1bb3543cf4e79381364dba19e8",
+    "entityIndexSha256": "43666c582b5c2cfcb71ecd2ce1f25039d17917364370bab89ffa182be32a3c66"
+  },
+  "logFingerprints": {
+    "evidence/local-resource-copy-app.log": "2f774f3e755b2813d33a66337e6640591374523e88794fa77c4170e3b785158b",
+    "evidence/local-resource-copy-audit.log": "8280652f64c2cf75268347ddaac2349dff104c9cf6b7b5eb8ef8dc7f059a187d",
+    "evidence/local-resource-copy-backend.log": "67f3687a4b3b17c1d350b8e4699c1fbdd6284a298214cde9944abd70a991ca9d",
+    "evidence/local-resource-copy-before.log": "907f01bb99b3ce91f998d4b77107a5a6409af1a9ef4cd563046196bd1b48420d",
+    "evidence/local-resource-copy-browser.log": "b902e3d5d104d611dcfb98e90e370d70e15fd9a98ce3ccce2c6adbe0479f5ad4",
+    "evidence/local-resource-copy-check.log": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "evidence/local-resource-copy-control.log": "2e5e48ad7479e9ee3d28fa11dec952e60c2487d837b35f6fbf2c23deb200c658",
+    "evidence/local-resource-copy-entity-build.log": "1b9cf12751765f751113b59d71fc8251b8c14f8910d40068be5c73620fc9e39b",
+    "evidence/local-resource-copy-native-build.log": "e41c9b625ee488d850cd9417563548891ac4d0a2e4a7085ed3276a8d109f747a",
+    "evidence/local-resource-copy-negative.log": "d98608f108bebb8a46e0ea54185c54c82edac9e5302c7ee99b367c2d2fb8c1fb",
+    "evidence/local-resource-copy-ordinary-build.log": "09018007afb6f6473a652dfb4deec0db668ccdea16d2ff617e7db71fe339e4a7",
+    "evidence/local-resource-copy-unit-bounded.log": "e04113de7866d9f01251125ea1efbae124704269c1fcc1fc124660d83cf05b5c",
+    "evidence/local-resource-copy-unit-corrected.log": "ed89b10d25fc967a1b3eedc5da291004f6fdbd4ebaeee04668710722fe6c63ef",
+    "evidence/local-resource-copy-unit-final.log": "3c8f7e92dfdbac2430050f52f31bf94cfc730b79429198e05fa440c9013ab1ca",
+    "evidence/local-resource-copy-unit.log": "ee3d1b015f154e9184f8c3ef700e15c5df505a28d7fd846d3a5ebe408cec55cd",
+    "evidence/local-lua-contract-fixture-corrected.log": "3e5b08ba39b0139e23bd0a9deba1d264e01052864d0768bdbe28610858ed288d",
+    "evidence/local-lua-contract-initial.log": "10cf788d1bb9766ab3030d3f2a338a6fed32c13fda55fdc4a6dc5074e324e041"
+  },
+  "limits": [
+    "Raw property/plain structuredClone/JSON/accessor/nested graph read closure remains open",
+    "Field/membership/order/absence and general plugin policies remain open",
+    "This does not fix or identify the private card's Lua error",
+    "No fresh latency or physical-device measure; prior performance is historical",
+    "No fresh Node24 candidate validation; no whole-goal completion"
+  ]
+}

@@ -1,0 +1,253 @@
+{
+  "verifiedAt": "2026-10-04T04:42:41.765971+00:00",
+  "baseCommit": "eaa8f2cb795339171f072e0ece7ec2507f7c9a63",
+  "schema": 20,
+  "schemaMigration": false,
+  "scope": "local public original sources and authored synthetic fixtures only",
+  "previousGoalTurn": "No implementation progress: brief explanation of alertNormal. Existing unfinished edits and completed reproduction handle were revalidated before local implementation resumed.",
+  "all15Preserved": true,
+  "completionBlockHash": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "wholeGoalComplete": false,
+  "app": {
+    "passed": 463,
+    "existingSkipped": 3,
+    "filesPassed": 55
+  },
+  "backend": {
+    "tests": 342,
+    "pass": 342,
+    "fail": 0,
+    "skipped": 0
+  },
+  "builtBrowser": {
+    "tests": 8,
+    "pass": 8,
+    "fail": 0,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entity": "passed",
+    "ordinary": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorPolicies": 2
+  },
+  "before": {
+    "initialSix": {
+      "combinedFiles": ["raw-before.log", "raw-additional-before.log"],
+      "tests": 6,
+      "pass": 2,
+      "fail": 4,
+      "observations": [
+        {
+          "scenario": "trigger-condition",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        {
+          "scenario": "trigger-lua",
+          "state": "failed",
+          "code": "REVISION_CONFLICT",
+          "canonicalMessages": 0,
+          "providerCalls": 1
+        },
+        {
+          "scenario": "toggle-metadata",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        {
+          "scenario": "unread-toggle-control",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        {
+          "scenario": "trigger-equality",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        {
+          "scenario": "trigger-absent",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        }
+      ]
+    },
+    "schema": {
+      "tests": 7,
+      "pass": 4,
+      "fail": 3,
+      "skipped": 0
+    }
+  },
+  "after": {
+    "actualNativeCases": [
+      {
+        "scenario": "trigger-condition",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "canonicalMessages": 0,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "trigger-lua",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "canonicalMessages": 0,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "trigger-equality",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "canonicalMessages": 0,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "trigger-direct-equality",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "canonicalMessages": 0,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "trigger-local-control",
+        "state": "completed",
+        "canonicalMessages": 2,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "trigger-absent",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "canonicalMessages": 0,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "toggle-metadata",
+        "state": "failed",
+        "code": "REVISION_CONFLICT",
+        "canonicalMessages": 0,
+        "providerCalls": 1
+      },
+      {
+        "scenario": "unread-toggle-control",
+        "state": "completed",
+        "canonicalMessages": 2,
+        "providerCalls": 1
+      }
+    ],
+    "newPointReadUnits": 3,
+    "newBackendNativeCases": 8,
+    "newClosedWorkerHealthCase": 1,
+    "syntheticRestoreAndHealthCases": {
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "negativeControls": {
+    "controls": [
+      {
+        "port": "readGlobalVariable",
+        "scenario": "toggle-metadata",
+        "exitCode": 1,
+        "observation": {
+          "scenario": "toggle-metadata",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        "failedExpectedly": true,
+        "alteredNativeHash": "5f558a381d67b30695bee7172c824670fe4a3aa2a5ab4d720d4d22cd85bee044",
+        "log": "evidence/local-engine-read-logs/negative-readGlobalVariable.log"
+      },
+      {
+        "port": "readOptionalScriptState",
+        "scenario": "trigger-condition",
+        "exitCode": 1,
+        "observation": {
+          "scenario": "trigger-condition",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        "failedExpectedly": true,
+        "alteredNativeHash": "e6a6098a79e0ceafbf5cccdb893cdeead6eab862e475fd55f5c409dd707c9d80",
+        "log": "evidence/local-engine-read-logs/negative-readOptionalScriptState.log"
+      },
+      {
+        "port": "readScriptState",
+        "scenario": "trigger-direct-equality",
+        "exitCode": 1,
+        "observation": {
+          "scenario": "trigger-direct-equality",
+          "state": "completed",
+          "canonicalMessages": 2,
+          "providerCalls": 1
+        },
+        "failedExpectedly": true,
+        "alteredNativeHash": "b6f68a581662c84ee133b971a0b5e1f6741a127c5d6eec2bd26f7777a453286f",
+        "log": "evidence/local-engine-read-logs/negative-readScriptState.log"
+      }
+    ],
+    "candidateNativeHash": "b3e6c8408c482fea196bb374c82e6297188488508d8e808add23844a740f08f3",
+    "sourceRestoredByteExact": true,
+    "restoredNativeHash": "b3e6c8408c482fea196bb374c82e6297188488508d8e808add23844a740f08f3",
+    "nativeRestoredByteExact": true
+  },
+  "artifactHashes": {
+    "native": "b3e6c8408c482fea196bb374c82e6297188488508d8e808add23844a740f08f3",
+    "entityIndex": "411a1d7552c4e2f7105ede0fc306d941567dfe65b724de12683cfda0cb08a349"
+  },
+  "sourceHashes": {
+    "docs/generation-ports.json": "4ae1fb554a1c21f6906ea9508fcf90d52c32c034288a7c25399064fcc297225d",
+    "docs/triggerRuntime-ports.json": "4b9a58b265118bb6fa8a01125c42461366f546118eb3743c598ad239b74ab3f0",
+    "server/native/generationWorker.test.cjs": "9b3242c15bcabd8bd37a8f2e670ec0c2b7fadfcc5b143684801715d172f97c73",
+    "server/runtime/production.cjs": "b81e6b389f6a1f059bf4e8e212068c14babd422964321c7494725f5978a42847",
+    "server/runtime/production.test.cjs": "58102f33b09bf182fcbaf32139b52f780450e5b453e78ec2818f4af5e300ce14",
+    "server/runtime/restoreBackup.cjs": "e096b656689d55d39b4215e14c7d922cd2a58065003470512d6099312d55b2d0",
+    "server/runtime/restoreBackup.test.cjs": "2ec6ec1c16c85fdaed6e89ea73e976dba27d104206fbaa9d47be27078ff11502",
+    "src/ts/process/generationRuntime.ts": "d18b61c5f85cc5eaf431c51a0d79eceed198b62ac1e1a0b45c0895135d3c8058",
+    "src/ts/process/index.svelte.ts": "2019439d18cc3c3d71c70a07d9d740dd2379ab348233648f1e492e6dc4b2834e",
+    "src/ts/process/triggerRuntime.ts": "709203f966ff3cb37b966878f6ede5c781a571a2768d5898401784b830094e3b",
+    "src/ts/process/triggers.ts": "0380dbc1a60349dc3003412c90eefd19bf373cc7e7f6c0efbaedd22ffcf4cbf6",
+    "src/ts/runtime/executionContext.ts": "e5cb4131c86e087c2165b91fc3bb978c77b8b7c2a609ec7428407b6e7ff239b9",
+    "src/ts/runtime/variableReadDependencies.test.ts": "abe5e1a4801640c00bfab772e681dc2cb47aba6295e32535589b8cdcee62e321"
+  },
+  "realModelCalls": 0,
+  "productionAccessed": false,
+  "productionModified": false,
+  "privateContentsReadOrImported": false,
+  "remotePushed": false,
+  "priorProtocolBrowserEvidence": {
+    "commit": "7bef4987799048a2786910647e5031e16914aa99",
+    "scenariosPassed": 18,
+    "reportedIncludingParent": 19,
+    "rerunInThisMilestone": false
+  },
+  "limits": [
+    "Named expression ports only; arbitrary raw DBState, whole-map enumeration/replacement and complete field/resource/collection/membership dependency closure remain unproven.",
+    "Same-incarnation character/settings snapshot policy and trusted legacy write-set policy remain; no broad provenance claim.",
+    "The health route checks a responding DB worker only, not provider/scheduler readiness and no new timeout for a hung DB call.",
+    "Captured execution snapshot time differs from earlier HTTP admission; no automatic provider/Lua replay after stale reads.",
+    "Original extraction audit is structural; scope is reinforced by actual native tests and independently removed observations.",
+    "Retention/export/total-storage and import/export/asset fidelity, general plugins, continuation/structural extension policy, physical mobile, representative latency/long-task and whole user trial remain incomplete."
+  ],
+  "warnings": "Existing Vite CSS/module/import/bundle warnings and Node experimental SQLite warnings remain.",
+  "activeOwnedValidationSessions": [],
+  "evidenceLogs": "evidence/local-engine-read-logs/"
+}

@@ -1,0 +1,23 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/group.ts",
+  "core": "src/ts/process/groupOrderRuntime.ts",
+  "factory": "createGroupOrderRuntime",
+  "functions": ["groupOrder", "getWords"],
+  "ports": [
+    {
+      "name": "findCharacterbyId",
+      "specifier": "../util",
+      "original": "findCharacterbyId"
+    },
+    {
+      "name": "shuffle",
+      "specifier": "lodash/shuffle",
+      "original": "default"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": true,
+  "nativeBinding": "src/ts/runtime/nativeGenerationRuntime.ts",
+  "nativeVerifiedScope": "Original mention/probability speaker ordering in native group generation. No group editor or member button support implied."
+}

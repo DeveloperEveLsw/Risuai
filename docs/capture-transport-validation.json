@@ -1,0 +1,235 @@
+{
+  "baselineCommit": "ed4fc6cf2b1468a987400a609f31379b8cda64ad",
+  "schemaVersion": 20,
+  "all15ConditionsRemainActive": true,
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateDataReads": false,
+    "realModelCalls": 0,
+    "remotePushes": 0
+  },
+  "gates": {
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 472,
+      "skipped": 3
+    },
+    "backend": {
+      "passed": 354
+    },
+    "browserRegressions": {
+      "passed": 12,
+      "originalBuiltUI": 9,
+      "additionalBuiltWorker": 1,
+      "clientCompiledSvelteScopeAndActualWorker": 1,
+      "originalDevUIWorker": 1
+    },
+    "builds": ["native", "entity", "ordinary"],
+    "ordinaryBuild": {
+      "exitCode": 0,
+      "terminalSession": 61949,
+      "isolatedTemporaryOutputRemoved": true,
+      "bothRuntimeFlagsRemoved": true
+    },
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    }
+  },
+  "sourceFingerprints": {
+    "src/ts/runtime/displayCaptureTransport.ts": "5615117930cbcc55c8670b14db43181bea95184c3e95ec4ce15b1ace7bd6f642",
+    "src/ts/runtime/displayCaptureTransport.test.ts": "57798d412307f60fa5a542aa66ad3c3ab91c2d9d8ed7dbbf9950d8fa23cd2fcd",
+    "src/ts/runtime/displayWorkerExecutor.ts": "4beb16ae7fe4aa443786d82aede03508198ae76b4a73ef76c1bc9b32b6bfe5f3",
+    "src/ts/runtime/display.worker.ts": "ce6fa7fcccee6743e025edbf258b0d91c833b665a1f509d725629c2a893d5142",
+    "src/ts/runtime/displayWireBudget.ts": "d1fe817792b9630fc662e7ce659ac0c30429bb21f10eefefcca04b841b6a4ec6",
+    "src/ts/runtime/displayScopeIdentity.ts": "0a5d09ba606ae78bd80dd8b30a6df8e391ba7886b1a74c19cfc4d81af0b164b2",
+    "src/ts/runtime/browserDisplayLua.ts": "169380b611e7dd4b20db3d77f9d10d1d884d9062fdfc7300949024d9dfbedd61",
+    "src/ts/runtime/displayLuaContext.ts": "90f94001d8223750a9fe6656fba6a7ed62ab4ed4248a4e83f59d8e1e2ff46f3e",
+    "src/ts/runtime/displayScopeCache.svelte.ts": "c23b931a99a316950e44aac54783a6cfefc9d6280557f4e5907f58c89d0cb8e7",
+    "server/browser/displayScopeHarness.svelte.ts": "92f81cd871ddab93851789af4af22da7092726145a5e6028f6ab54948aeb666a",
+    "server/browser/displayScopeCache.test.cjs": "22faf141e3056a8738ea63d25131b90a82229f2f0faaf1e092253819b26711d8",
+    "server/browser/displayPerformance.test.cjs": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176"
+  },
+  "artifactHashes": {
+    "native": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411",
+    "entityIndex": "cc0243aca467703d2b3226feff4740e07bb41272e2a0b8b581e4fd0d8cd7c677"
+  },
+  "sourceCommitRecordedIn": "workspace evidence/local-capture-transport-20261004.json after commit; omitted here to avoid a self-referential commit",
+  "transport": {
+    "reuseDefinitionBytes": 100045,
+    "firstPacketBytes": 102027,
+    "secondPacketBytes": 1971,
+    "originalLuaGlobalsAndFreshPrivateState": true,
+    "newWorkerResendsAndResetsGlobals": true,
+    "bodyAndEnvironmentChangeVisible": true,
+    "fatalMalformedReferenceRejectsTerminatesAndClears": true,
+    "zeroPartialCommands": true,
+    "boundedDictionaryAndExpandedLogicalLimit": true,
+    "exactPacketBytesAreNotIpcOrProductionNetworkBytes": true,
+    "unitCases": 5,
+    "arbitraryJsonSeed": 107,
+    "arbitraryJsonRuns": 1000
+  },
+  "performance": {
+    "fixture": {
+      "rows": 100,
+      "dependent": 6,
+      "sourceBytes": 1068010,
+      "htmlCells": 9600,
+      "regexCount": 16
+    },
+    "samples": 48,
+    "quantileMethod": "nearest rank; descriptive 12 samples per scenario/stage, not a population tail estimate",
+    "helperHash": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "sameHelperFixtureObserver": true,
+    "scenarios": [
+      {
+        "stage": "before",
+        "scenario": "desktop",
+        "samples": 12,
+        "buildIndexHash": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 11,
+          "maxMs": 67
+        },
+        "feedbackMs": {
+          "median": 22.0,
+          "p95": 26.3,
+          "max": 26.3
+        },
+        "settledMs": {
+          "median": 1272.45,
+          "p95": 1336.6,
+          "max": 1336.6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.1,
+          "max": 100.1
+        }
+      },
+      {
+        "stage": "before",
+        "scenario": "mobile-emulation-4x",
+        "samples": 12,
+        "buildIndexHash": "a119f65528a17504fcea5716836de35b7f3660ac28534044994cb2f74a77fd8a",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 12,
+          "maxMs": 274
+        },
+        "feedbackMs": {
+          "median": 42.55,
+          "p95": 64.2,
+          "max": 64.2
+        },
+        "settledMs": {
+          "median": 2519.1,
+          "p95": 2822.2,
+          "max": 2822.2
+        },
+        "maxFrameGapMs": {
+          "median": 266.6,
+          "p95": 300,
+          "max": 300
+        }
+      },
+      {
+        "stage": "after",
+        "scenario": "desktop",
+        "samples": 12,
+        "buildIndexHash": "cc0243aca467703d2b3226feff4740e07bb41272e2a0b8b581e4fd0d8cd7c677",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 11,
+          "maxMs": 67
+        },
+        "feedbackMs": {
+          "median": 21.15,
+          "p95": 32.2,
+          "max": 32.2
+        },
+        "settledMs": {
+          "median": 1146.6,
+          "p95": 1199.9,
+          "max": 1199.9
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.1,
+          "max": 100.1
+        }
+      },
+      {
+        "stage": "after",
+        "scenario": "mobile-emulation-4x",
+        "samples": 12,
+        "buildIndexHash": "cc0243aca467703d2b3226feff4740e07bb41272e2a0b8b581e4fd0d8cd7c677",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "longTasks": {
+          "count": 13,
+          "maxMs": 282
+        },
+        "feedbackMs": {
+          "median": 41.85,
+          "p95": 56.9,
+          "max": 56.9
+        },
+        "settledMs": {
+          "median": 2426.25,
+          "p95": 2648.9,
+          "max": 2648.9
+        },
+        "maxFrameGapMs": {
+          "median": 250.0,
+          "p95": 300,
+          "max": 300
+        }
+      }
+    ],
+    "localSyntheticOnly": true,
+    "physicalMobile": false,
+    "workerCpuThrottleVerified": false,
+    "stutteringSolved": false,
+    "measurementConclusion": "Transfer reuse has a small measured settlement reduction in this warm fixture. Roughly250ms frame gaps and2.4sec mobile-emulated settlement remain. Universal or physical-device speedup is unproven."
+  },
+  "control": {
+    "path": "evidence/local-capture-transport-inline-control.json",
+    "onlyImmutableCaptureReferencesDisabled": true,
+    "sourceOverrideActuallyLoaded": true,
+    "sourceOverrideHash": "63a9eb3096a18a1ece2dc52c8012aed2f33eca282c2be01cb7b14f8a87941391",
+    "developmentMode": true,
+    "samples": 4,
+    "allComputations": [106],
+    "independentRowsRecomputed": [94],
+    "sameHtmlValuesAndStableRows": true,
+    "notPooledWithOptimizedComparison": true
+  },
+  "retainedFailures": [
+    {
+      "log": "evidence/local-responsiveness-logs/capture-worker.log",
+      "failure": "Concurrent Vite browser harness could not dynamically import the scope fixture. Direct isolated HTTP returned200; isolated full real-worker scope test passed. Cause not definitively established; final harnesses run serially."
+    },
+    {
+      "change": "Differential review found inline negative zero needed normalization to original JSON zero; corrected and covered by unregistered-tree assertion."
+    }
+  ],
+  "limits": [
+    "A small warm settlement reduction is not resolution of stuttering or the2–3-second wait.",
+    "Approximately250ms frame gaps and2.4-second mobile-emulated settlement remain.",
+    "Dictionary UTF-8 quotas are not a process heap budget.",
+    "Physical mobile, worker CPU throttle, concurrent active devices, cold/configuration/large changed HTML workloads and whole-product user acceptance remain unproven.",
+    "Complete raw/cloned/field/map/collection/extension, import/export/assets/retention/storage and all15 requirements remain active."
+  ]
+}

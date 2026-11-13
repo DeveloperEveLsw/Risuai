@@ -4,6 +4,7 @@ import { asBuffer, Semaphore, sleep } from "../util";
 import { alertStore } from "../alert";
 import { hasher } from "../parser/parser.svelte";
 import { hubURL } from "../characterCards";
+import { entityRuntimeEnabled } from "../runtime/browserRuntimeState.svelte";
 
 // File size and chunk size constants
 const MAX_ASSET_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
@@ -233,23 +234,25 @@ export class CharXImporter{
      * ```
      */
     async parse(data:Uint8Array|File|ReadableStream<Uint8Array>){
-        // Create completion promise at the start of parsing
-        this.completionPromise = this.#awaitCompletion()
+      // Create completion promise at the start of parsing
+      this.completionPromise = this.#awaitCompletion();
+      // Asset failures can arrive before the caller reaches done(); preserve rejection without an unhandled event.
+      if (entityRuntimeEnabled) void this.completionPromise.catch(() => {});
 
-        // Convert all input types to ReadableStream for uniform processing
-        const stream = this.#toStream(data)
+      // Convert all input types to ReadableStream for uniform processing
+      const stream = this.#toStream(data);
 
-        const reader = stream.getReader()
-        while(true){
-            const {done, value} = await reader.read()
-            if(value){
-                await this.#feedChunk(value, false)
-            }
-            if(done){
-                await this.#feedChunk(new Uint8Array(0), true)
-                break
-            }
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (value) {
+          await this.#feedChunk(value, false);
         }
+        if (done) {
+          await this.#feedChunk(new Uint8Array(0), true);
+          break;
+        }
+      }
     }
 
     /**
@@ -336,7 +339,25 @@ export class CharXImporter{
         const assetIndex = file.name
         this.assetBuffers[assetIndex] = new AppendableBuffer()
 
-        file.ondata = (_err, dat, final) => this.#handleFileData(assetIndex, dat, final)
+        file.ondata = (error, dat, final) => {
+          if (entityRuntimeEnabled && error) {
+            this.errors.push(error);
+            delete this.assetBuffers[assetIndex];
+            this.#checkCompletion();
+            return;
+          }
+          this.#handleFileData(assetIndex, dat, final);
+        };
+
+        if (
+          entityRuntimeEnabled &&
+          (file.originalSize ?? 0) > MAX_ASSET_SIZE_BYTES
+        ) {
+          this.errors.push(new Error("CharX member exceeds the 50 MiB limit"));
+          this.excludedFiles.push(assetIndex);
+          delete this.assetBuffers[assetIndex];
+          return;
+        }
 
         // Only process files smaller than MAX_ASSET_SIZE_BYTES (50MB)
         if(file.originalSize ?? 0 < MAX_ASSET_SIZE_BYTES){
@@ -395,8 +416,12 @@ export class CharXImporter{
             await this.semaphore.acquire()
             acquired = true
             const assetSaveId = this.skipSaving
-                ? `assets/${await hasher(asset.data)}.png`
-                : await saveAsset(asset.data)
+              ? `assets/${await hasher(asset.data)}.png`
+              : await saveAsset(
+                  asset.data,
+                  "",
+                  entityRuntimeEnabled ? asset.id : "",
+                );
 
             this.assets[asset.id] = assetSaveId
         } catch (error) {

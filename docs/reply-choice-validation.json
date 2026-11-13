@@ -1,0 +1,99 @@
+{
+  "sourceBase": "6dfada7910e199d2eab3f78f6c3fd076702eab3f",
+  "verifiedAt": "2026-10-04T02:39:06.119066+00:00",
+  "scope": "local public original code and authored synthetic data/provider ports only",
+  "schemaVersion": 17,
+  "wholeGoalComplete": false,
+  "all15Preserved": true,
+  "application": {
+    "passed": 433,
+    "existingSkipped": 3
+  },
+  "backend": {
+    "passed": 278,
+    "skipped": 0
+  },
+  "originalBuiltBrowserUI": {
+    "passed": 4,
+    "skipped": 0
+  },
+  "protocolBrowser": {
+    "distinctScenariosPassed": 18,
+    "reportedResultsPassedIncludingParent": 19,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorPolicies": 2
+  },
+  "providerCacheSemantics": {
+    "baseline": "f9728b14c733d073168d8d0c6a8f34f8febf0304",
+    "dataOnlySelection": true,
+    "emptyStringMissAndFailedIndexPreserved": true,
+    "nonstreamCandidates": 3,
+    "nonstreamIncludesRegexAndEditLua": true,
+    "originalTestedOpenAIStreamingCandidates": 1,
+    "streamCachePrecedesOutputProcessing": true
+  },
+  "builtBrowser": {
+    "independentContexts": 2,
+    "stableMessageDomOnSelection": true,
+    "reloadSelectionPreserved": true,
+    "fallbackCallsAfterAllTabExitAndReplay": 1,
+    "seedSyntheticProviderPortCalls": 1,
+    "immutableRequestIdsReplayed": 2,
+    "stalePeerParentsBlocked": 1,
+    "scriptCountBeforeAfterSelectionAndNewGeneration": [
+      "1",
+      "1",
+      "2"
+    ]
+  },
+  "previousClientControl": {
+    "expectedFailedSubtests": 1,
+    "reportedFailuresIncludingParent": 2,
+    "candidateRestored": true
+  },
+  "remaining": [
+    "regenerated single/group batch history",
+    "rapid-click pending feedback/queue policy",
+    "existing completed-job cache backfill",
+    "archive retention and export",
+    "shared generation IDs from arbitrary extensions",
+    "complete field read dependencies",
+    "general extension and import/export/asset/storage compatibility",
+    "physical devices and representative latency/long tasks",
+    "all15 configured trial"
+  ],
+  "failedLogsRetained": [
+    "entity-initial.log",
+    "native-choice-initial.log",
+    "native-choice-fixture-correction.log",
+    "check.log",
+    "browser-before-settled-fixture.log"
+  ],
+  "freshAcceptanceLogs": [
+    "check-final.log",
+    "app.log",
+    "backend-final.log",
+    "browser-final.log",
+    "protocol-final.log",
+    "native-build.log",
+    "entity-build.log",
+    "ordinary-build.log",
+    "audit.log",
+    "protocol-restored-client.log",
+    "entity-build-final.log"
+  ],
+  "testedArtifactIndexBytesReproducedByFinalBuild": true
+}

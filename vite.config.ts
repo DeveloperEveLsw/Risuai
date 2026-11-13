@@ -27,9 +27,12 @@ export default defineConfig(({command, mode}) => {
     clearScreen: false,
     // tauri expects a fixed port, fail if that port is not available
     server: {
-      host: '0.0.0.0', // listen on all addresses
+      host: process.env.VITE_RISU_ENTITY_RUNTIME === 'TRUE' ? '127.0.0.1' : '0.0.0.0',
       port: 5174,
       strictPort: true,
+      proxy: process.env.VITE_RISU_ENTITY_RUNTIME === 'TRUE' ? {
+        '/api/runtime': { target: 'http://127.0.0.1:' + (process.env.RISU_RUNTIME_PORT ?? 6174), changeOrigin: true },
+      } : undefined,
       // hmr: false,
     },
     // to make use of `TAURI_ENV_DEBUG` and other env variables

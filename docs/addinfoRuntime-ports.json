@@ -1,0 +1,27 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/embedding/addinfo.ts",
+  "core": "src/ts/process/embedding/addinfoRuntime.ts",
+  "factory": "createAddinfoRuntime",
+  "functions": ["additionalInformations"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "HypaProcesser",
+      "specifier": "../memory/hypamemory",
+      "original": "HypaProcesser"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "getUserName",
+      "specifier": "src/ts/util",
+      "original": "getUserName"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

@@ -4,7 +4,15 @@ import { defaultSdDataFunc, type character, setDatabase, type customscript, type
 import { checkNullish, decryptBuffer, isKnownUri, selectFileByDom, sleep } from "./util"
 import { language } from "src/lang"
 import { v4 as uuidv4, v4 } from 'uuid';
-import { changeChar, characterFormatUpdate } from "./characters"
+import {
+  changeChar,
+  characterFormatUpdate,
+  createServerCharacter,
+} from "./characters";
+import {
+  entityRuntimeEnabled,
+  browserRuntime,
+} from "./runtime/browserRuntimeState.svelte";
 import { AppendableBuffer, BlankWriter, checkCharOrder, downloadFile, forageStorage, loadAsset, LocalWriter, openURL, readImage, saveAsset, VirtualWriter } from "./globalApi.svelte"
 import { isTauri, isNodeServer } from "src/ts/platform"
 import { compressImage, getImageType } from "./media"
@@ -19,25 +27,15 @@ import { exportModuleLegacy, readModule, type RisuModule } from "./process/modul
 import { readFile } from "@tauri-apps/plugin-fs"
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 import { AccountStorage } from "./storage/accountStorage"
-import { getNodeServerProxyAuth } from "./storage/nodeStorage"
 
 
 const EXTERNAL_HUB_URL = 'https://sv.risuai.xyz';
 const NIGHTLY_HUB_URL = 'https://nightly.sv.risuai.xyz'
 export const hubURL = isNodeServer
     ? '/hub-proxy'
-    : (window.location.hostname === 'nightly.risuai.xyz' || localStorage.getItem('hub') === 'nightly')
+    : (import.meta.env.VITE_RISU_NIGHTLY_BUILD === 'TRUE' || localStorage.getItem('hub') === 'nightly')
     ? NIGHTLY_HUB_URL 
     : EXTERNAL_HUB_URL;
-
-async function fetchHub(input: RequestInfo | URL, init: RequestInit = {}) {
-    if (!isNodeServer) {
-        return await fetch(input, init)
-    }
-    const headers = new Headers(init.headers)
-    headers.set('risu-auth', await getNodeServerProxyAuth())
-    return await fetch(input, { ...init, headers })
-}
 
 export async function importCharacter() {
     try {
@@ -76,7 +74,9 @@ export async function importCharacterProcess<T extends boolean = false>(f:{
             return db.characters.length - 1 as any
         }
         if((da.char_name || da.name) && (da.char_persona || da.description) && (da.char_greeting || da.first_mes)){
-            DBState.db.characters.push(convertOffSpecCards(da))
+            if (entityRuntimeEnabled)
+              await createServerCharacter(convertOffSpecCards(da));
+            else DBState.db.characters.push(convertOffSpecCards(da));
             alertNormal(language.importedCharacter)
             return
         }
@@ -86,7 +86,8 @@ export async function importCharacterProcess<T extends boolean = false>(f:{
         }
     }
     let db = getDatabase()
-    db.statics.imports += 1
+    if (entityRuntimeEnabled) await browserRuntime().recordImport();
+    else db.statics.imports += 1;
 
     if(f.name.endsWith('charx') || f.name.endsWith('jpg') || f.name.endsWith('jpeg')){
         console.log('reading charx')
@@ -388,7 +389,9 @@ export async function importCharacterProcess<T extends boolean = false>(f:{
     if(parsed.spec !== 'chara_card_v2' && parsed.spec !== 'chara_card_v3'){
         const charaData:OldTavernChar = JSON.parse(Buffer.from(readedChara, 'base64').toString('utf-8'))
         const imgp = await saveAsset(img)
-        DBState.db.characters.push(convertOffSpecCards(charaData, imgp))
+        if (entityRuntimeEnabled)
+          await createServerCharacter(convertOffSpecCards(charaData, imgp));
+        else DBState.db.characters.push(convertOffSpecCards(charaData, imgp));
         alertNormal(language.importedCharacter)
         return DBState.db.characters.length - 1
     }
@@ -403,7 +406,7 @@ export const getRealmInfo = async (realmPath:string) => {
     url.searchParams.delete('realm');
     window.history.pushState(null, '', url.toString());
 
-    const res = await fetchHub(`${hubURL}/hub/info/${realmPath}`)
+    const res = await fetch(`${hubURL}/hub/info/${realmPath}`)
     if(res.status !== 200){
         alertError(await res.text())
         return
@@ -1023,6 +1026,8 @@ async function importCharacterCardSpec<T extends boolean = false>(card:Character
         prebuiltAssetExclude: data?.extensions?.risuai?.prebuiltAssetExclude ?? [],
         prebuiltAssetStyle: data?.extensions?.risuai?.prebuiltAssetStyle ?? '',
         customModuleToggle: data?.extensions?.risuai?.toggles ?? {},
+        moduleNamespace: data?.extensions?.risuai?.moduleNamespace,
+        hideChatIcon: data?.extensions?.risuai?.hideChatIcon ?? false,
     }
 
     if(card.spec === 'chara_card_v3'){
@@ -1037,7 +1042,8 @@ async function importCharacterCardSpec<T extends boolean = false>(card:Character
         return char as any
     }
 
-    db.characters.push(char)
+    if (entityRuntimeEnabled) await createServerCharacter(char);
+    else db.characters.push(char);
     alertNormal(language.importedCharacter)
     return true as any
 
@@ -1659,7 +1665,9 @@ export function createBaseV3(char:character){
                     prebuiltAssetCommand: char.prebuiltAssetCommand ?? '',
                     prebuiltAssetExclude: char.prebuiltAssetExclude ?? [],
                     prebuiltAssetStyle: char.prebuiltAssetStyle ?? '',
-                    toggles: char.customModuleToggle ?? ''
+                    toggles: char.customModuleToggle ?? '',
+                    moduleNamespace: char.moduleNamespace,
+                    hideChatIcon: char.hideChatIcon ?? false
                 },
                 depth_prompt: char.depth_prompt
             },
@@ -1720,7 +1728,7 @@ export async function shareRisuHub2(char:character, arg:{
             return
         }
     
-        const fetchPromise = fetchHub(hubURL + '/hub/realm/upload', {
+        const fetchPromise = fetch(hubURL + '/hub/realm/upload', {
             method: "POST",
             body: writer.buf.buffer as any,
             headers: {
@@ -1788,7 +1796,7 @@ export async function getRisuHub(arg:{
         arg.search += ' __shared'
         const stringArg = `search==${arg.search}&&page==${arg.page}&&nsfw==${arg.nsfw}&&sort==${arg.sort}&&web==${(!isNodeServer && !isTauri) ? 'web' : 'other'}`
 
-        const da = await fetchHub(hubURL + '/realm/' + encodeURIComponent(stringArg) + "?cache=30", {
+        const da = await fetch(hubURL + '/realm/' + encodeURIComponent(stringArg) + "?cache=30", {
             headers: {
                 "x-risuai-info": appVer + ';' + (isNodeServer ? 'node' : (isTauri ? 'tauri' : 'web'))
             }
@@ -1880,7 +1888,7 @@ export async function downloadRisuHub(id:string, arg:{
 }
 
 export async function getHubResources(id:string) {
-    const res = await fetchHub(`${hubURL}/resource/${id}`)
+    const res = await fetch(`${hubURL}/resource/${id}`)
     if(res.status !== 200){
         throw (await res.text())
     }
@@ -2005,6 +2013,6 @@ interface charBookEntry{
     folder?: string // Risuai folder field
 }
 
-interface RccCardMetaData{
-    usePassword?: boolean
+interface RccCardMetaData {
+  usePassword?: boolean;
 }

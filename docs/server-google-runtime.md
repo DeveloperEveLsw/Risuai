@@ -1,0 +1,9 @@
+# Native Google and Vertex generation
+
+The restored hosted character selects `gemini-3.1-pro-preview-vertex`. Once the reviewed idle plugin admission passed, its job failed at the missing `requestGoogleCloudVertex` port before saving messages.
+
+`createGoogleRuntime` extracts the upstream Google handler into explicit capabilities. Its five declarations and the pure `base64url` helper are structurally compared with upstream commit `f9728b14`; their request formatting, Vertex region routing, OAuth JWT signing, SSE handling and output processing remain unchanged. Browser imports are type-only. The native composition supplies job-scoped database access, Web Crypto, parameter/schema helpers and the same cancellable transport used by other providers. OAuth uses that transport too. Access tokens remain on the server and are written through the context's ordinary guarded settings diff.
+
+Synthetic verification covers real local RSA signing/JWT verification, refresh persistence, cached authentication, streamed thought/text accumulation, Vertex quota failure without recursive replay, OAuth cancellation, explicit unsupported image capability, and actual native worker dispatch in streaming/nonstreaming/cancellation modes with upstream input/output regex and Lua. These tests make no external provider request.
+
+This is text generation support, not a complete plugin or MCP host. Image/audio generation and signature persistence still require explicit inlay capabilities and fail when those absent capabilities are used. Unknown active plugins remain blocked. Concurrent settings changes can conflict with token refresh persistence; an already executed provider request must not be replayed automatically. The extraction audit alone does not prove restored-data compatibility or browser performance. Hosted validation uses only the designated character in a separate chat; other characters are tested by the user.

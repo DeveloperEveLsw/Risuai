@@ -1,0 +1,155 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/request/openAI/requests.ts",
+  "core": "src/ts/process/request/openAI/completionRuntime.ts",
+  "factory": "createCompletionRuntime",
+  "functions": [
+    "isOfficialOpenAIURL",
+    "shouldUseOpenAIFlexProcessing",
+    "requestOpenAI",
+    "requestHTTPOpenAI",
+    "requestOpenAILegacyInstruct",
+    "getTranStream",
+    "wrapToolStream"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "LLMProvider",
+      "specifier": "src/ts/model/modellist",
+      "original": "LLMProvider"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "decodeToolCall",
+      "specifier": "../../mcp/mcp",
+      "original": "decodeToolCall"
+    },
+    {
+      "name": "LLMFlags",
+      "specifier": "src/ts/model/modellist",
+      "original": "LLMFlags"
+    },
+    {
+      "name": "strongBan",
+      "specifier": "src/ts/tokenizer",
+      "original": "strongBan"
+    },
+    {
+      "name": "tokenizeNum",
+      "specifier": "src/ts/tokenizer",
+      "original": "tokenizeNum"
+    },
+    {
+      "name": "getFreeOpenRouterModels",
+      "specifier": "src/ts/model/openrouter",
+      "original": "getFreeOpenRouterModels"
+    },
+    {
+      "name": "LLMFormat",
+      "specifier": "src/ts/model/modellist",
+      "original": "LLMFormat"
+    },
+    {
+      "name": "getLocalNetworkRequestOptions",
+      "specifier": "./shared",
+      "original": "getLocalNetworkRequestOptions"
+    },
+    {
+      "name": "applyParameters",
+      "specifier": "../shared",
+      "original": "applyParameters"
+    },
+    {
+      "name": "globalFetch",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "globalFetch"
+    },
+    {
+      "name": "language",
+      "specifier": "src/lang",
+      "original": "language"
+    },
+    {
+      "name": "getOpenAIJSONSchema",
+      "specifier": "../../templates/jsonSchema",
+      "original": "getOpenAIJSONSchema"
+    },
+    {
+      "name": "applyChatTemplate",
+      "specifier": "../../templates/chatTemplate",
+      "original": "applyChatTemplate"
+    },
+    {
+      "name": "simplifySchema",
+      "specifier": "src/ts/util",
+      "original": "simplifySchema"
+    },
+    {
+      "name": "supportsInlayImage",
+      "specifier": "../../files/inlays",
+      "original": "supportsInlayImage"
+    },
+    {
+      "name": "applyAdditionalParameters",
+      "specifier": "../shared",
+      "original": "applyAdditionalParameters"
+    },
+    {
+      "name": "getAdditionalParameters",
+      "specifier": "../shared",
+      "original": "getAdditionalParameters"
+    },
+    {
+      "name": "isTauri",
+      "specifier": "src/ts/platform",
+      "original": "isTauri"
+    },
+    {
+      "name": "isNodeServer",
+      "specifier": "src/ts/platform",
+      "original": "isNodeServer"
+    },
+    {
+      "name": "fetchNative",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "fetchNative"
+    },
+    {
+      "name": "textifyReadableStream",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "textifyReadableStream"
+    },
+    {
+      "name": "addFetchLog",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "addFetchLog"
+    },
+    {
+      "name": "extractJSON",
+      "specifier": "../../templates/jsonSchema",
+      "original": "extractJSON"
+    },
+    {
+      "name": "callTool",
+      "specifier": "../../mcp/mcp",
+      "original": "callTool"
+    },
+    {
+      "name": "encodeToolCall",
+      "specifier": "../../mcp/mcp",
+      "original": "encodeToolCall"
+    },
+    {
+      "name": "alertError",
+      "specifier": "src/ts/alert",
+      "original": "alertError"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "nativeHostIntegrated": false
+}

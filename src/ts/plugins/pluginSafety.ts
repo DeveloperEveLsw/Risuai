@@ -76,13 +76,7 @@ export async function checkCodeSafety(code: string): Promise<CheckResult> {
             import('acorn-walk')
         ]);
 
-        // V2.1 plugin source is executed inside an async wrapper by the
-        // loader. Parse it with the same top-level-await capability so the
-        // safety rewrite still redirects globals such as alert/prompt.
-        const ast = acorn.parse(code, {
-            ecmaVersion: 'latest',
-            allowAwaitOutsideFunction: true,
-        });
+        const ast = acorn.parse(code, { ecmaVersion: 'latest' });
 
         walk.ancestor(ast, {
 

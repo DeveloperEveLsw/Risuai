@@ -1,0 +1,135 @@
+{
+  "sourceBase": "2f8bb58bd60b596c530f9d7d2d6154a88d3c0dc8",
+  "verifiedAt": "2026-10-04T03:07:14.651148+00:00",
+  "scope": "local public original code and authored synthetic data/providers only",
+  "schemaVersion": 18,
+  "wholeGoalComplete": false,
+  "all15Preserved": true,
+  "completionRequirementsSha256": "7d87e1a22f43f8d6e6a236422c83fd31261d42f9f3897221e96a7fc6b926550d",
+  "application": {
+    "passed": 436,
+    "existingSkipped": 3
+  },
+  "backend": {
+    "passed": 288,
+    "skipped": 0
+  },
+  "originalBuiltBrowserUI": {
+    "passed": 4,
+    "skipped": 0
+  },
+  "protocolBrowser": {
+    "distinctScenariosPassed": 18,
+    "reportedResultsPassedIncludingParent": 19,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorPolicies": 2
+  },
+  "batchSemantics": {
+    "immutableCompletePayloads": true,
+    "providerCandidatesFirst": true,
+    "fullOwnedSuffixReplacement": true,
+    "monotonicRestoredIds": true,
+    "outputEffectsRerun": false,
+    "variablesMetadataStatisticsRewound": false,
+    "displayScriptsFollowExistingAdmissionPolicy": true,
+    "originalAssignmentLoopEqualLengthDifferential": true,
+    "unequalLengthOriginalCorruptionDeliberatelyRepaired": true,
+    "prefixGuard": "last ID/count and selected tail ID order, not full prefix fingerprint"
+  },
+  "coverage": {
+    "sqlBatchCases": 9,
+    "newReadModelCases": 3,
+    "nativeOriginalGroupSizes": [2, 1],
+    "nativeGroupProviderCallsAcrossFourSelections": 3,
+    "actualUiGroupProviderCallsDuringSavedSelections": 4,
+    "builtSingleFallbackCallsAfterAllTabsCloseAndReplay": 1,
+    "stablePrefixDom": true,
+    "reloadHistoryPreserved": true,
+    "workerCrashAndServiceRestart": true,
+    "obsoleteUnadmittedCommandsRejected": true
+  },
+  "previousProjectionControl": {
+    "expectedFailedCases": 2,
+    "candidateRestoredByteForByte": true
+  },
+  "freshAcceptanceLogs": [
+    "test-app-final.log",
+    "test-backend-final.log",
+    "built-ui-final.log",
+    "protocol-browser.log",
+    "check-final.log",
+    "build-native-final.log",
+    "build-entity-final.log",
+    "build-ordinary-final.log",
+    "audit-engine.log"
+  ],
+  "failedLogsRetained": [
+    "initial-provider-regression.log",
+    "batch-initial.log",
+    "recovery-debug.log",
+    "built-ui-unresolved-peer.log",
+    "group-ui-pre-selection-revision-fixture.log",
+    "group-ui-before-terminal-readiness.log",
+    "previous-projection-control.log"
+  ],
+  "artifactHashes": {
+    "dist/index.html": "c43a98252ffc211ca690e4851af6ecf84424e3f649065502acc37282050d5190",
+    "server/native/dist/extensionJob.mjs": "28ebccd39548151675bdc15c3b54f040a5d5ab80f987578ad131eed282976245"
+  },
+  "testedArtifactsReproducedByFinalBuild": true,
+  "sourceHashes": {
+    "server/browser/groupGenerationUi.test.cjs": "b3e4d38f542b1d0109d4f80528ec1183efd2c7de8457bf6002dc111456a9bf73",
+    "server/browser/replyChoicesUi.test.cjs": "87373e8f315b015777aedff6734886a2b13c77909bf713da660c91a048082039",
+    "server/entity/assets.test.cjs": "7cd1e6e2ac562dfdaab5e4976f3b02f3118e0189bf6f17b2c3d1aa8f3bc325ef",
+    "server/entity/bookkeeping.test.cjs": "f12f7af80d8bc2dc112e175068f60dd04dd7d6a603b8fd55a1ab033ae8afbbde",
+    "server/entity/bookmarks.test.cjs": "600d80eeb746e14204c3621a4abe42ae2d9f4404960fadd64077d70dad3bc36d",
+    "server/entity/catalog.test.cjs": "ced49bde4560b554c26b317367a2ef660d01b6608f03177297a35f14e6095879",
+    "server/entity/chatNavigation.test.cjs": "9fb9684801c892fd0a0cdc16af9e5e110f2840440140c18ed1899a031d60fc2f",
+    "server/entity/displayEffects.test.cjs": "13836830d07fe81bd30bf67ee5e91b2d3cf6d3d123710e4a91dbd538f12fce2d",
+    "server/entity/displayMessageIntents.test.cjs": "f0f99aabc8fe38f529bb5cfd9f3c5b5c9861adc3d0a831dc697aec1ce9802cc5",
+    "server/entity/fields.test.cjs": "6a4a4348cb7a3502ee63430bb46f391c1ed0c35cb8cfd390369070945379e277",
+    "server/entity/groupMembers.test.cjs": "cfc288c361e61cb6fdf4cebeb9652573aee48ddec837574c2a6eb55d40e4d51b",
+    "server/entity/jobProgress.test.cjs": "6d66848f57044914c8348e334a209034a5e2840895dfac400daaeced3ca0fc6a",
+    "server/entity/jobResults.test.cjs": "761b0061ef68b332ab7f54fda2f5ffbf1329d278143023e853799eabf0311f1d",
+    "server/entity/lifecycle.test.cjs": "ba057c3fb2cd0c1dd948c4f0f230134ee3bf46929e1431a82662ed7f48e1973b",
+    "server/entity/replyBatches.cjs": "d3478532d73b043341a6a82e15d6d354e112c85b83bdf8d84da9b78725d35ba6",
+    "server/entity/replyBatches.test.cjs": "949bfcdef89796d4eb1f7ec1de15f09aa7eddf48f3bcd846376be2f9d20c5c69",
+    "server/entity/replyChoices.cjs": "b91d3908c5b4a825cf5a3eee58c8984919af9f5441066b5a520023c9b55d2fcc",
+    "server/entity/replyChoices.test.cjs": "4e0c230bb93cfe5664b454c41cac2b42681ec5571eb5680545594f6053d300cc",
+    "server/entity/schema.sql": "222b255032bb7fe7cc0de8f3de0fedc48e30ed9fb30e543c4c353080be629c7d",
+    "server/entity/store.cjs": "293c3e6400d50552445c0645cde955436e721e8170889e3f00ef2eeaaca52139",
+    "server/entity/store.test.cjs": "c42fdbc6366746e6ade397b43fa8c9c569ca8b08473594b491a0d06b28de16e8",
+    "server/entity/variableConcurrency.test.cjs": "f4be884983f4a6cf2d6d4da41316b9224c6cd8b307494b81746686bc622c9625",
+    "server/entity/variables.test.cjs": "1bbf567de9417dc613fb886d3b82c468a545414a09fad464f019a0fa929ec37b",
+    "server/native/groupGeneration.test.cjs": "3904df58d66b9b2a24308ab5c051e6a33b3957ec2311f48e8047faa7f588bbf0",
+    "src/ts/runtime/bookmarkPreviews.test.ts": "3ec2af8184d1c2937aa29e1e4d6298007f86feab194972f14f7b968c1fc03cfb",
+    "src/ts/runtime/bookmarkPreviews.ts": "9d1eb25692f5e2af93ef10a99c0e9f1ad839c56084d3af9d1917154fdfc815ae",
+    "src/ts/runtime/replyChoices.ts": "56de96b2df94e8f29cd6ec97bae748f68786cbe8184cec34fa7843cf39631436",
+    "src/ts/runtime/risuReadModel.test.ts": "da8a6ecf548a8325b05f9fba91b57eaf6434e15394af3616d1829433fa22ab02",
+    "src/ts/runtime/risuReadModel.ts": "9399e318777fda8ce190b80fbf8d35d36b0cd13a5d367bdcffd463fb3ef8bc05"
+  },
+  "remaining": [
+    "rapid-click pending feedback and queue policy",
+    "complete continuation and structural-extension history policy",
+    "full prefix/read dependency provenance",
+    "historical backfill, clone/import/export, retention and storage budgets",
+    "general extensions/editors/assets/offline policies",
+    "physical devices and representative latency/long tasks",
+    "all15 configured user trial"
+  ],
+  "productionAccessQueryStopDeploymentPush": false,
+  "externalProviderCalls": 0
+}

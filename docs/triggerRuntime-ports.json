@@ -1,0 +1,160 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/triggers.ts",
+  "core": "src/ts/process/triggerRuntime.ts",
+  "factory": "createTriggerRuntime",
+  "functions": ["collectStreamingText", "runTrigger"],
+  "ports": [
+    {
+      "name": "getCurrentChat",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentChat"
+    },
+    {
+      "name": "getModuleTriggers",
+      "specifier": "./modules",
+      "original": "getModuleTriggers"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "parseKeyValue",
+      "specifier": "../util",
+      "original": "parseKeyValue"
+    },
+    {
+      "name": "CurrentTriggerIdStore",
+      "specifier": "../stores.svelte",
+      "original": "CurrentTriggerIdStore"
+    },
+    {
+      "name": "selectedCharID",
+      "specifier": "../stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentCharacter"
+    },
+    {
+      "name": "risuChatParser",
+      "specifier": "../parser/parser.svelte",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "processMultiCommand",
+      "specifier": "./command",
+      "original": "processMultiCommand"
+    },
+    {
+      "name": "alertNormal",
+      "specifier": "../alert",
+      "original": "alertNormal"
+    },
+    {
+      "name": "alertError",
+      "specifier": "../alert",
+      "original": "alertError"
+    },
+    {
+      "name": "alertInput",
+      "specifier": "../alert",
+      "original": "alertInput"
+    },
+    {
+      "name": "alertSelect",
+      "specifier": "../alert",
+      "original": "alertSelect"
+    },
+    {
+      "name": "parseChatML",
+      "specifier": "../parser/chatML",
+      "original": "parseChatML"
+    },
+    {
+      "name": "requestChatData",
+      "specifier": "./request/request",
+      "original": "requestChatData"
+    },
+    {
+      "name": "HypaProcesser",
+      "specifier": "./memory/hypamemory",
+      "original": "HypaProcesser"
+    },
+    {
+      "name": "generateAIImage",
+      "specifier": "./stableDiff",
+      "original": "generateAIImage"
+    },
+    {
+      "name": "writeInlayImage",
+      "specifier": "./files/inlays",
+      "original": "writeInlayImage"
+    },
+    {
+      "name": "runScripted",
+      "specifier": "./scriptings",
+      "original": "runScripted"
+    },
+    {
+      "name": "sleep",
+      "specifier": "../util",
+      "original": "sleep"
+    },
+    {
+      "name": "setCurrentCharacter",
+      "specifier": "../storage/database.svelte",
+      "original": "setCurrentCharacter"
+    },
+    {
+      "name": "DBState",
+      "specifier": "../stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "ReloadGUIPointer",
+      "specifier": "../stores.svelte",
+      "original": "ReloadGUIPointer"
+    },
+    {
+      "name": "ReloadChatPointer",
+      "specifier": "../stores.svelte",
+      "original": "ReloadChatPointer"
+    },
+    {
+      "name": "tokenize",
+      "specifier": "../tokenizer",
+      "original": "tokenize"
+    },
+    {
+      "name": "calcString",
+      "specifier": "./infunctions",
+      "original": "calcString"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "expressionPorts": [
+    {
+      "name": "readResourceValue",
+      "parameters": ["value"],
+      "expression": "value"
+    },
+    {
+      "name": "readOptionalScriptState",
+      "parameters": ["state", "key"],
+      "expression": "state?.[key]"
+    },
+    {
+      "name": "readScriptState",
+      "parameters": ["state", "key"],
+      "expression": "state[key]"
+    }
+  ],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Native v1/v2 trigger composition tested; advanced network/image/UI capabilities remain explicit"
+}

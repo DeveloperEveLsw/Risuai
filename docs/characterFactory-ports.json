@@ -1,0 +1,22 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/characters.ts",
+  "core": "src/ts/characterFactory.ts",
+  "factory": "createCharacterFactory",
+  "functions": ["createBlankChar"],
+  "ports": [
+    {
+      "name": "uuidv4",
+      "specifier": "uuid",
+      "original": "v4"
+    },
+    {
+      "name": "defaultSdDataFunc",
+      "specifier": "./storage/database.svelte",
+      "original": "defaultSdDataFunc"
+    }
+  ],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/executionContext.ts",
+  "nativeVerifiedScope": "Native default character factory used by execution contexts"
+}

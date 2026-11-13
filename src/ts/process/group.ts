@@ -1,102 +1,83 @@
 import shuffle from "lodash/shuffle";
+import { createGroupOrderRuntime } from "./groupOrderRuntime";
 import { findCharacterbyId } from "../util";
 import { alertConfirm, alertError, alertSelectChar } from "../alert";
 import { language } from "src/lang";
 import { get } from "svelte/store";
-import { getDatabase, setDatabase } from "../storage/database.svelte";
 import { DBState, selectedCharID } from "../stores.svelte";
+import {
+  browserRuntime,
+  entityRuntimeEnabled,
+  reportRuntimeError,
+} from "../runtime/browserRuntimeState.svelte";
 
-export async function addGroupChar(){
-    let selectedId = get(selectedCharID)
-    let group = DBState.db.characters[selectedId]
-    if(group.type === 'group'){
-        const res = await alertSelectChar()
-        if(res){
-            if(group.characters.includes(res)){
-                alertError(language.errors.alreadyCharInGroup)
-            }
-            else{
-                if(await alertConfirm(language.askLoadFirstMsg)){
-                    group.chats[group.chatPage].message.push({
-                        role:'char',
-                        data: findCharacterbyId(res).firstMessage,
-                        saying: res,
-                    })
-                }
-
-                group.characters.push(res)
-                group.characterTalks.push(1 / 6 * 4)
-                group.characterActive.push(true)
-            }
+export async function addGroupChar() {
+  let selectedId = get(selectedCharID);
+  let group = DBState.db.characters[selectedId];
+  if (group.type === "group") {
+    if (entityRuntimeEnabled) {
+      try {
+        // Selection and confirmation may outlive the current screen. Pin the
+        // owner and greeting chat before either dialog opens.
+        const runtime = browserRuntime();
+        const target = runtime.captureGroup(group.chaId);
+        const memberId = await alertSelectChar();
+        if (!memberId) return;
+        if (runtime.groupView(target.groupId).characters.includes(memberId)) {
+          alertError(language.errors.alreadyCharInGroup);
+          return;
         }
+        const greeting = await alertConfirm(language.askLoadFirstMsg);
+        await runtime.addGroupMember(target, memberId, greeting);
+      } catch (error) {
+        reportRuntimeError(error);
+      }
+      return;
     }
-}
-
-
-export function rmCharFromGroup(index:number){
-    let selectedId = get(selectedCharID)
-    let group = DBState.db.characters[selectedId]
-    if(group.type === 'group'){
-        group.characters.splice(index, 1)
-        group.characterTalks.splice(index, 1)
-        group.characterActive.splice(index, 1)
-    }
-}
-
-export type GroupOrder = {
-    id: string,
-    talkness: number,
-    index: number
-}
-
-export function groupOrder(chars:GroupOrder[], input:string):GroupOrder[] {
-    let order:GroupOrder[] = [];
-    let ids:string[] = []
-    if (input) {
-        const words = getWords(input)
-
-        for (const word of words) {
-            for (let char of chars) {
-                const charNameChunks = getWords(findCharacterbyId(char.id).name)
-
-                if (charNameChunks.includes(word)) {
-                    order.push(char);
-                    ids.push(char.id)
-                    break;
-                }
-            }
-        }
-    }
-
-    const shuffled = shuffle(chars)
-    for (const char of shuffled) {
-        if(ids.includes(char.id)){
-            continue
+    const res = await alertSelectChar();
+    if (res) {
+      if (group.characters.includes(res)) {
+        alertError(language.errors.alreadyCharInGroup);
+      } else {
+        if (await alertConfirm(language.askLoadFirstMsg)) {
+          group.chats[group.chatPage].message.push({
+            role: "char",
+            data: findCharacterbyId(res).firstMessage,
+            saying: res,
+          });
         }
 
-        const chance = char.talkness ?? 0.5
-
-        if (chance >= Math.random()) {
-            order.push(char);
-            ids.push(char.id)
-        }
+        group.characters.push(res);
+        group.characterTalks.push((1 / 6) * 4);
+        group.characterActive.push(true);
+      }
     }
-
-    while (order.length === 0) {
-        order.push(chars[Math.floor(Math.random() * chars.length)]);
-    }
-
-    return order;
+  }
 }
 
-function getWords(data:string){
-    const matches =  data.split(/\n| /g)
-    let words:string[] = []
-    if(!matches){
-        return [data]
+export async function rmCharFromGroup(index: number) {
+  let selectedId = get(selectedCharID);
+  let group = DBState.db.characters[selectedId];
+  if (group.type === "group") {
+    if (entityRuntimeEnabled) {
+      try {
+        const runtime = browserRuntime();
+        const memberId = runtime.groupView(group.chaId).characters[index];
+        const target = runtime.captureGroupMember(group.chaId, memberId, index);
+        await runtime.changeGroupMember(target, "remove");
+      } catch (error) {
+        reportRuntimeError(error);
+      }
+      return;
     }
-    for(const match of matches){
-        words.push(match.toLocaleLowerCase())
-    }
-    return words
+    group.characters.splice(index, 1);
+    group.characterTalks.splice(index, 1);
+    group.characterActive.splice(index, 1);
+  }
 }
+
+export type { GroupOrder } from "./groupOrderRuntime";
+export const { groupOrder } = createGroupOrderRuntime({
+  findCharacterbyId,
+  shuffle,
+});

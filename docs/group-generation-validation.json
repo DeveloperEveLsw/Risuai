@@ -1,0 +1,91 @@
+{
+  "verifiedAt": "2026-10-04T00:42:17.590212+00:00",
+  "baseCommit": "d123a74a138efb12730fffbc690ffc12c97ebae2",
+  "classification": "local integration progress; all15 unchanged, whole goal incomplete",
+  "syntheticOnly": true,
+  "externalProviderCalls": 0,
+  "productionAccess": false,
+  "deployment": false,
+  "remotePush": false,
+  "checks": {
+    "application": {
+      "passed": 427,
+      "skipped": 3
+    },
+    "backend": {
+      "passed": 221,
+      "nativeGroupTestsIncluded": 6
+    },
+    "browser": {
+      "passed": 6,
+      "builtGroupOriginalUIIncluded": 1,
+      "independentBrowserContexts": 2,
+      "physicalMobile": false
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "builds": ["native", "entity web", "ordinary web"],
+    "audit": {
+      "declarations": 168,
+      "originalBodies": 166,
+      "explicitPriorPolicies": 2,
+      "newGroupBodies": ["groupOrder", "getWords"]
+    }
+  },
+  "controls": {
+    "missingPort": "risu-group-before.log",
+    "memberCloneBlocked": "risu-group-after.log",
+    "reconnectBlankBody": "risu-group-browser-fixed.log",
+    "priorReplyRemoved": "risu-group-stream-before.log",
+    "fixedRowRetained": "risu-group-stream-after.log",
+    "fixtureCorrections": [
+      "job-list result summary assertion",
+      "expected group rather than member regex",
+      "top-level Lua test placement",
+      "module trigger field name"
+    ]
+  },
+  "sourceHashes": {
+    "src/ts/process/group.ts": "9b91e3327453de7ddb7f011e2af6c39b250059de9754cf82bff4e857a3d4113e",
+    "src/ts/process/groupOrderRuntime.ts": "c5abf11da40f425cdc58b4629e8c48ffb4a3e4fda81deff69d9f4f8fe0b32fed",
+    "src/ts/runtime/extensionRuntime.ts": "409108cb136038f8d4ab3f80818a770c98feecfd8c48646ec64752386e69bf5e",
+    "src/ts/runtime/nativeGenerationRuntime.ts": "3628437c36633b92355c91a29c7e2544b55d2d69832e66fd8825bf2c5ffb69e1",
+    "src/ts/parser/parser.svelte.ts": "78f47a5fb4b853d97cc929ecb3694cf11ae86c4db647e89fc57fbffc213f9e5f",
+    "server/native/groupGeneration.test.cjs": "557ea5f36e5c5282f9ad1b4ee68870362d0f7f91fc049eb3ffb33dde6faaec46",
+    "server/browser/groupGenerationUi.test.cjs": "58b4c499ae149143ad0efbc8c26662975f2b79467322a389b1a6235a31313c01",
+    "server/engine/auditExtraction.mjs": "3a6f8724bcfd4b4770645c53c8399ba664672dd701e03617fc9055e31a45bef7",
+    "docs/groupOrderRuntime-ports.json": "1f9cc99acb06ab5c1b79033443ea5c4e2b6a249553d6dc71f975fcce3b402c16"
+  },
+  "nativeArtifactSha256": "e4f1d4d213471185e9d6fd9122925a665ba0609a539c4a918bdc23696e34b50f",
+  "builtIndexSha256": "2ad0cda8cf76cc9bfd0709caf1ebf438942d4783d15a71a855ab373e2a314c81",
+  "logDirectory": "/home/lws19/Documents/Codex/2026-10-02-flrk-mcp-risu-ai/evidence/local-group-generation-logs",
+  "logHashes": {
+    "risu-group-after.log": "17ef36bace641484c313ee475f2cb1a2d9c3de87817322dd118bf392cbbaa3cf",
+    "risu-group-after2.log": "a27a3aab6c7b5b560ae347b6aa4d2aeb85a4e57fc5c3700d96f5a8080cdb7e10",
+    "risu-group-app-gate.log": "9f3b3571fe0d8482c1cc72279e060c8baf85a44b91192d2f2d8706cd58237bd8",
+    "risu-group-audit.log": "dbc6285d1141a1a3e864c96ef556e4c1a6e0746142fa53efe2aa85f4de9961f1",
+    "risu-group-backend-gate.log": "edb47088d2d763297ae6c18ddcd4a7ea96e78c9eecd30293b18cb7a0520f878a",
+    "risu-group-before.log": "05c071025c8af2aff2adb31bffb8858253f408dddd45d7e0814567b8453a82f8",
+    "risu-group-browser-built-gate.log": "6387af55a0e77194ff2749fc0ed21ab4418a9cde35ae014610189b79df941094",
+    "risu-group-browser-debug.log": "3e0f13493d504855031e83f733b964d84240bba80dbc967eb1bcb753faeb7c21",
+    "risu-group-browser-fixed.log": "9789cc09a7830d5e93fea90e3bb479160248d52310ab598206c57e955af74601",
+    "risu-group-browser.log": "41292ef2927b03438bd9654ef23ef1567617394bf459c270e97745c9a5477bfb",
+    "risu-group-entity-build-gate.log": "a1fdcac9488fd264250b6e2521b7b7f424df7309734bb7505080f01dda15120f",
+    "risu-group-native-build4.log": "ff47db4c8cca5a6a15d53f2a1e97b0d45c62b8eb489ff802a980a65aceba85d4",
+    "risu-group-native-tests2.log": "1e6f03bdbc7f19e91b3d90d2b06625af9d3d076e680c661484c8f4a5aceedb45",
+    "risu-group-native-tests3.log": "e5824361d404b65ce1dadfdf4f2a1bf05c56f158fe07568de9e6efde877afdf9",
+    "risu-group-native-tests4.log": "49f7148b8b3993427e6c75f0efdb0379c507df3cffdbe8e3bfdffb8cdf1c18b3",
+    "risu-group-ordinary-build.log": "1315036a4adad259ea20d48145274491f9c64a9e0d2759bdf7b92ce8ff51baca",
+    "risu-group-stream-after.log": "a5c759ad1a4bfd052e85264084bed0839eb80adbfd1e2f17faf5a8cc3e5493e1",
+    "risu-group-stream-before.log": "0e6baa7a17b5ff50de0ece5b388b6c94e4566e49ebece266e663db80bfd55de4",
+    "risu-group-typecheck-gate.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+  },
+  "remaining": [
+    "group member editors/button context/continue-reroll/automode and negative/recovery cases",
+    "full shared member read-dependency contracts and progress for existing-history edits",
+    "large group history progress scan CPU/memory measurement",
+    "general extension fidelity, physical mobile, representative performance and practical all15 acceptance"
+  ]
+}

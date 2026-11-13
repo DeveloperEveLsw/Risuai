@@ -1,10 +1,11 @@
 <script lang="ts">
   import { StarIcon } from "@lucide/svelte";
-  import { DBState, selectedCharID } from "src/ts/stores.svelte";
   import type { BulkEditState, Category } from "./types";
   import { language } from "src/lang";
 
+  import type { SerializableHypaV3Data } from "src/ts/process/memory/hypav3";
   interface Props {
+    hypaV3Data: SerializableHypaV3Data;
     bulkEditState: BulkEditState;
     categories: Category[];
     showImportantOnly: boolean;
@@ -19,6 +20,7 @@
   }
 
   let {
+    hypaV3Data,
     bulkEditState,
     categories,
     showImportantOnly,
@@ -31,12 +33,6 @@
     onToggleImportant,
     onParseAndSelectSummaries,
   }: Props = $props();
-
-  const hypaV3Data = $derived(
-    DBState.db.characters[$selectedCharID].chats[
-      DBState.db.characters[$selectedCharID].chatPage
-    ].hypaV3Data
-  );
 
   function applyCategoryToSelected() {
     onApplyCategory();
@@ -65,7 +61,7 @@
   }
 
   function handleBulkSelectKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       parseAndSelectSummaries();
     }
   }
@@ -73,22 +69,26 @@
 
 <!-- Bulk Edit Action Bar -->
 {#if bulkEditState.isEnabled}
-  <div class="sticky bottom-0 p-3 bg-zinc-800 border-t border-zinc-700 rounded-b-lg">
+  <div
+    class="sticky bottom-0 p-3 bg-zinc-800 border-t border-zinc-700 rounded-b-lg"
+  >
     <div class="flex items-center justify-between">
       <!-- Left Side: Resummarize Button -->
       <div class="flex items-center gap-2">
         <!-- Resummarize Button -->
         <button
-          class="px-4 py-2 rounded text-sm font-medium transition-colors {bulkEditState.selectedSummaries.size > 1 
-            ? 'bg-green-600 hover:bg-blue-700 text-white' 
+          class="px-4 py-2 rounded text-sm font-medium transition-colors {bulkEditState
+            .selectedSummaries.size > 1
+            ? 'bg-green-600 hover:bg-blue-700 text-white'
             : 'bg-zinc-600 text-zinc-400 cursor-not-allowed'}"
+          data-hypa-bulk-summarize
           onclick={onResummarize}
           disabled={bulkEditState.selectedSummaries.size < 2}
         >
           {language.hypaV3Modal.reSummarize}
         </button>
       </div>
-      
+
       <!-- Right Side: Category, Important, Bulk Select, Clear -->
       <div class="flex items-center gap-2">
         <!-- Category Selection -->
@@ -104,9 +104,11 @@
 
         <!-- Apply Category Button -->
         <button
-          class="px-4 py-2 rounded text-sm font-medium transition-colors {bulkEditState.selectedSummaries.size > 0
+          class="px-4 py-2 rounded text-sm font-medium transition-colors {bulkEditState
+            .selectedSummaries.size > 0
             ? 'bg-blue-600 hover:bg-blue-700 text-white'
             : 'bg-zinc-600 text-zinc-400 cursor-not-allowed'}"
+          data-hypa-bulk-category-apply
           onclick={applyCategoryToSelected}
           disabled={bulkEditState.selectedSummaries.size === 0}
         >
@@ -115,7 +117,11 @@
 
         <!-- Bulk Toggle Important Button -->
         <button
-          class="px-3 py-2 rounded-sm border border-yellow-600 hover:bg-yellow-700 text-yellow-300 text-sm transition-colors flex items-center gap-2 {bulkEditState.selectedSummaries.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
+          class="px-3 py-2 rounded-sm border border-yellow-600 hover:bg-yellow-700 text-yellow-300 text-sm transition-colors flex items-center gap-2 {bulkEditState
+            .selectedSummaries.size === 0
+            ? 'opacity-50 cursor-not-allowed'
+            : ''}"
+          data-hypa-bulk-important
           onclick={bulkToggleImportant}
           disabled={bulkEditState.selectedSummaries.size === 0}
         >
@@ -134,6 +140,7 @@
           />
           <button
             class="px-3 py-2 rounded-sm border border-blue-600 hover:bg-blue-700 text-blue-300 text-sm transition-colors"
+            data-hypa-bulk-select
             onclick={parseAndSelectSummaries}
           >
             {language.select}

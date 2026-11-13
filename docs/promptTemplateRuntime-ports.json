@@ -1,0 +1,20 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/storage/database.svelte.ts",
+  "core": "src/ts/storage/promptTemplateRuntime.ts",
+  "factory": "createPromptTemplateRuntime",
+  "functions": [
+    "normalizePromptRole",
+    "normalizeCacheRole",
+    "normalizePromptTemplate"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "safeStructuredClone",
+      "specifier": "../polyfill",
+      "original": "safeStructuredClone"
+    }
+  ],
+  "globals": []
+}

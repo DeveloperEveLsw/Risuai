@@ -1,0 +1,63 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/lorebook.svelte.ts",
+  "core": "src/ts/process/lorebookRuntime.ts",
+  "factory": "createLorebookRuntime",
+  "functions": ["loadLoreBookV3Prompt"],
+  "ports": [
+    {
+      "name": "selectedCharID",
+      "specifier": "../stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "DBState",
+      "specifier": "../stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "getModuleLorebooks",
+      "specifier": "./modules",
+      "original": "getModuleLorebooks"
+    },
+    {
+      "name": "findCharacterbyId",
+      "specifier": "../util",
+      "original": "findCharacterbyId"
+    },
+    {
+      "name": "CCardLib",
+      "specifier": "@risuai/ccardlib",
+      "original": "CCardLib"
+    },
+    {
+      "name": "getChatVar",
+      "specifier": "../parser/chatVar.svelte",
+      "original": "getChatVar"
+    },
+    {
+      "name": "pickHashRand",
+      "specifier": "../util",
+      "original": "pickHashRand"
+    },
+    {
+      "name": "tokenize",
+      "specifier": "../tokenizer",
+      "original": "tokenize"
+    },
+    {
+      "name": "risuChatParser",
+      "specifier": "../parser/parser.svelte",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "setChatVar",
+      "specifier": "../parser/chatVar.svelte",
+      "original": "setChatVar"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Actual recursive selection and token-budget checks in the native composition; not full generation"
+}

@@ -1,0 +1,317 @@
+{
+  "baselineCommit": "1d0b8447576665009a6dbcfebf85d2c7951b3f59",
+  "schemaVersion": 20,
+  "all15ConditionsRemainActive": true,
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateDataReads": false,
+    "realModelCalls": 0,
+    "remotePushes": 0
+  },
+  "gates": {
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 477,
+      "skipped": 3,
+      "freshForCandidate": true,
+      "terminalSession": 42361
+    },
+    "backend": {
+      "passed": 354,
+      "reusedFromCommit": "1d0b8447576665009a6dbcfebf85d2c7951b3f59",
+      "freshlyRerun": false,
+      "backendFilesUnchanged": true,
+      "nativeArtifactIdentical": true,
+      "log": "evidence/local-responsiveness-logs/capture-backend.log"
+    },
+    "browserRegressions": {
+      "passed": 28,
+      "skipped": 0,
+      "files": 27,
+      "originalBuiltUI": 9,
+      "additionalDisplayCases": 19,
+      "additionalBuiltWorkerIncluded": 1,
+      "clientCompiledSvelteAndActualWorkerIncluded": 1,
+      "serial": true,
+      "terminalSession": 40744
+    },
+    "builds": ["native", "entity", "ordinary"],
+    "ordinaryBuild": {
+      "exitCode": 0,
+      "terminalSession": 54324,
+      "isolatedTemporaryOutputRemoved": true,
+      "bothRuntimeFlagsRemoved": true
+    },
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    }
+  },
+  "sourceFingerprints": {
+    "src/lib/ChatScreens/Chat.svelte": "80e0bc4d960829792ba468e5ff0b3114778a984101bbc3873b51fec9c9275fc0",
+    "src/lib/ChatScreens/ChatBody.svelte": "2501e1ae5243b0df8f0a15ccd948de7f562d9544eb340176d282f174ebdb577f",
+    "src/ts/parser/parser.svelte.ts": "78f47a5fb4b853d97cc929ecb3694cf11ae86c4db647e89fc57fbffc213f9e5f",
+    "src/ts/parser/cbsRuntime.ts": "0d8f4fe2f9f7c8819d7242c914c7df33af3a208c2833fae03527b3d33439a4d3",
+    "src/ts/process/scripts.ts": "7efc5a10953b203a96d65f07bb3f3dc572c215ddf6eb3ffb7034b8dcb0be6edc",
+    "src/ts/process/triggers.ts": "0380dbc1a60349dc3003412c90eefd19bf373cc7e7f6c0efbaedd22ffcf4cbf6",
+    "src/ts/runtime/displayCbsScope.ts": "0f7ade67c1240203e426066a4f72f3c5e654ef9cafccb5ab10b824f8135b2556",
+    "src/ts/runtime/displayReadDependencies.ts": "f39d9d9211ce717cf989a24cc5737017e9290c7969e6cdba9e1226254c4a4d41",
+    "src/ts/runtime/canonicalDisplayHistory.ts": "40ace21dbdb8223a0fd2445c31482c72ba5f474b35abcc0ca2b6dbbb45fa3d82",
+    "src/ts/runtime/browserDisplayMetadata.ts": "890cacd57f9cd4e269dbaf7b7404a6297b6e6a0a0e30e3ecec37d3a8a7030942",
+    "src/ts/runtime/displayRenderCache.ts": "2b8ebe1e1edcec14f5f8ddb8eb6f7637f7dbc4e6e8e9ff1c37cef7744e54d8e4",
+    "src/ts/runtime/stableDisplayDom.ts": "682b6e958abf6422621769176162d68cbe65aa7cd3c53d197b39e4da4a129251",
+    "src/ts/observer.svelte.ts": "e9f03dae411b056e0e37bec2da03111f34559eee811df53a9d804184c47b4bf7",
+    "src/ts/runtime/browserDisplayLua.ts": "169380b611e7dd4b20db3d77f9d10d1d884d9062fdfc7300949024d9dfbedd61",
+    "src/ts/runtime/displayScheduling.ts": "296a4041075652168cbce5c08ecd16df90323749c6fa4fad3763991bf62b6b17",
+    "src/ts/runtime/displayLuaContext.ts": "90f94001d8223750a9fe6656fba6a7ed62ab4ed4248a4e83f59d8e1e2ff46f3e",
+    "src/ts/runtime/displayWorkerExecutor.ts": "4beb16ae7fe4aa443786d82aede03508198ae76b4a73ef76c1bc9b32b6bfe5f3",
+    "src/ts/runtime/displayWireBudget.ts": "d1fe817792b9630fc662e7ce659ac0c30429bb21f10eefefcca04b841b6a4ec6",
+    "src/ts/runtime/displayScopeCache.svelte.ts": "c23b931a99a316950e44aac54783a6cfefc9d6280557f4e5907f58c89d0cb8e7",
+    "src/ts/runtime/displayScopeIdentity.ts": "ce51463992207f2164d9775ded898b35aff81ec571d2eec8e410c6e8fee01736",
+    "src/ts/runtime/browserRuntimeController.svelte.ts": "686e90dcf843eb651b542e27e333f8d2f42bf2a402089bab12b5351eb4a7205b",
+    "src/ts/runtime/risuReadModel.ts": "9399e318777fda8ce190b80fbf8d35d36b0cd13a5d367bdcffd463fb3ef8bc05",
+    "server/entity/store.cjs": "c765b48db75eca7bbcf6bce99e367053ec11994f0cfcdea43a6986eef59e84dc",
+    "src/ts/runtime/browserRuntimeState.svelte.ts": "e1b8020757cf2ad87a50e566b9e11ee24a5f220193c40b836d96a0bdf5ee6238",
+    "src/ts/runtime/display.worker.ts": "ce6fa7fcccee6743e025edbf258b0d91c833b665a1f509d725629c2a893d5142",
+    "src/ts/runtime/displayEffects.ts": "ad79908aba18888f8d59e1de6ca9ab6a631ecb16248d84818d0831c215a0d3a1",
+    "src/ts/process/scriptings.ts": "5bc763225329358a0ece5acef8a9fc9de492d82bc20102247f5fc7cf0fb5100f",
+    "server/browser/chromium.cjs": "4f03356ed5f1fe819e1959adee7372af56a0e2dc90899f9148cd5fb1aa42cf89",
+    "server/browser/displayPerformance.test.cjs": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "src/ts/runtime/displayScopeIdentity.test.ts": "e2793a3fbb3d4de53908dba427085cab0ca121e7786b5507f4b02e0d0217616e",
+    "server/browser/displayScopeHarness.svelte.ts": "b4effdfa758c78481399951c63b9685a5e47f24d327039e5fb10ea128f2a8875",
+    "server/browser/displayScopeCache.test.cjs": "e1460b992ed67587aec180826961d239e05849ddd46d564942ff90141ba2ac95",
+    "server/browser/displayDependencyUi.test.cjs": "55d4df9abbf5b05d502696ecd19683a84d487d30e3c4b34b3fb6d099c9677b79",
+    "src/ts/runtime/displayCaptureTransport.ts": "5615117930cbcc55c8670b14db43181bea95184c3e95ec4ce15b1ace7bd6f642"
+  },
+  "artifactHashes": {
+    "native": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411",
+    "entityIndex": "12951d5c3449d8ed626c209ee0992c8ff20ce99c4617537d344783f10d0f139b"
+  },
+  "sourceIdentity": {
+    "unitCases": 5,
+    "arbitraryJsonRuns": 500,
+    "arbitraryJsonSeed": 107,
+    "thresholdUtf16CodeUnits": 4096,
+    "actualWorker": {
+      "identityKeys": [
+        {
+          "anchored": true,
+          "bytes": 1073
+        },
+        {
+          "anchored": true,
+          "bytes": 1073
+        },
+        {
+          "anchored": true,
+          "bytes": 1072
+        },
+        {
+          "anchored": true,
+          "bytes": 1072
+        },
+        {
+          "anchored": true,
+          "bytes": 1072
+        }
+      ],
+      "rawSecondPacketBytes": 101965,
+      "newDefinitions": 0,
+      "outputs": [
+        "0/private-1/First/before/1",
+        "0/private-2/First/before/2",
+        "9/private-3/Later/after/3",
+        "9/private-1/Later/after/1"
+      ],
+      "canonicalCounter": "9",
+      "corruption": {
+        "failed": true,
+        "output": "Synthetic corrupted",
+        "errors": [
+          "Error: Error: Display capture transport: missing reference"
+        ],
+        "terminated": 2,
+        "dictionary": {
+          "entries": 0,
+          "cachedBytes": 0,
+          "definitionsSent": 1,
+          "definitionBytesSent": 100045,
+          "reusedReferences": 1
+        }
+      },
+      "commands": []
+    },
+    "originalUi": {
+      "sourceBytes": 7192,
+      "keyBytes": 1689,
+      "durableRawSourceSha256": "3bc6f438dd2aed3c9c8473bb9ae2eced1bf461557bdfe1ee01487e26ee1b5b6c",
+      "staleSameClockBlocked": true
+    },
+    "full16MiBExecutionLimitRetained": true,
+    "originalSynchronousCbsAndSvelteReadsRetained": true,
+    "luaResultsCached": false
+  },
+  "performance": {
+    "observations": 48,
+    "summary": [
+      {
+        "stage": "before",
+        "scenario": "desktop",
+        "samples": 12,
+        "buildIndexHash": "cc0243aca467703d2b3226feff4740e07bb41272e2a0b8b581e4fd0d8cd7c677",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "feedbackMs": {
+          "median": 21.55,
+          "p95": 26.5,
+          "max": 26.5
+        },
+        "settledMs": {
+          "median": 1177.75,
+          "p95": 1287.2,
+          "max": 1287.2
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.1,
+          "max": 100.1
+        },
+        "longTasks": {
+          "count": 11,
+          "maxMs": 74
+        }
+      },
+      {
+        "stage": "before",
+        "scenario": "mobile-emulation-4x",
+        "samples": 12,
+        "buildIndexHash": "cc0243aca467703d2b3226feff4740e07bb41272e2a0b8b581e4fd0d8cd7c677",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "feedbackMs": {
+          "median": 41.25,
+          "p95": 53.6,
+          "max": 53.6
+        },
+        "settledMs": {
+          "median": 2250.5,
+          "p95": 2502.2,
+          "max": 2502.2
+        },
+        "maxFrameGapMs": {
+          "median": 266.6,
+          "p95": 316.6,
+          "max": 316.6
+        },
+        "longTasks": {
+          "count": 12,
+          "maxMs": 275
+        }
+      },
+      {
+        "stage": "after",
+        "scenario": "desktop",
+        "samples": 12,
+        "buildIndexHash": "12951d5c3449d8ed626c209ee0992c8ff20ce99c4617537d344783f10d0f139b",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "feedbackMs": {
+          "median": 21.15,
+          "p95": 25.9,
+          "max": 25.9
+        },
+        "settledMs": {
+          "median": 1138.15,
+          "p95": 1223.1,
+          "max": 1223.1
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.1,
+          "max": 100.1
+        },
+        "longTasks": {
+          "count": 11,
+          "maxMs": 58
+        }
+      },
+      {
+        "stage": "after",
+        "scenario": "mobile-emulation-4x",
+        "samples": 12,
+        "buildIndexHash": "12951d5c3449d8ed626c209ee0992c8ff20ce99c4617537d344783f10d0f139b",
+        "computations": [106],
+        "independentRowsRecomputed": [94],
+        "feedbackMs": {
+          "median": 38.65,
+          "p95": 51.8,
+          "max": 51.8
+        },
+        "settledMs": {
+          "median": 2242.3,
+          "p95": 2450.5,
+          "max": 2450.5
+        },
+        "maxFrameGapMs": {
+          "median": 241.65,
+          "p95": 266.7,
+          "max": 266.7
+        },
+        "longTasks": {
+          "count": 12,
+          "maxMs": 271
+        }
+      }
+    ],
+    "quantileMethod": "nearest rank; with 12 samples p95 is observed maximum, not population tail inference",
+    "sameEnvironment": true,
+    "environment": {
+      "node": "v22.21.0",
+      "chromium": "Chrome/153.0.8010.12",
+      "platform": "linux",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "cpu": "AMD Ryzen 5 7500F 6-Core Processor",
+      "logicalCpus": 12
+    },
+    "sameFixture": true,
+    "helperSha256": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "sourceIdentitySha256Before": "0a5d09ba606ae78bd80dd8b30a6df8e391ba7886b1a74c19cfc4d81af0b164b2",
+    "sourceIdentitySha256After": "ce51463992207f2164d9775ded898b35aff81ec571d2eec8e410c6e8fee01736",
+    "actualMobileOS": false,
+    "workerCpuThrottle": "unverified",
+    "limits": [
+      "Small observed changes, not universal causal speedup or stutter resolution.",
+      "Approximately2.24s settlement and240ms frame gap remain; full15conditions active."
+    ],
+    "allBaselineFingerprintsMatch1dCommit": true,
+    "allCandidateFingerprintsStillMatch": true,
+    "fingerprintCount": 29
+  },
+  "control": {
+    "optimizedSamples": 48,
+    "separateDevSamples": 4,
+    "actuallyLoaded": [
+      "/home/lws19/Documents/Codex/2026-10-02-flrk-mcp-risu-ai/development/risuai/src/ts/runtime/displayScopeIdentity.ts"
+    ],
+    "overrideHashes": {
+      "src/ts/runtime/displayScopeIdentity.ts": "0ee1a4ae8b8e01ec011a1f5b89872993b9ae9d9c153bf33c1e74c94094faecf1"
+    },
+    "onlySourceFieldRecognitionDisabled": true,
+    "allCalls106Independent94": true,
+    "stableDomAndValues": true,
+    "notPooledWithOptimizedSamples": true
+  },
+  "sourceCommitRecordedIn": "workspace evidence/local-source-identity-20261004.json after commit; omitted here to avoid self-reference",
+  "wholeGoalComplete": false,
+  "limits": [
+    "Approximately2.24seconds settlement and240ms frame gaps remain; observed changes are small, not stutter resolution or universal causal speedup.",
+    "Physical mobile, workerCPU throttle, concurrent devices, cold/scaling/changedHTML/assets workloads and full trial remain unverified.",
+    "Complete resource/field/map/collection/extension, storage/import/export/retention and all15conditions remain active."
+  ]
+}

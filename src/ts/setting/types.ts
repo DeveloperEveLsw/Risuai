@@ -126,6 +126,12 @@ export interface SettingItem {
      * Only for input types (check, text, number, textarea, slider, select, color)
      */
     bindKey?: keyof Database;
+
+    /** Explicit single-field contract for custom getValue/setValue callbacks in server mode. */
+    runtimeField?: keyof Database;
+
+    /** Server mode applies this browser presentation effect reactively, including rollback. */
+    reactivePresentation?: boolean;
     
     /**
      * Path for nested object binding (e.g., 'ooba.top_p')

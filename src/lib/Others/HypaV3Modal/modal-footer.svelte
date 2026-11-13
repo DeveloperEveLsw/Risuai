@@ -8,13 +8,23 @@
   import { language } from "src/lang";
   import { getFirstMessage, processRegexScript } from "./utils";
 
+  import type { HypaModalContext } from "./context";
   interface Props {
+    context?: HypaModalContext;
     hypaV3Data: SerializableHypaV3Data;
   }
 
-  let { hypaV3Data }: Props = $props();
+  let { hypaV3Data, context }: Props = $props();
 
+  function firstMessage() {
+    return context ? context.firstMessage() : getFirstMessage();
+  }
   async function getNextSummarizationTarget(): Promise<Message | null> {
+    if (context)
+      return context.message(
+        hypaV3Data.summaries.at(-1)?.chatMemos.at(-1) ?? null,
+        true,
+      );
     const char = DBState.db.characters[$selectedCharID];
     const chat = char.chats[DBState.db.characters[$selectedCharID].chatPage];
     const shouldProcess = getCurrentHypaV3Preset().settings.processRegexScript;
@@ -23,7 +33,7 @@
     if (hypaV3Data.summaries.length > 0) {
       const lastSummary = hypaV3Data.summaries.at(-1);
       const lastMessageIndex = chat.message.findIndex(
-        (m) => m.chatId === lastSummary.chatMemos.at(-1)
+        (m) => m.chatId === lastSummary.chatMemos.at(-1),
       );
 
       if (lastMessageIndex !== -1) {
@@ -37,16 +47,16 @@
 
     // When no summaries exist OR couldn't find last connected message,
     // check if first message is available
-    const firstMessage = getFirstMessage();
+    const first = firstMessage();
 
-    if (!firstMessage) {
+    if (!first) {
       const next = chat.message[0] ?? null;
 
       return next && shouldProcess ? await processRegexScript(next, 0) : next;
     }
 
     // Will summarize first message
-    const next: Message = { role: "char", chatId: "first", data: firstMessage };
+    const next: Message = { role: "char", chatId: "first", data: first };
 
     return shouldProcess ? await processRegexScript(next) : next;
   }
@@ -80,7 +90,7 @@
     <span class="text-sm text-red-400"
       >{language.hypaV3Modal.nextSummarizationLoadingError.replace(
         "{0}",
-        error.message
+        error.message,
       )}</span
     >
   {/await}
@@ -92,7 +102,7 @@
   </div>
 
   <!-- No First Message -->
-  {#if !getFirstMessage()}
+  {#if !firstMessage()}
     <span class="text-sm text-red-400"
       >{language.hypaV3Modal.emptySelectedFirstMessageLabel}</span
     >

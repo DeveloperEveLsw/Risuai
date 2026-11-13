@@ -10,6 +10,8 @@
     import { FileDownIcon, FileUpIcon, ImportIcon } from "@lucide/svelte";
     import { selectSingleFile } from "src/ts/util";
     import { getModelInfo } from "src/ts/model/modellist";
+    import { LLMFlags } from "src/ts/model/types";
+    import { allowsMinimalReasoningEffort } from "src/ts/setting/botSettingsParamsData";
 
     type AuxModelKey = 'memory' | 'emotion' | 'translate' | 'otherAx'
     const auxModelKeys: AuxModelKey[] = ['memory', 'emotion', 'translate', 'otherAx']
@@ -49,7 +51,7 @@
         { value: 2, label: 'High' },
     ]
     let reasoningEffortOptions = $derived([
-        ...(!modelInfo.parameters.includes('reasoning_effort_min_medium') ? [{
+        ...(allowsMinimalReasoningEffort(modelInfo) ? [{
             value: -1,
             label: modelInfo.parameters.includes('reasoning_effort_none') ? 'None' : 'Minimal',
         }] : []),
@@ -65,6 +67,9 @@
         }
         if (modelInfo.parameters.includes('reasoning_effort_min_medium') && value.reasoning_effort < 1) {
             value.reasoning_effort = 1
+        }
+        if (modelInfo.flags.includes(LLMFlags.geminiThinkingNoMinimal) && value.reasoning_effort < 0) {
+            value.reasoning_effort = 0
         }
     })
 </script>

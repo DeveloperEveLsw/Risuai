@@ -15,13 +15,15 @@
     import { exportAsDataset } from "src/ts/storage/exportAsDataset";
     import { loginToSionyw, testSionywLogin } from "src/ts/sionyw";
     import { cleanColdStorage } from "src/ts/process/coldstorage.svelte";
+    import { entityRuntimeEnabled } from "src/ts/runtime/browserRuntimeState.svelte";
+    import { saveServerSnapshotBackup } from "src/ts/drive/serverSnapshotBackup";
     let openIframe = $state(false)
     let openIframeURL = $state('')
     let popup:Window = null
 </script>
 
 <svelte:window onmessage={async (e) => {
-    if(e.origin.startsWith("https://sv.risuai.xyz") || e.origin.startsWith("http://127.0.0.1") || e.origin === window.location.origin){
+    if(e.origin.startsWith("https://nightly.sv.risuai.xyz") || e.origin.startsWith("https://sv.risuai.xyz") || e.origin.startsWith("http://127.0.0.1") || e.origin === window.location.origin){
         if(e.data.msg?.type === 'drive'){
             await loadRisuAccountData()
             DBState.db.account.data.refresh_token = e.data.msg.data.refresh_token
@@ -43,6 +45,21 @@
 
 
 <h2 class="mb-2 text-2xl font-bold mt-2">{language.account} & {language.files}</h2>
+
+{#if entityRuntimeEnabled}
+  <div data-runtime-server-backup>
+    <Button onclick={saveServerSnapshotBackup} className="mt-2">
+      {DBState.db.language === "ko"
+        ? "서버 데이터 전체 백업"
+        : "Back up all server data"}
+    </Button>
+  </div>
+  <p class="text-textcolor2 mt-1">
+    {DBState.db.language === "ko"
+      ? "대화·에셋·작업 결과·응답 선택 이력을 포함합니다. 서버 명령으로 새 DB에 복원합니다."
+      : "Includes chats, assets, saved job results and reply alternatives. Restore into a new database with the server command."}
+  </p>
+{/if}
 
 <Button
     onclick={async () => {

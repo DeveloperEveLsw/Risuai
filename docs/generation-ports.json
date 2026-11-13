@@ -1,0 +1,299 @@
+{
+  "baseline": "f9728b14",
+  "ports": [
+    {
+      "name": "changeToPreset",
+      "specifier": "../storage/database.svelte",
+      "original": "changeToPreset"
+    },
+    {
+      "name": "setCurrentChat",
+      "specifier": "../storage/database.svelte",
+      "original": "setCurrentChat"
+    },
+    {
+      "name": "DBState",
+      "specifier": "../stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "CharEmotion",
+      "specifier": "../stores.svelte",
+      "original": "CharEmotion"
+    },
+    {
+      "name": "selectedCharID",
+      "specifier": "../stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "ChatTokenizer",
+      "specifier": "../tokenizer",
+      "original": "ChatTokenizer"
+    },
+    {
+      "name": "tokenize",
+      "specifier": "../tokenizer",
+      "original": "tokenize"
+    },
+    {
+      "name": "tokenizeNum",
+      "specifier": "../tokenizer",
+      "original": "tokenizeNum"
+    },
+    {
+      "name": "language",
+      "specifier": "../../lang",
+      "original": "language"
+    },
+    {
+      "name": "alertError",
+      "specifier": "../alert",
+      "original": "alertError"
+    },
+    {
+      "name": "alertToast",
+      "specifier": "../alert",
+      "original": "alertToast"
+    },
+    {
+      "name": "parseChatML",
+      "specifier": "../parser/chatML",
+      "original": "parseChatML"
+    },
+    {
+      "name": "loadLoreBookV3Prompt",
+      "specifier": "./lorebook.svelte",
+      "original": "loadLoreBookV3Prompt"
+    },
+    {
+      "name": "findCharacterbyId",
+      "specifier": "../util",
+      "original": "findCharacterbyId"
+    },
+    {
+      "name": "getAuthorNoteDefaultText",
+      "specifier": "../util",
+      "original": "getAuthorNoteDefaultText"
+    },
+    {
+      "name": "getPersonaPrompt",
+      "specifier": "../util",
+      "original": "getPersonaPrompt"
+    },
+    {
+      "name": "getUserName",
+      "specifier": "../util",
+      "original": "getUserName"
+    },
+    {
+      "name": "isLastCharPunctuation",
+      "specifier": "../util",
+      "original": "isLastCharPunctuation"
+    },
+    {
+      "name": "trimUntilPunctuation",
+      "specifier": "../util",
+      "original": "trimUntilPunctuation"
+    },
+    {
+      "name": "parseToggleSyntax",
+      "specifier": "../util",
+      "original": "parseToggleSyntax"
+    },
+    {
+      "name": "prebuiltAssetCommand",
+      "specifier": "../util",
+      "original": "prebuiltAssetCommand"
+    },
+    {
+      "name": "requestChatData",
+      "specifier": "./request/request",
+      "original": "requestChatData"
+    },
+    {
+      "name": "stableDiff",
+      "specifier": "./stableDiff",
+      "original": "stableDiff"
+    },
+    {
+      "name": "processScript",
+      "specifier": "./scripts",
+      "original": "processScript"
+    },
+    {
+      "name": "processScriptFull",
+      "specifier": "./scripts",
+      "original": "processScriptFull"
+    },
+    {
+      "name": "risuChatParser",
+      "specifier": "./scripts",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "exampleMessage",
+      "specifier": "./exampleMessages",
+      "original": "exampleMessage"
+    },
+    {
+      "name": "sayTTS",
+      "specifier": "./tts",
+      "original": "sayTTS"
+    },
+    {
+      "name": "supaMemory",
+      "specifier": "./memory/supaMemory",
+      "original": "supaMemory"
+    },
+    {
+      "name": "v4",
+      "specifier": "uuid",
+      "original": "v4"
+    },
+    {
+      "name": "groupOrder",
+      "specifier": "./group",
+      "original": "groupOrder"
+    },
+    {
+      "name": "runTrigger",
+      "specifier": "./triggers",
+      "original": "runTrigger"
+    },
+    {
+      "name": "HypaProcesser",
+      "specifier": "./memory/hypamemory",
+      "original": "HypaProcesser"
+    },
+    {
+      "name": "additionalInformations",
+      "specifier": "./embedding/addinfo",
+      "original": "additionalInformations"
+    },
+    {
+      "name": "getInlayAsset",
+      "specifier": "./files/inlays",
+      "original": "getInlayAsset"
+    },
+    {
+      "name": "getGenerationModelString",
+      "specifier": "./models/modelString",
+      "original": "getGenerationModelString"
+    },
+    {
+      "name": "connectionOpen",
+      "specifier": "../sync/multiuser",
+      "original": "connectionOpen"
+    },
+    {
+      "name": "peerRevertChat",
+      "specifier": "../sync/multiuser",
+      "original": "peerRevertChat"
+    },
+    {
+      "name": "peerSafeCheck",
+      "specifier": "../sync/multiuser",
+      "original": "peerSafeCheck"
+    },
+    {
+      "name": "peerSync",
+      "specifier": "../sync/multiuser",
+      "original": "peerSync"
+    },
+    {
+      "name": "runInlayScreen",
+      "specifier": "./inlayScreen",
+      "original": "runInlayScreen"
+    },
+    {
+      "name": "addRerolls",
+      "specifier": "./prereroll",
+      "original": "addRerolls"
+    },
+    {
+      "name": "runImageEmbedding",
+      "specifier": "./transformers",
+      "original": "runImageEmbedding"
+    },
+    {
+      "name": "hanuraiMemory",
+      "specifier": "./memory/hanuraiMemory",
+      "original": "hanuraiMemory"
+    },
+    {
+      "name": "hypaMemoryV2",
+      "specifier": "./memory/hypav2",
+      "original": "hypaMemoryV2"
+    },
+    {
+      "name": "runLuaEditTrigger",
+      "specifier": "./scriptings",
+      "original": "runLuaEditTrigger"
+    },
+    {
+      "name": "getModelInfo",
+      "specifier": "../model/modellist",
+      "original": "getModelInfo"
+    },
+    {
+      "name": "LLMFlags",
+      "specifier": "../model/modellist",
+      "original": "LLMFlags"
+    },
+    {
+      "name": "hypaMemoryV3",
+      "specifier": "./memory/hypav3",
+      "original": "hypaMemoryV3"
+    },
+    {
+      "name": "getModuleAssets",
+      "specifier": "./modules",
+      "original": "getModuleAssets"
+    },
+    {
+      "name": "getModuleToggles",
+      "specifier": "./modules",
+      "original": "getModuleToggles"
+    },
+    {
+      "name": "readImage",
+      "specifier": "../globalApi.svelte",
+      "original": "readImage"
+    },
+    {
+      "name": "pluginV2",
+      "specifier": "../plugins/plugins.svelte",
+      "original": "pluginV2"
+    }
+  ],
+  "browserCapabilities": [
+    "safeStructuredClone",
+    "snapshot",
+    "requestAnimationFrame",
+    "cancelAnimationFrame",
+    "notify"
+  ],
+  "algorithm": "Original sendChat and helper functions extracted with TypeScript lexical symbol resolution; imports are injected, preview state uses live accessors, notification is a capability.",
+  "nativeHostIntegrated": false,
+  "upstreamPipelineExecutedNatively": true,
+  "expressionPorts": [
+    {
+      "name": "readGlobalVariable",
+      "parameters": ["key"],
+      "expression": "DBState.db.globalChatVariables[key]"
+    },
+    {
+      "name": "incrementMessageCount",
+      "parameters": [],
+      "expression": "DBState.db.statics.messages += 1"
+    },
+    {
+      "name": "recordCharacterInteraction",
+      "parameters": ["character", "timestamp"],
+      "expression": "character.lastInteraction = timestamp"
+    }
+  ],
+  "bookkeepingContract": "Browser ports perform the original assignments. Native ports retain job-local values while recording an additive message count and monotonic character activity in separately versioned tables. reloadKeys remains transient in native contexts. Explicit non-generated counter/activity replacements require their own revisions.",
+  "verifiedNativeScope": "Synthetic completion and Responses API HTTP generation, tokenizer, CBS, lorebook, output regex/Lua and final persistence. Other providers, plugins, memory/assets, HTTP scheduling and browser synchronization remain incomplete."
+}

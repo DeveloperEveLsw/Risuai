@@ -1,0 +1,316 @@
+{
+  "baselineCommit": "af4498baaf0baa8938a4c13e624016710783efdb",
+  "hostedBaselineCommit": "20852d75c3cf5b96b4f21d5817a52fc72b0d99a0",
+  "verifiedAt": "2026-10-04T11:55:21.510637+00:00",
+  "schemaVersion": 21,
+  "schemaChanged": false,
+  "all15ConditionsRemainActive": true,
+  "wholeGoalComplete": false,
+  "performanceIssueResolved": false,
+  "gates": {
+    "app": {
+      "passed": 533,
+      "existingSkips": 3,
+      "fresh": true
+    },
+    "backend": {
+      "passed": 385,
+      "fresh": false,
+      "reuseReceipt": "evidence/hosted-current-rollout-20852d7-20261004.json",
+      "byteIdenticalServerFiles": 117,
+      "nativeArtifactIdentical": true
+    },
+    "browser": {
+      "passed": 22,
+      "serialSuite": 21,
+      "builtFidelity": 1,
+      "skipped": 0,
+      "fresh": true
+    },
+    "check": {
+      "errors": 0,
+      "warnings": 0,
+      "fresh": true
+    },
+    "builds": {
+      "kinds": [
+        "native",
+        "entity",
+        "ordinary"
+      ],
+      "fresh": true,
+      "ordinaryBothRuntimeFlagsRemoved": true
+    },
+    "audit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    }
+  },
+  "backendCompatibility": {
+    "schemaAndCommandBodiesUnchanged": true,
+    "allServerFilesUnchanged": true,
+    "nativeArtifactIdentical": true,
+    "unchangedServerFilesFromHosted": 117,
+    "rollbackRetainsCurrentDatabase": true
+  },
+  "contract": {
+    "ownedContextlessPreparationDeferred": true,
+    "previousDomAndTypedValueRetained": true,
+    "ordinaryContextlessFallbackRetained": true,
+    "resumedCanonicalEffectsVisibleToPeer": true,
+    "baselineAndGuardRemovalFailSameAssertion": true,
+    "normalLuaAndCbsCallbacks": 106,
+    "independentCallbacks": 94,
+    "noCacheOrScriptOutputPolicyChange": true,
+    "actualBuiltUiFixtures": 11,
+    "exactHtmlTextAndSanitizer": true
+  },
+  "performance": {
+    "receipt": "evidence/local-capture-gap-performance-comparison-20261004.json",
+    "warmObservations": 24,
+    "condition": "large-idle / HTML96cells /100rows / extraLua0",
+    "orders": 1,
+    "perRolePerScenario": 6,
+    "summary": [
+      {
+        "role": "baseline",
+        "scenario": "desktop",
+        "samples": 6,
+        "statistics": {
+          "feedbackMs": {
+            "median": 20.5,
+            "p95": 26.69999998807907,
+            "max": 26.69999998807907
+          },
+          "settledMs": {
+            "median": 620.9000000059605,
+            "p95": 752.1999999880791,
+            "max": 752.1999999880791
+          },
+          "maxFrameGapMs": 100,
+          "longestTaskMs": 55
+        },
+        "rawObservations": "evidence/local-capture-gap-performance-1-large-idle-baseline.json"
+      },
+      {
+        "role": "baseline",
+        "scenario": "mobile-emulation-4x",
+        "samples": 6,
+        "statistics": {
+          "feedbackMs": {
+            "median": 45.349999994039536,
+            "p95": 63.30000001192093,
+            "max": 63.30000001192093
+          },
+          "settledMs": {
+            "median": 1554.449999988079,
+            "p95": 1730.0999999940395,
+            "max": 1730.0999999940395
+          },
+          "maxFrameGapMs": 200,
+          "longestTaskMs": 201
+        },
+        "rawObservations": "evidence/local-capture-gap-performance-1-large-idle-baseline.json"
+      },
+      {
+        "role": "candidate",
+        "scenario": "desktop",
+        "samples": 6,
+        "statistics": {
+          "feedbackMs": {
+            "median": 19.799999982118607,
+            "p95": 21.5,
+            "max": 21.5
+          },
+          "settledMs": {
+            "median": 538.1500000059605,
+            "p95": 554,
+            "max": 554
+          },
+          "maxFrameGapMs": 66.59999999999945,
+          "longestTaskMs": 0
+        },
+        "rawObservations": "evidence/local-capture-gap-performance-1-large-idle-candidate.json"
+      },
+      {
+        "role": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "samples": 6,
+        "statistics": {
+          "feedbackMs": {
+            "median": 46.00000001490116,
+            "p95": 61.5,
+            "max": 61.5
+          },
+          "settledMs": {
+            "median": 1579.2000000029802,
+            "p95": 1714.300000011921,
+            "max": 1714.300000011921
+          },
+          "maxFrameGapMs": 150.10000000000036,
+          "longestTaskMs": 169
+        },
+        "rawObservations": "evidence/local-capture-gap-performance-1-large-idle-candidate.json"
+      }
+    ],
+    "statisticalOrUniversalImprovementEstablished": false,
+    "physicalMobileOrWorkerThrottleVerified": false
+  },
+  "sourceFingerprints": {
+    "src/ts/parser/parser.svelte.ts": "56d722ddd8c15752c748b62aba532a062abbe66bd8c5ae4a601616b20e0f466b",
+    "src/ts/parser/thoughtToolFormatting.ts": "db294ee271ac74d699b99153b194cf58cae69d2a246e903b8d54a415308588e0",
+    "server/browser/displayProjectionUi.test.cjs": "c731c16e2b7544200485aa1bf3ba65f2b0504e0555eeabd1e0861d96d47b21e2",
+    "docs/engine-extraction-audit.json": "194f29891f38eda6db7179770642c0cc02f0afb16ae420af31f03bcf56c3e79c",
+    "docs/server-runtime-plan.md": "7a14fc707e92fd04d9ddb91a4b1233e8b7589f2cd4c86209459c089137ff634a",
+    "docs/thought-tool-performance.md": "63d9298c2c46edcca8cf7dadcb6d089559694737eca5de2999adab4c8a8b8695",
+    "server/engine/auditExtraction.mjs": "3a6f8724bcfd4b4770645c53c8399ba664672dd701e03617fc9055e31a45bef7",
+    "server/entity/assets.cjs": "1e4fe91baf5fde9d036c9d4c0f78e3bb1958fde36b978168264af6373197ec98",
+    "server/entity/assets.test.cjs": "728ec562bc656606f42211def34ca123f8b08d8605e6b61f4500d708fb9d52d2",
+    "server/entity/bookkeeping.cjs": "4cf098a426e548482e438211d3da2c0e2f846993cee9eff3a96382fdb7c651f1",
+    "server/entity/bookkeeping.test.cjs": "3b33718e945428a529d9c474f4e7a2caf1ee22099db87bbb76c308add6b702cd",
+    "server/entity/bookmarks.cjs": "60a65b075adc75021d53e6fa304858538541faa16ece7d15c797daf982763c76",
+    "server/entity/bookmarks.test.cjs": "ac1d4bf3dcca94e5adaa77eeb12299be5d870e704ad49d5b53ffd8e48e4eb381",
+    "server/entity/branching.cjs": "0723cda7b0e8141971cce935d9e50c7fcbb55db133784364a36648e9ee9bddd7",
+    "server/entity/branching.test.cjs": "34fad4e545a8add6690e703d8e7b3e79eb58502eff597bd25e17e54b11252786",
+    "server/entity/catalog.cjs": "0b77079da8866dc4697fb0628593951cb19e85468bd5838beba09c202131b3d7",
+    "server/entity/catalog.test.cjs": "bd3abfdbbba097e8ef7161e8fe89a6665162b2cc368f6bd56a428b73f2664f6b",
+    "server/entity/characterNavigation.cjs": "a00f6cb9271f087c4b118ac7e3a029481547118ab9ac06e0cbfc0b60eca653d8",
+    "server/entity/characterNavigation.test.cjs": "9e5dd907770ec8fecaed7618063c03bafb2ba582b57036c0f46adde02a7f5bde",
+    "server/entity/chatNavigation.cjs": "866affdb7d09556a6a0f3b5f931af2492d635e7b62f1326cbec61d34109a1773",
+    "server/entity/chatNavigation.test.cjs": "e94b79bcbd826822c78db7ec6149c39bc541bbc8029b73abb23966487c0d9f13",
+    "server/entity/chatSummary.test.cjs": "bc411dc426222859e5c832c53cf4288bd837add716021a8c89d4fcf48963dbd2",
+    "server/entity/client.cjs": "7ebb9dda8045b78d6984c6ed715bc6af507835aa99b35e2fcb141fe9d9edf51e",
+    "server/entity/displayEffects.cjs": "672562c15099135a3713e253d5c79632b970280b1facb3a8e4a05ce30d663cb4",
+    "server/entity/displayEffects.test.cjs": "c26fb12d23789d137254084d5b4ebc15116889f480b58dd8ae5252d5d38de2ba",
+    "server/entity/displayMessageIntents.test.cjs": "a24c9ef91fe4a69f69a89c6e39e457a9801f69a4f4ed03aec3c108c83a8ae71f",
+    "server/entity/errors.cjs": "34b915e6df441edc39a7992e8a3cd16d85118ca20e7237a1c51a03bd5ebdb3f5",
+    "server/entity/fields.cjs": "0fa9b24e315cca886579767b1e466979b55bba7a3f90f4130c0e0e645584b950",
+    "server/entity/fields.test.cjs": "cb9945af6cba129576d96f55fe6592438c0da410a8f42316fb0ad85b1fbc0179",
+    "server/entity/groupMembers.cjs": "2e69caf53a414adcde8a6d43bf20725bd0756b15d4b3a4572a1af26dd821c79a",
+    "server/entity/groupMembers.test.cjs": "9d77fb9b348147a4a5f07ce39a6e4c7ff60a19c5e7209be9511f8f6772d1b088",
+    "server/entity/interactions.cjs": "bff745fb808694625a92133f3defe582f0756f55ea9fab2e4d0cc735fe5acf9f",
+    "server/entity/interactions.test.cjs": "999819c8f53b810397f8fb51de4c5445c9035f1e0c4cac5c3128a319bc525277",
+    "server/entity/jobProgress.test.cjs": "1cde25c23ecd1346d658714233d04ed15de46d0f80f15ddfa91fc1a8d27e9296",
+    "server/entity/jobResults.cjs": "db1d2628edcb8cff1f24b158b5154c4a15283a457a8ab5fbe2345df84a43b045",
+    "server/entity/jobResults.test.cjs": "7e6d18c661d6df7909b1b821b81a85ef1e28ddab552156b6bd45b5d12f991a04",
+    "server/entity/jobRetry.test.cjs": "f649839092eb91a5e8801556e3348273b348b8029e3a89cd6386ad0be1df4407",
+    "server/entity/library.cjs": "3f250010e47f2efb40c448b5714021ea16b342720a1044bf956eade7c35fe73a",
+    "server/entity/library.test.cjs": "8d47ad6e97bdd832df5dd73e6ebd0d9fd57344da598193a60bfad75ee3c8cf86",
+    "server/entity/librarySelection.cjs": "cbf7eecdd8e37a7a41a85722d3a6a09119fb2e94329c615dd670f4ea43221287",
+    "server/entity/librarySelection.test.cjs": "e8a00bebe428d6c626d7b3d99a5e58cfcd810b35927c85618406a501e7d51545",
+    "server/entity/lifecycle.cjs": "d4e8511b607da3000dd68313c9a19347a74d3d1eb3d7e62cfd93c4805242bafa",
+    "server/entity/lifecycle.test.cjs": "6ef15622471f6e80b7d3947c7498f356c83cb14971100ee6c51bbbf6ca83833f",
+    "server/entity/messageWindow.cjs": "de28be315e032dca5de63789a15bda0c5d6889133782aca5d1afd0046efb2009",
+    "server/entity/messageWindow.test.cjs": "497904a7641a6b823e67a47f44b2a32f933a6dce8a14eb1e674b5866fc653e5b",
+    "server/entity/messages.cjs": "3018d3066f3bcc5f0d7e92df6b13d507207fe34010bd69854a59c4a9a0570cb2",
+    "server/entity/messages.test.cjs": "2697b7fc2954c3013a276bfe770424ff048d0119ed54b1df7b3912aca7f0dfcd",
+    "server/entity/notices.cjs": "e4cabfd48fea79ecfce0e1b251e3f3980b0b60d19f626879ccd08c9e8e115ab3",
+    "server/entity/notices.test.cjs": "ac8f028ebea816c94dcd346374e549167b9c506e282eb3fb52f4da079760689d",
+    "server/entity/openDatabase.cjs": "4e623b53f25de3c579824e56d9f7bf82337d52ceb5bc1fa159573f805c51e2f9",
+    "server/entity/openDatabase.test.cjs": "400179129d5c3fec9f4e4557d20d78fe1a1fd04cdc060c2ea996328a59d544c7",
+    "server/entity/providerOutputMigration.test.cjs": "af7aa39eb52ee00838261c3ae188b2f80da8a452d7ce82d4a26fe9b9b4c0c96e",
+    "server/entity/providerOutputs.cjs": "487835c87133ac4d17e6669ad4c7448c64c480fcae041f2b2c06e51a61bd3b61",
+    "server/entity/replyBatches.cjs": "d3478532d73b043341a6a82e15d6d354e112c85b83bdf8d84da9b78725d35ba6",
+    "server/entity/replyBatches.test.cjs": "cd58c9494775d60aa6db99e0c4925458be2e67005b3b019d55acbfa84870fb8b",
+    "server/entity/replyChoices.cjs": "b91d3908c5b4a825cf5a3eee58c8984919af9f5441066b5a520023c9b55d2fcc",
+    "server/entity/replyChoices.test.cjs": "3476f250a6f073ddc523025ae0ab201c20a0669b25fb092bfb92a053698dca9f",
+    "server/entity/resourceReads.cjs": "1370a047e59ed3e8acf6ce8a8ce1237b02f70b1e47b74c7e3ca19fc0f85d27c1",
+    "server/entity/resourceReads.test.cjs": "e21e8464d4002e049fed4ce5ade63598d8da0310810342d8fbb6dd1ced8618a4",
+    "server/entity/schema.sql": "ba49faf689be149adb5ce5abca6c2bf76c525eda455c49fccb7576e02791b68e",
+    "server/entity/storagePressure.test.cjs": "d55f6878b702f144aac909550e93f48d34f4630549a1917f710569a1bf996106",
+    "server/entity/store.cjs": "513c1f1a005641bf269fd948ceb155ddc9276353ea8d57e91e02e5ba19f76d13",
+    "server/entity/store.test.cjs": "4f13950b4a1f0038142877e6443ef9cc555f281fcaf48097867a8f8b0b69d253",
+    "server/entity/variableConcurrency.test.cjs": "621d28d4025ffe36ff369c9ea74263e359d5cab13691764926ddf764eb45cff2",
+    "server/entity/variableReads.cjs": "609c97cbc9c496fece674b5e277bb6f2556d784e8ce42fe7f149368c0a1a5bd1",
+    "server/entity/variableReads.test.cjs": "0604b88086768a42761d2cfebfa619d3bd5a769e9559dca6064341bd2edcc3c1",
+    "server/entity/variables.cjs": "a458c35ffd18e7658647e2e232d4ed12de2e141e14f6235be8d51513a2d7ece9",
+    "server/entity/variables.test.cjs": "e2e05f66fac77fac2ff17ae99aeb7faf0843d02ebbe575e5697f2119e9bd94b3",
+    "server/entity/worker.cjs": "2aba29932d4b0562208ee9128a300ed562c845c59f012360baab3e5755e124e8",
+    "server/entity/writeSet.cjs": "89f6479d0899eff3b2be41e6c99221beafa5d8ec25b6ce107d45a45017de217e",
+    "server/hono/.gitignore": "5e185bf05c71062b7b082dbb2e4cd7a7df87eb5540b0e80a65b27e2bbdd682f2",
+    "server/hono/README.md": "6d52b7b4b4b9daa5320b4b9d59285995cb07762bfc4cda0f01f51b5927e91d9d",
+    "server/hono/package.json": "b02f12f98be7863ebbdfae863d8ef3c2d032525a4138af022e33375998e89db5",
+    "server/hono/pnpm-lock.yaml": "c3c671182e3bfd63dec06ed947939a71bbdb93d4fc3b86d2378044948606fdaa",
+    "server/hono/src/app/index.ts": "1d635e8ee48798a5f7b19114c6919d5f24cf565441c6c3d73861ee91770e1924",
+    "server/hono/src/bun.ts": "15385bdb8db04c74c0cb9b7afcb0d9fda47a7024dc55be4c3f82bcbd7253173b",
+    "server/hono/src/cf.ts": "d6e4a0b3a11e618f2a44a160269b26ca0d388627816d9ce3708ff0d1168d67dc",
+    "server/hono/src/node.ts": "f2fd73ce76648cfd380fb04aeebfdbd3cb36ea9847a42142acab97ef5109ca74",
+    "server/hono/src/utils/postbuild.js": "a4c268ea36f9a62810cb4a2fd26339ba4f52c3ed9cd5841039a210c6b1b3f3cd",
+    "server/hono/tsconfig.json": "c4d8fa3fc0d05657861837b1c6338bf8c31fcdc8717cc686b33c69e2aa8e3a9c",
+    "server/hono/wrangler.jsonc": "d5fe183a9543ba6d13f3f470994e009b53a0aee365540d213db06833636e0cb4",
+    "server/native/extensionProcess.cjs": "16111d94dc3e84c820bfcfbd3475288fe68f2d478cb96f91e5068bcd3ea2faf9",
+    "server/native/extensionWorker.cjs": "22a42cf80689cbcb788b3bd2a219185513fa3212f32f4a5890c5774b657ea16a",
+    "server/native/extensionWorker.test.cjs": "a0f39a52aacd021bf194c59ed9f4b76b9dad6a43bb952eb017a998077888890c",
+    "server/native/generationWorker.test.cjs": "41ab0574bc75c2e185235c2231386d460a0ba630b5002374dcad3fe5fb9652a7",
+    "server/native/groupGeneration.test.cjs": "3904df58d66b9b2a24308ab5c051e6a33b3957ec2311f48e8047faa7f588bbf0",
+    "server/native/interactions.cjs": "c90c7d49ff2ccb475898c7eb9e05b75dc68a5d4c13a11e4fed781931b8840906",
+    "server/native/interactions.test.cjs": "7dc4d23ff63242306bb92912038fe10e33b5b771b43e082ca6714961369f0cda",
+    "server/native/jobChannel.cjs": "332ddaf02f0d0725336c7a773be8a359ff4c6730de5bdd6c24994085310f3636",
+    "server/native/luaValueContracts.test.cjs": "cb9894ae6337754b94b4557271a5420276e154eee28e757bd186ea806fa1ba3e",
+    "server/native/notices.cjs": "41f8f8fc8878d26be28e300275f42219ff10158b23cecc2bc6f17a2a9e4d1e6d",
+    "server/native/notices.test.cjs": "2cfba900651d6d22937878a3c3127447b71898cf82a8868867d2aabe3fa1f337",
+    "server/native/pluginAdmission.cjs": "a5d6168e20d3541835daae330d5a37d788131c8e3f8bdb2ad48992b6711deea0",
+    "server/native/pluginAdmission.test.cjs": "f9694190b4a4679019b748a00747531197f55c5dbd532ef7fbcbc73d42d8ef7c",
+    "server/native/processWorker.cjs": "45b0f6734bc119c17ebf419ecd0190d77cfca3ef3e0669677487c218685b270d",
+    "server/native/progress.cjs": "771e4eb754d4fc9d1ed4f3442f8878990971b27f5f15c76740615c2c485870a5",
+    "server/native/providerOutputs.test.cjs": "632128ebfd30338be7d44534aa4ba27b47ad8d532c874dfd0a681d5195586143",
+    "server/native/readSnapshot.cjs": "89b61fa9fd9806be629c2040105c284bd85ec17da6c4f0e76a4ce38e30ff19ae",
+    "server/native/readSnapshot.test.cjs": "41369bc8d933008571c4ca12925b1571d35056587d5740b8a084228286f854e4",
+    "server/native/scheduler.cjs": "6e96bede686a5d0923325ab68914009f889dbf37d4b4bfb11784af2ff9d66b1b",
+    "server/native/tokenizerLoader.cjs": "7c2ad2da91906366bdd5933fe2a88d8b5f2b8be113b2679d70879aae99f40afd",
+    "server/native/variableReads.test.cjs": "ce9f7d8f15987e635780e5da8f4cc8514fdba8578f9cf418a10a959a98771725",
+    "server/node/readme.md": "8d6a4401f6100877c9f383cf2f0b05c068da906668896a34d97f1de6ace694e2",
+    "server/node/server.cjs": "e9d07373fb9dbe1f1edad1299e4ccd9c26939f5ce36196eaa8a13709e6c7c96e",
+    "server/node/ssl/Generate Certificate.bat": "742fb55c81b16b5e5c44256cb0c214730fbc570bc5e4213c1bd4e33308d8d77e",
+    "server/node/ssl/Generate Certificate.sh": "3933ff2a31050931787a462271282c841568e71145bc27a355aa8d8161954f6f",
+    "server/node/ssl/ca.conf": "7df2399ebe6202bee9770f5b36b248e2c72cf4a464e5cc2e011e659074a4568c",
+    "server/node/ssl/server.conf": "2bdfbdd3184694ca478e0f969b9ef7a2707bb4b4d2da72da433af3fdbf672a52",
+    "server/runtime/assets.cjs": "e5c15d6dc780bde34fbb769acbe7179c7de02e64575e73aca0c670935523edb3",
+    "server/runtime/assets.test.cjs": "969a7eadca186364ef994889a0fc6774a8b5e857bef9e8f9f99608806aa510d3",
+    "server/runtime/develop.cjs": "8e5674771c03b2f36a1cedee8c7eb2180e29b55f3e32edb0d912d68ebfc5c2af",
+    "server/runtime/diagnostics.cjs": "2fa1096696d8104c0af6617fdf4117557154519ef100221e4c633b67fee81007",
+    "server/runtime/diagnostics.test.cjs": "f4b50a7f1a6a1b312618d01323df3a8de8e92975353d0dd21d27e1616713deec",
+    "server/runtime/displayEffects.test.cjs": "9dafe18daee0ec87158f0a7043835ce9a349ab4508c980e42640eaf28a0b642c",
+    "server/runtime/interactions.test.cjs": "a6a5936d9365ac6e87a337ce50b53a0c47c5794f6d95bfd28cd17d8c750111ad",
+    "server/runtime/notices.test.cjs": "ba3aff9da51d841ecf6d2cc9ee4637730e159619831d02ae29175ff00670d389",
+    "server/runtime/production.cjs": "b81e6b389f6a1f059bf4e8e212068c14babd422964321c7494725f5978a42847",
+    "server/runtime/production.test.cjs": "58102f33b09bf182fcbaf32139b52f780450e5b453e78ec2818f4af5e300ce14",
+    "server/runtime/restoreBackup.cjs": "e096b656689d55d39b4215e14c7d922cd2a58065003470512d6099312d55b2d0",
+    "server/runtime/restoreBackup.test.cjs": "2ec6ec1c16c85fdaed6e89ea73e976dba27d104206fbaa9d47be27078ff11502",
+    "server/runtime/service.cjs": "688af5e9462c3104a1a02bb9ef917a6854d0a6ff79aa3cad7fd2718851325093",
+    "server/runtime/service.test.cjs": "3273712a1ca51ac91ebcfd6192de64f030e58f633099fed338dfb8fefb8d8710",
+    "server/runtime/start.cjs": "35f7b56af478efdd6e5516ddc72241384ddaee4489d81f28011e220dbf396d91"
+  },
+  "logFingerprints": {
+    "evidence/local-capture-gap-app-20261004.log": "d6d4cba8f71cc7af8932f55bc7db0849e2571b2bc86e115b3087664403fa2207",
+    "evidence/local-capture-gap-audit-20261004.log": "194f29891f38eda6db7179770642c0cc02f0afb16ae420af31f03bcf56c3e79c",
+    "evidence/local-capture-gap-baseline-projection-20261004.log": "56a63b9591abb88f0b469b226a6d8645ce949d0f753c8be7f489ad3a74573a6f",
+    "evidence/local-capture-gap-browser-20261004.log": "74d60ee72eb8ec41b84edbe1a3d1027cc87c9a97ec4e87230d9d1bf22de0982b",
+    "evidence/local-capture-gap-built-fidelity-20261004.log": "a5c61c4913ebaf4e0e51b3e3a7209ac6be3feff1c7963e587f437bbbcb468e12",
+    "evidence/local-capture-gap-candidate-projection-20261004.log": "6e11524b2e3a8b22add93c94c3e95f1c4811b780a9f1ee5c4a36764fd769d02d",
+    "evidence/local-capture-gap-check-20261004.log": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "evidence/local-capture-gap-entity-build-20261004.log": "be1269d8e49642d43a48227d9193406e22796930123465de32a04e319c72f0e8",
+    "evidence/local-capture-gap-native-build-20261004.log": "82d9f2cab7aa18998ab8937eecb21c3cc4bc4db8d0ede66f504826b6e5f47afa",
+    "evidence/local-capture-gap-ordinary-build-20261004.log": "5005c66d5702bd8cb89a35a862a582a0d09807386582f325a8dd7228800ed8b2",
+    "evidence/local-capture-gap-performance-run-20261004.log": "0b24e5d6515ab2feb6d75358e60bcc1f5da61b4e0222657fc0975c088cba0626",
+    "evidence/local-capture-gap-removal-20261004.log": "d9b529f078ec34e1deeb3c74a96abdb877821a33bc9fd6f8f6798f64f13a6fd5",
+    "evidence/local-capture-gap-source-format-20261004.log": "ce59869b45b7e2650aaf4b1f04decfba5d2f15d1ecfd36a71855f3d4e09f8361",
+    "evidence/local-capture-gap-test-format-20261004.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+  },
+  "artifacts": {
+    "nativeSha256": "ab496e296e04cb688e30feb44401727e7c4678f5731aa801c5e7d10ed78f7fbd",
+    "entityIndexSha256": "930e4445f01bb7f56e2e1008f9ef05bc1da032a1044f968acac10e1907bb29a5",
+    "ordinaryIndexSha256": "e3168e9bf67bc1d9de4e63932b4d48d9328b3b3ef37eece516bb46f679d4388e"
+  },
+  "limits": [
+    "Only owning entity UI without canonical capture defers; ordinary/background/translation fallbacks retained",
+    "One-condition one-order 24 observations; no broad speed or zero-stutter promise",
+    "Actual Nexus Lua gsub cause, full resource read/extension closure, import/export/retention/assets/global storage/physical mobile and all15 conditions remain open"
+  ],
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "privateContentAuthReads": 0,
+  "realModelCalls": 0,
+  "remotePushes": 0,
+  "localSyntheticTestsOnly": true
+}

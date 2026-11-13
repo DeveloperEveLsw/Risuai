@@ -1,0 +1,144 @@
+{
+  "sourceBase": "7e4b02e022370ff550074ba676d3539d992b2381",
+  "verifiedAt": "2026-10-04T02:17:33.839689+00:00",
+  "scope": "local public code/authored synthetic data only",
+  "schemaVersion": 16,
+  "wholeGoalComplete": false,
+  "all15Preserved": true,
+  "application": {
+    "passed": 433,
+    "existingSkipped": 3
+  },
+  "backend": {
+    "passed": 269,
+    "skipped": 0
+  },
+  "originalBuiltBrowserUI": {
+    "passed": 3,
+    "skipped": 0
+  },
+  "protocolBrowser": {
+    "distinctScenariosPassed": 17,
+    "reportedResultsPassedIncludingParent": 18,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorPolicies": 2
+  },
+  "nativeGroupRetry": {
+    "callsBefore": 2,
+    "callsAfter": 4,
+    "savedMessages": 3,
+    "messageStatistics": 3,
+    "currentPromptVariableConfirmed": true,
+    "luaVariablesAndGroupRegexConfirmed": true
+  },
+  "builtRetry": {
+    "isolatedContexts": 2,
+    "providerCallsAfterReplay": 1,
+    "savedMessages": 2,
+    "heldParentReceipts": 2,
+    "immutableIDsReplayed": true,
+    "allTabsClosedBeforeCompletion": true,
+    "navigationOwnerRetained": true
+  },
+  "configurationControl": {
+    "baselinePostsDespiteBlockedConfiguration": true,
+    "cleanBaselineFailedScenarios": 1,
+    "candidateDefersUntilResolved": true
+  },
+  "logs": [
+    {
+      "path": "evidence/local-job-retry-logs/initial.log",
+      "sha256": "87ebf25b6fb0647090a29dcc79c8f5d432f71fa3188d90aee5d888978ba644cd"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/sql.log",
+      "sha256": "9cd92fff8394e12b880eec504496078046eefeefc2e52d5f6861eef9f43d86a1"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/native.log",
+      "sha256": "6636a44d86ea61ed644ed4e5ddd042d6b2c82efd19c3156fa117c4e76e6fa02f"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/native-build.log",
+      "sha256": "bf21dece2b833250d6e96b02ef26518b17cbb7f381c59429faeb766b997d0a6e"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/backend.log",
+      "sha256": "e8623c70e0bfe5e49704dbd1de2162509312b2d1461f000b31dc64d8cf4be7f6"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/native-regex-fixture-failure.log",
+      "sha256": "8de9c886677408a7b7477efc611ae6fbb89aa9319ed2c074b185aadcf0080845"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/app.log",
+      "sha256": "7710848c9eaf86c5c4d550f7cf4718838535548c2aeac1b981ff31d21fd9478b"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/check.log",
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/audit.log",
+      "sha256": "73551b61cce1bde31898702f39fd5efe8c8aa0696060d14c1c4849a801b3cd4d"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/web.log",
+      "sha256": "98f545824c487902018f15f04a41bbc2c6c4f7f1d06a4ec8481d53dc6ce8e4c4"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/ordinary-web.log",
+      "sha256": "386e0834b91d0b9dc1e229383e140efdd1cf8f78a37131f77621868813f98cb5"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/browser.log",
+      "sha256": "02d1cb6183666e32345f9ee42082ff0905ed0ed705eb9db896508da416d512a0"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/browser-single.log",
+      "sha256": "c22f2a79d71d3c44a1f06c2fef4d03a3d16a1f346bea8f206d5ecb37ae3a28db"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/browser-replay-failure.log",
+      "sha256": "172f08ef703a5a855bfb529c572cbff93b29b56a48804f3f07187c21f64f7137"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/config-before.log",
+      "sha256": "f0c8b1dce0a84c125837e2906065fa487fe2db592707832f8cad63c91ab13bcc"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/config-before-clean.log",
+      "sha256": "b61a924d1684fe38bdb679a38c821d2ef193f9f0601614bbbb018c445b330d17"
+    },
+    {
+      "path": "evidence/local-job-retry-logs/config-after.log",
+      "sha256": "df73bdceeafee20ef7491d46d28952011e67e85c850c2a631ccd2309d01fe35a"
+    }
+  ],
+  "productionAccess": false,
+  "deployment": false,
+  "remotePush": false,
+  "actualProviderRequests": 0,
+  "remaining": [
+    "reply variants",
+    "complete read dependencies",
+    "general extensions",
+    "group behavior",
+    "physical devices",
+    "representative latency/long tasks",
+    "all15 configured trial"
+  ]
+}

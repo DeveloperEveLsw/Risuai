@@ -1,0 +1,59 @@
+{
+  "status": "staged_verified",
+  "baseCommit": "ff9803cd8c5da6b8379e7ec203bc1d9b3f995e97",
+  "target": "Safe error correlation and retained initial/runtime failure metadata",
+  "backendDiagnosticTestsPassed": 7,
+  "clientDiagnosticTestsPassed": 8,
+  "initialTypes": "0 errors, 0 warnings",
+  "privateOriginalContentRead": false,
+  "liveModified": false,
+  "all15Preserved": true,
+  "applicationPassed": 427,
+  "applicationSkipped": 3,
+  "backendPassed": 212,
+  "browserPassed": 20,
+  "browserSkipped": 0,
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "nativeBuild": "passed",
+  "webBuild": "passed",
+  "webBuildPath": "/tmp/risu-diagnostics-web-20261004",
+  "serverNode24Pending": false,
+  "browserActualDesktop": true,
+  "physicalMobileVerified": false,
+  "logs": "evidence/hosted-diagnostics-logs",
+  "serverNode24BackendPassed": 212,
+  "serverIsolatedRestoreProbe": {
+    "ready": true,
+    "authenticatedApi": true,
+    "anonymousApiStatus": 401,
+    "rootLoginStatus": 303,
+    "foreignOriginStatus": 403,
+    "builtUi": true,
+    "streamingEvents": true,
+    "restoredAssetHttpHashMatches": true,
+    "bootstrapBytes": 8969,
+    "characters": 15,
+    "resources": 61,
+    "serverId": "7a4a0929-a51f-41fd-9ef1-57235039a2f5",
+    "privateContentsDisplayed": false
+  },
+  "serverIsolatedDiagnosticCorrelation": {
+    "matched": true,
+    "anonymousStatus": 401,
+    "requestId": "8695d600-53c7-4a4e-b46f-b3d873a90a2c",
+    "privateBodiesPrinted": false
+  },
+  "snapshot": {
+    "snapshot": "/data/validation-20261004/before-diagnostics.sqlite",
+    "sha256": "b63bf9c2c746517a303d9c118b04c3a33b1ca3a0c9cca3671b37501642cb6596",
+    "integrity": {
+      "quick_check": "ok"
+    },
+    "foreignKeys": 0,
+    "activeJobs": 0
+  },
+  "latestTargetedBackendPassed": 7
+}

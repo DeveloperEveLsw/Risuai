@@ -1,0 +1,47 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/hypamemory.ts",
+  "core": "src/ts/process/memory/embeddingRuntime.ts",
+  "factory": "createEmbeddingRuntime",
+  "functions": ["similarity", "cosineSimilarity", "contextHash"],
+  "classes": ["HypaProcesser"],
+  "ports": [
+    {
+      "name": "localforage",
+      "specifier": "localforage",
+      "original": "default"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "isContextModel",
+      "specifier": "./contextualEmbedding",
+      "original": "isContextModel"
+    },
+    {
+      "name": "getContextProvider",
+      "specifier": "./contextualEmbedding",
+      "original": "getContextProvider"
+    },
+    {
+      "name": "runEmbedding",
+      "specifier": "../transformers",
+      "original": "runEmbedding"
+    },
+    {
+      "name": "appendLastPath",
+      "specifier": "src/ts/util",
+      "original": "appendLastPath"
+    },
+    {
+      "name": "globalFetch",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "globalFetch"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

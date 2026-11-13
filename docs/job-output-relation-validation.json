@@ -1,0 +1,954 @@
+{
+  "baselineCommit": "8ce0bc522fa56f48e6e2fab49ee958f3ef352220",
+  "verifiedAt": "2026-10-04T08:19:52.293860+00:00",
+  "schemaVersion": 21,
+  "migrationFrom": 20,
+  "wholeGoalComplete": false,
+  "all15ConditionsRemainActive": true,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateReads": false,
+    "realModelCalls": 0,
+    "deployments": 0,
+    "pushes": 0
+  },
+  "gates": {
+    "node": "22.21.0",
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 494,
+      "skipped": 3,
+      "fresh": true
+    },
+    "backend": {
+      "passed": 377,
+      "skipped": 0,
+      "fresh": true,
+      "fileConcurrency": 2
+    },
+    "browser": {
+      "passed": 14,
+      "skipped": 0,
+      "fresh": true,
+      "serial": true,
+      "originalBuiltUi": 10,
+      "displayCases": 4
+    },
+    "focused": {
+      "passed": 15,
+      "migration": 4,
+      "retentionBudgetConcurrency": 11
+    },
+    "builds": {
+      "fresh": false,
+      "reusedFrom": "8ce0bc522fa56f48e6e2fab49ee958f3ef352220",
+      "kinds": ["native", "entity", "ordinary"],
+      "nativeEntityArtifactBytesIdentical": true,
+      "allTrackedSrcFilesUnchanged": true
+    },
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    },
+    "candidateNode24Fresh": false
+  },
+  "storage": {
+    "relation": "job_provider_outputs",
+    "key": ["job_id", "request"],
+    "privateJsonUtf8Budget": 4194304,
+    "combinedLogicalCheckpointBudget": 16777216,
+    "atomicProgressAndRawRows": true,
+    "unchangedRawRowsNotReadOrResent": true,
+    "notAGlobalStorageOrHeapBudget": true
+  },
+  "performance": {
+    "comparison": [
+      {
+        "run": 1,
+        "order": "baseline/candidate",
+        "before": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.6079089999999496,
+              "p95": 3.840563000000003,
+              "max": 3.9022379999999828
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.18395600000002332,
+              "p95": 0.20052900000001728,
+              "max": 0.2120909999999867
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.971341000000052,
+              "p95": 4.175692999999995,
+              "max": 4.220591999999982
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.6352779999999996,
+              "p95": 4.035536000000008,
+              "max": 5.636759000000012
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.1844199999999887,
+              "p95": 0.2670569999999941,
+              "max": 0.27934099999998807
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.9546840000000145,
+              "p95": 4.118640000000028,
+              "max": 4.122788999999983
+            }
+          }
+        }
+      },
+      {
+        "run": 1,
+        "order": "baseline/candidate",
+        "before": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.5959589999999935,
+              "p95": 3.763705000000016,
+              "max": 3.9097360000000094
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.1788930000000164,
+              "p95": 0.24842799999998988,
+              "max": 0.34366799999997966
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.483872000000019,
+              "p95": 4.797198999999978,
+              "max": 4.839971999999989
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.6585149999999658,
+              "p95": 3.974980999999957,
+              "max": 4.016203000000019
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.1794840000000022,
+              "p95": 0.20760700000005272,
+              "max": 0.20821399999999812
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.471687999999972,
+              "p95": 4.761386000000016,
+              "max": 4.7990610000000515
+            }
+          }
+        }
+      },
+      {
+        "run": 1,
+        "order": "baseline/candidate",
+        "before": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.684346000000005,
+              "p95": 3.9035339999999223,
+              "max": 3.980036000000041
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.18248000000005504,
+              "p95": 0.4190659999999298,
+              "max": 0.7721559999999954
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.96421399999997,
+              "p95": 4.109019999999987,
+              "max": 4.153777999999988
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.7478590000000622,
+              "p95": 3.9812200000000075,
+              "max": 4.128094000000033
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.17388199999993503,
+              "p95": 0.2598280000000841,
+              "max": 0.4239820000000236
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.994972999999959,
+              "p95": 4.158884000000057,
+              "max": 4.455242999999996
+            }
+          }
+        }
+      },
+      {
+        "run": 1,
+        "order": "baseline/candidate",
+        "before": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.694404000000077,
+              "p95": 4.1996579999999994,
+              "max": 4.539819999999963
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.21022900000002664,
+              "p95": 0.2631060000001071,
+              "max": 0.2828190000000177
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.535585000000083,
+              "p95": 5.276356000000078,
+              "max": 5.49014800000009
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.749328000000105,
+              "p95": 4.094585999999936,
+              "max": 4.1861240000000635
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.17483400000014626,
+              "p95": 0.23629800000003343,
+              "max": 2.109609999999975
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.631450000000086,
+              "p95": 4.811980999999832,
+              "max": 5.172096999999894
+            }
+          }
+        }
+      },
+      {
+        "run": 1,
+        "order": "baseline/candidate",
+        "before": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 33.98856799999999,
+              "p95": 43.106064999999944,
+              "max": 49.87749299999996
+            },
+            "status": {
+              "samples": 20,
+              "median": 2.6066399999999703,
+              "p95": 3.1483069999999316,
+              "max": 3.1642729999998664
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 8.265065999999933,
+              "p95": 14.296858000000157,
+              "max": 14.374188000000004
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 31.079565000000002,
+              "p95": 32.82614599999988,
+              "max": 35.23996299999999
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.2762800000000425,
+              "p95": 0.4303890000001047,
+              "max": 0.434650000000147
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.019608000000062,
+              "p95": 4.572306000000026,
+              "max": 14.160114000000021
+            }
+          }
+        }
+      },
+      {
+        "run": 1,
+        "order": "baseline/candidate",
+        "before": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 34.45588899999984,
+              "p95": 45.258200000000215,
+              "max": 45.4396270000002
+            },
+            "status": {
+              "samples": 20,
+              "median": 2.526553999999578,
+              "p95": 2.870730000000094,
+              "max": 2.9410330000000613
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 21.002970000000005,
+              "p95": 26.13274999999976,
+              "max": 26.311013000000003
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 31.11340799999971,
+              "p95": 32.716143999999986,
+              "max": 32.96893200000022
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.24103699999977835,
+              "p95": 0.3035899999999856,
+              "max": 0.3957559999998921
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.670607000000018,
+              "p95": 8.329623000000083,
+              "max": 15.600926000000072
+            }
+          }
+        }
+      },
+      {
+        "run": 2,
+        "order": "candidate/baseline",
+        "before": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.7429600000000107,
+              "p95": 3.911151999999987,
+              "max": 3.9233639999999923
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.1800630000000183,
+              "p95": 0.256637000000012,
+              "max": 0.40260399999999663
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.953651000000036,
+              "p95": 4.166757999999987,
+              "max": 4.169608000000039
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.6295829999999967,
+              "p95": 3.867494000000022,
+              "max": 4.0597569999999905
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.18939500000001885,
+              "p95": 0.2879560000000083,
+              "max": 0.2888990000000149
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.943536000000023,
+              "p95": 4.098318000000006,
+              "max": 4.121237000000008
+            }
+          }
+        }
+      },
+      {
+        "run": 2,
+        "order": "candidate/baseline",
+        "before": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.6069629999999506,
+              "p95": 3.8880320000000097,
+              "max": 6.342205000000035
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.1783100000000104,
+              "p95": 0.22898299999997107,
+              "max": 0.2294170000000122
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.444703000000004,
+              "p95": 4.677327999999989,
+              "max": 8.136836000000017
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 0,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.646571999999992,
+              "p95": 4.0895759999999655,
+              "max": 4.190555000000018
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.17927399999996396,
+              "p95": 0.2607419999999365,
+              "max": 0.29545199999995475
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.474613999999974,
+              "p95": 4.676216000000011,
+              "max": 4.800971000000004
+            }
+          }
+        }
+      },
+      {
+        "run": 2,
+        "order": "candidate/baseline",
+        "before": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.8315039999999954,
+              "p95": 5.26238699999999,
+              "max": 7.3587230000000545
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.19433799999990242,
+              "p95": 0.2823470000000725,
+              "max": 0.7805660000000216
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.9601639999999634,
+              "p95": 4.383330999999998,
+              "max": 5.98217800000009
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.7054780000000846,
+              "p95": 3.98957699999994,
+              "max": 4.035294000000022
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.17870800000002873,
+              "p95": 0.21965799999998126,
+              "max": 0.23604199999999764
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.896488999999974,
+              "p95": 4.2763459999999895,
+              "max": 4.3479750000000195
+            }
+          }
+        }
+      },
+      {
+        "run": 2,
+        "order": "candidate/baseline",
+        "before": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.7784489999999096,
+              "p95": 4.279972999999927,
+              "max": 4.736255999999912
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.18759399999999005,
+              "p95": 0.23214900000016314,
+              "max": 0.2344669999999951
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.578600999999935,
+              "p95": 4.8416440000000875,
+              "max": 4.91474600000015
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 16384,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 3.690454000000045,
+              "p95": 3.9437379999999393,
+              "max": 5.62501199999997
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.18410799999992378,
+              "p95": 0.2344350000000759,
+              "max": 0.2800470000001951
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.4978309999999055,
+              "p95": 4.753218000000061,
+              "max": 5.043210999999928
+            }
+          }
+        }
+      },
+      {
+        "run": 2,
+        "order": "candidate/baseline",
+        "before": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 33.79050599999982,
+              "p95": 44.80616699999996,
+              "max": 45.11041100000011
+            },
+            "status": {
+              "samples": 20,
+              "median": 2.438997999999856,
+              "p95": 2.751708000000235,
+              "max": 2.8874170000003687
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 8.121087999999872,
+              "p95": 14.205009000000246,
+              "max": 15.806503999999904
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 2,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 29.680777000000035,
+              "p95": 30.34301500000015,
+              "max": 33.28928300000007
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.24638200000003962,
+              "p95": 0.3655069999999796,
+              "max": 0.41440600000032646
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 3.9952679999998963,
+              "p95": 4.656155000000126,
+              "max": 14.130313999999998
+            }
+          }
+        }
+      },
+      {
+        "run": 2,
+        "order": "candidate/baseline",
+        "before": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 34.354355999999825,
+              "p95": 43.74670699999979,
+              "max": 50.51208600000018
+            },
+            "status": {
+              "samples": 20,
+              "median": 2.4502299999999195,
+              "p95": 2.73738400000002,
+              "max": 2.78153199999997
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 20.378323000000364,
+              "p95": 26.835591000000022,
+              "max": 26.87258299999985
+            }
+          }
+        },
+        "after": {
+          "privateOutputBytes": 3145728,
+          "concurrentStatusRequests": 8,
+          "measurement": "actual native checkpoint/DB worker IPC/SQLite, 4warmup+20samples; fixed bytes with different16-byte suffix on every write; no HTTP/browser/provider",
+          "maxStatusBytes": 332,
+          "timings": {
+            "checkpoint": {
+              "samples": 20,
+              "median": 29.66010099999994,
+              "p95": 32.823038,
+              "max": 33.33482700000013
+            },
+            "status": {
+              "samples": 20,
+              "median": 0.23126000000002023,
+              "p95": 0.28744200000028286,
+              "max": 0.29255200000034165
+            },
+            "toggleAfterPollBurst": {
+              "samples": 20,
+              "median": 4.5948749999997744,
+              "p95": 5.125302999999803,
+              "max": 14.73181599999998
+            }
+          }
+        }
+      }
+    ],
+    "helperSha256": "1bdd6010b9e1be37b5e586a259b89aaf387de914f96beb7d0f7d3ad8f813aac2",
+    "gatesFinishedBeforeMeasurement": true,
+    "publicProgress": "small fixed synthetic body",
+    "privateBodies": "fixed byte sizes, differing16-byte suffix each write",
+    "warmup": 4,
+    "samplesPerConditionPerRun": 20,
+    "measurement": "actual native checkpoint, DB-worker IPC and SQLite; no HTTP/browser/provider",
+    "pooledPercentileClaim": false,
+    "intermediate": "two transactions increased small-body checkpoint median3.9→7.5ms; fixed with one transaction; static-body phases retained separately"
+  },
+  "migration": {
+    "states": ["running", "failed", "cancelled", "interrupted", "completed"],
+    "identityCanonicalCursorFencesRevisionsPreserved": true,
+    "invalidLegacyRollback": true,
+    "actualSqliteFullRollback": true,
+    "futureSchemaRejected": true,
+    "exactPreviousCodeRollback": {
+      "baselineCommit": "8ce0bc522fa56f48e6e2fab49ee958f3ef352220",
+      "migration": "20→21",
+      "oldCodeRejects21": true,
+      "version20SnapshotRestoresExactly": true,
+      "candidate21Preserved": true,
+      "identityCursorCanonicalAndJobPreserved": true,
+      "syntheticOnly": true,
+      "providerCalls": 0,
+      "productionAccess": false
+    }
+  },
+  "baselineExtraction": {
+    "path": "/tmp/risu-progress-baseline-public-zvu_9779",
+    "commit": "8ce0bc522fa56f48e6e2fab49ee958f3ef352220",
+    "temporary": true,
+    "publicOnly": true,
+    "sourceFingerprints": {
+      "server/entity/worker.cjs": "2aba29932d4b0562208ee9128a300ed562c845c59f012360baab3e5755e124e8",
+      "server/entity/groupMembers.test.cjs": "4f407b6dcaa3bf5d8849597ad45a2d358512c825a131ab37897e1ef97ed2be1f",
+      "server/entity/groupMembers.cjs": "2e69caf53a414adcde8a6d43bf20725bd0756b15d4b3a4572a1af26dd821c79a",
+      "server/entity/lifecycle.cjs": "d4e8511b607da3000dd68313c9a19347a74d3d1eb3d7e62cfd93c4805242bafa",
+      "server/entity/replyChoices.cjs": "b91d3908c5b4a825cf5a3eee58c8984919af9f5441066b5a520023c9b55d2fcc",
+      "server/entity/displayEffects.cjs": "672562c15099135a3713e253d5c79632b970280b1facb3a8e4a05ce30d663cb4",
+      "server/entity/branching.test.cjs": "34fad4e545a8add6690e703d8e7b3e79eb58502eff597bd25e17e54b11252786",
+      "server/entity/client.cjs": "7ebb9dda8045b78d6984c6ed715bc6af507835aa99b35e2fcb141fe9d9edf51e",
+      "server/entity/chatNavigation.test.cjs": "df3527d7d13999fe4640487ddd71e2070b63114028caf594f34a9096a8261847",
+      "server/entity/messageWindow.test.cjs": "497904a7641a6b823e67a47f44b2a32f933a6dce8a14eb1e674b5866fc653e5b",
+      "server/entity/resourceReads.cjs": "1370a047e59ed3e8acf6ce8a8ce1237b02f70b1e47b74c7e3ca19fc0f85d27c1",
+      "server/entity/writeSet.cjs": "89f6479d0899eff3b2be41e6c99221beafa5d8ec25b6ce107d45a45017de217e",
+      "server/entity/bookkeeping.test.cjs": "be0be6bad41e86e33b997587733773b524ae16501592438bf1a361d2faf0a3c1",
+      "server/entity/replyBatches.cjs": "d3478532d73b043341a6a82e15d6d354e112c85b83bdf8d84da9b78725d35ba6",
+      "server/entity/jobProgress.test.cjs": "fcb33c4270d4c20367cadf500aed106afe8a70f340cc816e90d5418d3274cffb",
+      "server/entity/providerOutputs.cjs": "bbb04a17879c1ad2f48ff6a17ddd9cb65e9e75a3d9bd40aaa44248e29757ab0e",
+      "server/entity/variableReads.test.cjs": "0604b88086768a42761d2cfebfa619d3bd5a769e9559dca6064341bd2edcc3c1",
+      "server/entity/resourceReads.test.cjs": "e21e8464d4002e049fed4ce5ade63598d8da0310810342d8fbb6dd1ced8618a4",
+      "server/entity/catalog.test.cjs": "67088b9001cb8b34443e43ad1b7df1f163860177dc45325a7584ffe11c2ab5db",
+      "server/entity/assets.test.cjs": "d64ff4a56f7ddbf154b3a2d7b1e4b614b6db6fbfdb188ae5dccad5bd9d38e9c0",
+      "server/entity/chatSummary.test.cjs": "bc411dc426222859e5c832c53cf4288bd837add716021a8c89d4fcf48963dbd2",
+      "server/entity/jobResults.test.cjs": "d49c932c00568d3fccd2623ee739370a90ca995276c55252170cfeaa115f76e5",
+      "server/entity/fields.cjs": "0fa9b24e315cca886579767b1e466979b55bba7a3f90f4130c0e0e645584b950",
+      "server/entity/notices.cjs": "e4cabfd48fea79ecfce0e1b251e3f3980b0b60d19f626879ccd08c9e8e115ab3",
+      "server/entity/interactions.cjs": "bff745fb808694625a92133f3defe582f0756f55ea9fab2e4d0cc735fe5acf9f",
+      "server/entity/library.cjs": "3f250010e47f2efb40c448b5714021ea16b342720a1044bf956eade7c35fe73a",
+      "server/entity/displayEffects.test.cjs": "ce82997e0dd8f5b56e86c44f14e9d51b5410cc1d3059d4acdcc7d404d1063a8b",
+      "server/entity/library.test.cjs": "8d47ad6e97bdd832df5dd73e6ebd0d9fd57344da598193a60bfad75ee3c8cf86",
+      "server/entity/jobResults.cjs": "57590af13dc5d63c76a573da821f39860a26617f398e8259940df9223b7d67bd",
+      "server/entity/librarySelection.cjs": "cbf7eecdd8e37a7a41a85722d3a6a09119fb2e94329c615dd670f4ea43221287",
+      "server/entity/store.cjs": "24262ee877c513a7042d15436b329b1ffb069da0a1ce46d894c5c433988e7586",
+      "server/entity/bookmarks.cjs": "60a65b075adc75021d53e6fa304858538541faa16ece7d15c797daf982763c76",
+      "server/entity/fields.test.cjs": "26de2b308a9fd8dbe285fce685496102ad480d77a87d2c7bd0ca92a3bbacd603",
+      "server/entity/assets.cjs": "1e4fe91baf5fde9d036c9d4c0f78e3bb1958fde36b978168264af6373197ec98",
+      "server/entity/interactions.test.cjs": "14de912c48d0f7ac2f0b3517952d49f9b20db9a875244318941ccbb3db4b13c0",
+      "server/entity/store.test.cjs": "c01dfcbafe63709bc5693595fd7e5a4ab3d137f79c9cda1315dbab8d6ecdb317",
+      "server/entity/characterNavigation.test.cjs": "9e5dd907770ec8fecaed7618063c03bafb2ba582b57036c0f46adde02a7f5bde",
+      "server/entity/lifecycle.test.cjs": "b95a62ba92e8f9451d38225afc2385486865a775ff197901a84052aaee1626be",
+      "server/entity/variables.test.cjs": "ae5dff350c2f961996df355495edb8f4cdaddfe07171a1615eff86fe38307097",
+      "server/entity/schema.sql": "b7bc438daa2974aabb01c95a7897842b8f2a885662128ffd30ceb9f678cd7161",
+      "server/entity/variables.cjs": "a458c35ffd18e7658647e2e232d4ed12de2e141e14f6235be8d51513a2d7ece9",
+      "server/entity/messages.cjs": "3018d3066f3bcc5f0d7e92df6b13d507207fe34010bd69854a59c4a9a0570cb2",
+      "server/entity/characterNavigation.cjs": "a00f6cb9271f087c4b118ac7e3a029481547118ab9ac06e0cbfc0b60eca653d8",
+      "server/entity/notices.test.cjs": "508c415f92521f0c85a95f3f02d8d10266223b90a57bae458fad8e1418ff0120",
+      "server/entity/replyChoices.test.cjs": "f8d3c28b50e55294f5fd6bd40c971360480f9be9cb9f296cb95796fdc3971aa3",
+      "server/entity/bookkeeping.cjs": "4cf098a426e548482e438211d3da2c0e2f846993cee9eff3a96382fdb7c651f1",
+      "server/entity/branching.cjs": "0723cda7b0e8141971cce935d9e50c7fcbb55db133784364a36648e9ee9bddd7",
+      "server/entity/jobRetry.test.cjs": "f649839092eb91a5e8801556e3348273b348b8029e3a89cd6386ad0be1df4407",
+      "server/entity/errors.cjs": "34b915e6df441edc39a7992e8a3cd16d85118ca20e7237a1c51a03bd5ebdb3f5",
+      "server/entity/librarySelection.test.cjs": "e8a00bebe428d6c626d7b3d99a5e58cfcd810b35927c85618406a501e7d51545",
+      "server/entity/storagePressure.test.cjs": "d55f6878b702f144aac909550e93f48d34f4630549a1917f710569a1bf996106",
+      "server/entity/bookmarks.test.cjs": "67a4ac65d5be58d983cfebfb1cc54a8349c49ec8f7f9a2cd2814efe4211f8835",
+      "server/entity/catalog.cjs": "0b77079da8866dc4697fb0628593951cb19e85468bd5838beba09c202131b3d7",
+      "server/entity/displayMessageIntents.test.cjs": "63f8ad05429122c32297ec42ab00af3c7d7e81ea8ec65033d4ddd8f100841248",
+      "server/entity/chatNavigation.cjs": "866affdb7d09556a6a0f3b5f931af2492d635e7b62f1326cbec61d34109a1773",
+      "server/entity/variableConcurrency.test.cjs": "1362fdd297e5c9e21afa8affd650938e7f57a094307dcf437e1110f605e52ef9",
+      "server/entity/replyBatches.test.cjs": "0dc863848b624da72e994c62b21a58a523f9350e71725259f587f6c9a17e6bf9",
+      "server/entity/messageWindow.cjs": "de28be315e032dca5de63789a15bda0c5d6889133782aca5d1afd0046efb2009",
+      "server/entity/messages.test.cjs": "2697b7fc2954c3013a276bfe770424ff048d0119ed54b1df7b3912aca7f0dfcd",
+      "server/entity/variableReads.cjs": "609c97cbc9c496fece674b5e277bb6f2556d784e8ce42fe7f149368c0a1a5bd1",
+      "server/native/progress.cjs": "90536c8f46172208be13d56cb695f8523912dda2eb8e57adf4078ab6ef702d66",
+      "src/ts/storage/promptTemplateRuntime.ts": "1fe0bb82bff8a34b8755e1f9804290230c926f7de6949de5b045d929bc118913",
+      "src/ts/storage/presetRuntime.ts": "221134886d1572c95fe243ed4373fb4df9dcf9f45835de4375cd43dac51eb721",
+      "src/ts/runtime/characterNavigation.mjs": "eb294c6bf28c141fd483c2e7d962550f187aea5d5477065cd6403953e6588521",
+      "src/ts/model/types.ts": "676f450344e842cd5a4bddfbdb09cda220c351c98c07a5ab36f54b30a9441caf"
+    },
+    "exactBaselineVerified": true,
+    "removed": true
+  },
+  "initialIssues": {
+    "baselineLoad": "two missing public TS ports; preserved failed logs; exact65-file baseline verified after completion",
+    "documentationStatusRow": {
+      "initial": "status row retained static-body intermediate values2.671/2.693→0.244/0.245ms",
+      "corrected": "final differing-body status2.527/2.450→0.241/0.231ms; receipt and FLRK already used final values",
+      "codeChanged": false
+    }
+  },
+  "sourceFingerprints": {
+    "docs/engine-extraction-audit.json": "2c85b2843910344436b8747e4aba34e36c0a5fc558c04277fd68bec1d1f24f65",
+    "docs/job-output-relation.md": "51d4c0ee6308cd9033084b2c1f4df8a675a99e6cdac2f6d078ebafc4615cb4ea",
+    "docs/provider-output-retention.md": "26bd148f2914c6045cbb694aeb10781c9b96b03f017835c522641dc11320b508",
+    "docs/server-runtime-plan.md": "9cab2e73519272b0d59dbb98c23f24e201051386aea99e31a0729027872fd0e0",
+    "server/browser/providerOutputUi.test.cjs": "7a830390894778fad254d5e772ae1e1469303e62a39dd7f36fb040532fcb7701",
+    "server/entity/assets.test.cjs": "728ec562bc656606f42211def34ca123f8b08d8605e6b61f4500d708fb9d52d2",
+    "server/entity/bookkeeping.test.cjs": "3b33718e945428a529d9c474f4e7a2caf1ee22099db87bbb76c308add6b702cd",
+    "server/entity/bookmarks.test.cjs": "ac1d4bf3dcca94e5adaa77eeb12299be5d870e704ad49d5b53ffd8e48e4eb381",
+    "server/entity/catalog.test.cjs": "bd3abfdbbba097e8ef7161e8fe89a6665162b2cc368f6bd56a428b73f2664f6b",
+    "server/entity/chatNavigation.test.cjs": "e94b79bcbd826822c78db7ec6149c39bc541bbc8029b73abb23966487c0d9f13",
+    "server/entity/displayEffects.test.cjs": "c26fb12d23789d137254084d5b4ebc15116889f480b58dd8ae5252d5d38de2ba",
+    "server/entity/displayMessageIntents.test.cjs": "a24c9ef91fe4a69f69a89c6e39e457a9801f69a4f4ed03aec3c108c83a8ae71f",
+    "server/entity/fields.test.cjs": "cb9945af6cba129576d96f55fe6592438c0da410a8f42316fb0ad85b1fbc0179",
+    "server/entity/groupMembers.test.cjs": "9d77fb9b348147a4a5f07ce39a6e4c7ff60a19c5e7209be9511f8f6772d1b088",
+    "server/entity/interactions.test.cjs": "999819c8f53b810397f8fb51de4c5445c9035f1e0c4cac5c3128a319bc525277",
+    "server/entity/jobProgress.test.cjs": "1cde25c23ecd1346d658714233d04ed15de46d0f80f15ddfa91fc1a8d27e9296",
+    "server/entity/jobResults.cjs": "db1d2628edcb8cff1f24b158b5154c4a15283a457a8ab5fbe2345df84a43b045",
+    "server/entity/jobResults.test.cjs": "7e6d18c661d6df7909b1b821b81a85ef1e28ddab552156b6bd45b5d12f991a04",
+    "server/entity/lifecycle.test.cjs": "6ef15622471f6e80b7d3947c7498f356c83cb14971100ee6c51bbbf6ca83833f",
+    "server/entity/notices.test.cjs": "ac8f028ebea816c94dcd346374e549167b9c506e282eb3fb52f4da079760689d",
+    "server/entity/providerOutputMigration.test.cjs": "af7aa39eb52ee00838261c3ae188b2f80da8a452d7ce82d4a26fe9b9b4c0c96e",
+    "server/entity/providerOutputs.cjs": "487835c87133ac4d17e6669ad4c7448c64c480fcae041f2b2c06e51a61bd3b61",
+    "server/entity/replyBatches.test.cjs": "cd58c9494775d60aa6db99e0c4925458be2e67005b3b019d55acbfa84870fb8b",
+    "server/entity/replyChoices.test.cjs": "3476f250a6f073ddc523025ae0ab201c20a0669b25fb092bfb92a053698dca9f",
+    "server/entity/schema.sql": "ba49faf689be149adb5ce5abca6c2bf76c525eda455c49fccb7576e02791b68e",
+    "server/entity/store.cjs": "0895f3e8d5c7f14a6ed33219c3b88bceacfca5582d11fb5e1c3eabef2840aaea",
+    "server/entity/store.test.cjs": "4f13950b4a1f0038142877e6443ef9cc555f281fcaf48097867a8f8b0b69d253",
+    "server/entity/variableConcurrency.test.cjs": "621d28d4025ffe36ff369c9ea74263e359d5cab13691764926ddf764eb45cff2",
+    "server/entity/variables.test.cjs": "e2e05f66fac77fac2ff17ae99aeb7faf0843d02ebbe575e5697f2119e9bd94b3",
+    "server/native/progress.cjs": "771e4eb754d4fc9d1ed4f3442f8878990971b27f5f15c76740615c2c485870a5",
+    "server/native/providerOutputs.test.cjs": "632128ebfd30338be7d44534aa4ba27b47ad8d532c874dfd0a681d5195586143"
+  },
+  "artifacts": {
+    "nativeSha256": "fe48443d5d0ecd3dbc94fc811014df57048d30029427ca1333db0363bca0d5aa",
+    "entityIndexSha256": "1358cd6baf83d9ec8a1126f9063f75ab020ce2fc30e9811a7a468cfc2ad299f4"
+  },
+  "logFingerprints": {
+    "evidence/local-progress-cost-baseline-final-1.log": "083a06b4481302bca8fdfec866d975aab82b4e375e1c3ae71f92bf0d40afec48",
+    "evidence/local-progress-cost-baseline-final-2.log": "228f12a4efb63bbe208c250088a883eac4d75ae517bbde2ffed41648420c09e7",
+    "evidence/local-progress-cost-baseline-native-initial.log": "a7a9e87b896432a1a15ab1c22a37932cec02918e754e9df4f26f0fd196c15b4e",
+    "evidence/local-progress-cost-baseline-native-second.log": "1c639a7e621c70303080364b2030f732e9d32c369fd20542dc3d44c3f730c3ea",
+    "evidence/local-progress-cost-baseline-native.log": "66f931649a3e246ffbd88749b360a7bd2d09dc43e2e35cefe2fbeac0f3d2efbd",
+    "evidence/local-progress-cost-baseline-paired-1.log": "e99190046c398f619092d6df937bcf86f8fab7acfb0e464091bd9a29ca27996a",
+    "evidence/local-progress-cost-baseline-paired-2.log": "0a113949cc443495ac357c181d6a409c5ff1de52f26f1a781537aedce4599d92",
+    "evidence/local-progress-cost-baseline-static-final-1.log": "e80d7a6f998e9a4fd12929709e90517246ae8951f152d3b09d0a786c3812387f",
+    "evidence/local-progress-cost-baseline-static-final-2.log": "82e36937ffbba0b3ce13b17e7ddb6d8139d200e941cd3f14fd316728ae4f5258",
+    "evidence/local-progress-cost-before.log": "76e8b6fec3dd4f16f8c4170fa2523b3cc7c8323b1173b6d0508ef4a2163efad4",
+    "evidence/local-progress-cost-candidate-final-1.log": "21b5e69769aeb0cca02243650b5af526c09991423bf9584c01ae21926a9a7918",
+    "evidence/local-progress-cost-candidate-final-2.log": "5da82388de7256abbcd71cbf3a843d3b5af13da9dcccc2a76dd7c29330d47d58",
+    "evidence/local-progress-cost-candidate-native.log": "7cb6af8631a8a1a92ee97fd7e0f160f0f68d9f69c611bd8d647783e8340ba342",
+    "evidence/local-progress-cost-candidate-paired-1.log": "131b8357d44f9412e5253a49fd1725b314e07c8520b4cdee2e0222b5e1387f43",
+    "evidence/local-progress-cost-candidate-paired-2.log": "c38d4da4a3b12498e1a1abcac79ace0228eb9500b189135a539fbb261db716cd",
+    "evidence/local-progress-cost-candidate-static-final-1.log": "f0974007cd1ee55da8f29dfb67bc2dde01371c32e42c862670edabe0a13c122c",
+    "evidence/local-progress-cost-candidate-static-final-2.log": "dff25ca0557c96ea914e98b150ce9bb9223875749c02c95f96607416ed70bf2f",
+    "evidence/local-progress-relation-app.log": "3b377e28d96f00f41208b4205340c01828ed9fb4528f41e0d5b9e4a2defb8543",
+    "evidence/local-progress-relation-audit.log": "2c85b2843910344436b8747e4aba34e36c0a5fc558c04277fd68bec1d1f24f65",
+    "evidence/local-progress-relation-backend-before-combined-budget.log": "ae22440ac8ee682c2d566179da86329d55b3b589a59cba7c453382c9f4705141",
+    "evidence/local-progress-relation-backend.log": "a8dacd81370613acfd07023d6bbf1e00e385b7d333aa3a44bc4e1c4ce4ca2ebe",
+    "evidence/local-progress-relation-browser-before-combined-budget.log": "d6c65d56bb5988d263458915f9ecae75278f78c29da6cf993abe600b3ba9c043",
+    "evidence/local-progress-relation-browser.log": "bc57a30bab5097f64d180fa1974cc2fec15d9343426892befd5bb674b8db811f",
+    "evidence/local-progress-relation-cases-first.log": "326501a549dff61ac91483a5090f2085ec4e5acb60667b6dcf593f6eb23150c6",
+    "evidence/local-progress-relation-cases.log": "511d4a379b6549d891bf993e5e16b79af2ec8f6f38211b434b10a145beac2aef",
+    "evidence/local-progress-relation-check.log": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "evidence/local-progress-relation-format.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "evidence/local-progress-relation-rollback.log": "02b6052b8ef3023470fb04b9cd99e888d57661c84b6fefc1ca59bcc3497dec36",
+    "evidence/local-progress-relation-store-first.log": "3426a36e305fba923db4884cd31197f82c6a54fcb490d87cd83f39b79f758b50"
+  },
+  "measurementFingerprints": {
+    "evidence/local-progress-cost-baseline-final-1.json": "818aafbaeadb13415d5a2786e23c8b3966af5ae388d056d84a7205151f510efc",
+    "evidence/local-progress-cost-baseline-final-2.json": "e43fc056c75389d3aee3fb01e4b492f2e56b11e70e5ff2544afd1229a2f2a34d",
+    "evidence/local-progress-cost-baseline-metadata.json": "1fda9dbdcd721d4862869829995aabe18453c144080a162572452d4becee1611",
+    "evidence/local-progress-cost-baseline-native-initial.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evidence/local-progress-cost-baseline-native-second.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evidence/local-progress-cost-baseline-native.json": "25f8d18015a6ce815e72abb02571b8f35c70f074a94e2b4b869a0d84c03dd440",
+    "evidence/local-progress-cost-baseline-paired-1.json": "30ce435c3da203e3a44f494106d888895a4ac9bbe7aaf85783ee11ba083ae3d2",
+    "evidence/local-progress-cost-baseline-paired-2.json": "48ade388ca2c86d3d83680116e9ee5853038ca48320339f093a8fbf75d56eaca",
+    "evidence/local-progress-cost-baseline-path.json": "0425755e75faee979db6b2ed5a61a632406f9b7736822a6ec10b11b2729afcb2",
+    "evidence/local-progress-cost-baseline-static-final-1.json": "8569aa3c361808797fb7f5de511de1b551bbbf6eeae31c326aef50959525d335",
+    "evidence/local-progress-cost-baseline-static-final-2.json": "f7c83c069ffeae251d1241c7b918dc21df9f76ea336d7b0de305de69e8712670",
+    "evidence/local-progress-cost-before.json": "9e1011d8d961423d395a309f4fdf54c1f82d0b7578d2fc36bb1c2cc4cd96b224",
+    "evidence/local-progress-cost-candidate-final-1.json": "3abee1cc1b3945b5b392610ee7f28fa5dac4fadf9a98e1469aaec7d4213bbe8f",
+    "evidence/local-progress-cost-candidate-final-2.json": "cfc44d004b490e5a013ec48daff5cff0fa397673f9a45966a5add935047ad886",
+    "evidence/local-progress-cost-candidate-native.json": "52a6b0afbb505bf7c2052a56d4bd59d7240dc56da22c98ddd5f9168b6b0f2d6a",
+    "evidence/local-progress-cost-candidate-paired-1.json": "177ed702a3772659cc7d8fd7fa017ef6052706447527417b1899238c7577f1b1",
+    "evidence/local-progress-cost-candidate-paired-2.json": "2cb6ff4d16ec655614475364147c4d902b056e16e453cf6ac3201f86249a69bf",
+    "evidence/local-progress-cost-candidate-static-final-1.json": "6abd9c04537f08b63836ac8d66bac24f5b0f4fa6229c5979db419dae6e18f3b3",
+    "evidence/local-progress-cost-candidate-static-final-2.json": "1415bfb7090be884616db2ef7b8722ec83d6fe9ba72285789379ac6186698ec1"
+  },
+  "limits": [
+    "DB stress boundary only; not full browser/physical-device/model/card latency",
+    "Large public stream progress and original failed write-set JSON costs remain",
+    "No universal zero stutter or full read/extension/storage/import-export/trial completion",
+    "No fresh Node24 candidate gate",
+    "User private-card gsub cause remains unknown; no supplied message content recorded",
+    "Code-only rollback of21 is invalid; old20 snapshot required and newer data is not auto-merged"
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/request/google.ts",
+  "core": "src/ts/process/request/googleRuntime.ts",
+  "factory": "createGoogleRuntime",
+  "functions": [
+    "requestGoogleCloudVertex",
+    "requestGoogle",
+    "initStreamState",
+    "getTranStream",
+    "wrapToolStream"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "fetchNative",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "fetchNative"
+    },
+    {
+      "name": "textifyReadableStream",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "textifyReadableStream"
+    },
+    {
+      "name": "LLMFlags",
+      "specifier": "src/ts/model/modellist",
+      "original": "LLMFlags"
+    },
+    {
+      "name": "LLMFormat",
+      "specifier": "src/ts/model/modellist",
+      "original": "LLMFormat"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "setDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "setDatabase"
+    },
+    {
+      "name": "base64url",
+      "specifier": "src/ts/util",
+      "original": "base64url"
+    },
+    {
+      "name": "simplifySchema",
+      "specifier": "src/ts/util",
+      "original": "simplifySchema"
+    },
+    {
+      "name": "v4",
+      "specifier": "uuid",
+      "original": "v4"
+    },
+    {
+      "name": "saveInlayedSignature",
+      "specifier": "../files/inlays",
+      "original": "saveInlayedSignature"
+    },
+    {
+      "name": "setInlayAsset",
+      "specifier": "../files/inlays",
+      "original": "setInlayAsset"
+    },
+    {
+      "name": "writeInlayImage",
+      "specifier": "../files/inlays",
+      "original": "writeInlayImage"
+    },
+    {
+      "name": "extractJSON",
+      "specifier": "../templates/jsonSchema",
+      "original": "extractJSON"
+    },
+    {
+      "name": "getGeneralJSONSchema",
+      "specifier": "../templates/jsonSchema",
+      "original": "getGeneralJSONSchema"
+    },
+    {
+      "name": "callTool",
+      "specifier": "../mcp/mcp",
+      "original": "callTool"
+    },
+    {
+      "name": "decodeToolCall",
+      "specifier": "../mcp/mcp",
+      "original": "decodeToolCall"
+    },
+    {
+      "name": "encodeToolCall",
+      "specifier": "../mcp/mcp",
+      "original": "encodeToolCall"
+    },
+    {
+      "name": "alertError",
+      "specifier": "src/ts/alert",
+      "original": "alertError"
+    },
+    {
+      "name": "addFetchLog",
+      "specifier": "src/ts/globalApi.svelte",
+      "original": "addFetchLog"
+    },
+    {
+      "name": "applyAdditionalParameters",
+      "specifier": "./shared",
+      "original": "applyAdditionalParameters"
+    },
+    {
+      "name": "applyParameters",
+      "specifier": "./shared",
+      "original": "applyParameters"
+    },
+    {
+      "name": "getAdditionalParameters",
+      "specifier": "./shared",
+      "original": "getAdditionalParameters"
+    },
+    {
+      "name": "bodyIntercepterStore",
+      "specifier": "src/ts/stores.svelte",
+      "original": "bodyIntercepterStore"
+    }
+  ],
+  "globals": ["fetch", "window", "crypto", "Image"],
+  "nativeHostIntegrated": true,
+  "limits": "Text generation and Vertex OAuth are bound. Image/audio output, signature persistence and MCP calls require their explicit capabilities; this factory is not a complete plugin host.",
+  "invocationPolicies": [
+    {
+      "function": "requestGoogleCloudVertex",
+      "originalHash": "f7e2e7160934dcd12a7c9cd76377e3f86f8ebc3a17b235b4e257a9dd2b89ae19",
+      "extractedHash": "383eb8752506bef668c4f654fc1689059c73e682c94e216b0cb5b99527a1ee7c",
+      "description": "Gemini 4 Argon only: shared final request policy runs after additional parameters and string-body hooks, before OAuth; it preserves low/medium/high, omits forced defaults, removes unsupported sampling/budget/candidate fields, clamps only output upper bounds, preserves complete assistant-ended history with a user continuation, rejects explicit cache references without provider admission and selects global/us/eu Vertex locations. Other Gemini models retain upstream ordering and parameters.",
+      "tests": [
+        "src/ts/process/request/gemini4ArgonPolicy.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "src/ts/process/request/jsonSse.test.ts",
+        "server/native/generationWorker.test.cjs",
+        "server/browser/vertexStreamingUi.test.cjs"
+      ]
+    },
+    {
+      "function": "requestGoogle",
+      "originalHash": "2b956a54d9acbcd28a34d1730c4f6f4c2006e200a743e4a5610e855d43eb77b2",
+      "extractedHash": "1ff9a8fbc8d386a98c9f8d8f41868035d82eada6e871fcdabb8cc12fb91f7cfc",
+      "description": "Pipe rejection is observed through its readable stream without an unhandled side promise. The shared Argon policy is reapplied at dispatch, transport body hooks cannot undo it, and Argon quota failures are returned without recursive provider replay. Original request/tool dispatch and earlier Gemini model policies remain unchanged.",
+      "tests": [
+        "src/ts/process/request/gemini4ArgonPolicy.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "src/ts/process/request/jsonSse.test.ts",
+        "server/native/generationWorker.test.cjs",
+        "server/browser/vertexStreamingUi.test.cjs"
+      ]
+    },
+    {
+      "function": "getTranStream",
+      "originalHash": "0403d855a49244f612e110359ca5951a76943954b4c97ce911233dddccc53ea0",
+      "extractedHash": "1db883170f388fd67c3043e85c82b207700feba111e87fa1671d523f4ac822c3",
+      "description": "Incremental UTF-8/JSON SSE decoding processes each event once, emits immutable cumulative snapshots and rejects provider error events rather than accepting a partial answer.",
+      "tests": [
+        "src/ts/process/request/jsonSse.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "server/browser/vertexStreamingUi.test.cjs",
+        "server/native/generationWorker.test.cjs"
+      ]
+    },
+    {
+      "function": "wrapToolStream",
+      "originalHash": "ea2c8903ebb78ac06f525d7f8a20f03fe4a3d9d3a9578b2c5715c7c34c348789",
+      "extractedHash": "7de6af3c3469c638cead9d431c423d7fd4fbe9dcea9323868a786fc3c9883339",
+      "description": "Pipe rejection is observed through its readable stream without an unhandled side promise. Argon tool follow-up bodies run the original string hooks once, then the shared final request policy before transport; response parsing, signature handling and original tool execution remain unchanged.",
+      "tests": [
+        "src/ts/process/request/gemini4ArgonPolicy.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "src/ts/process/request/jsonSse.test.ts",
+        "server/native/generationWorker.test.cjs",
+        "server/browser/vertexStreamingUi.test.cjs"
+      ]
+    }
+  ]
+}

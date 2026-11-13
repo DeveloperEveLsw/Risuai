@@ -1,0 +1,201 @@
+{
+  "verifiedAt": "2026-10-04T01:19:54.539054+00:00",
+  "status": "milestone_verified_goal_active",
+  "baseCommit": "c55cfd8bb993e9cff9bc2eddc7e417da99b50022",
+  "all15Preserved": true,
+  "wholeGoalComplete": false,
+  "syntheticOnly": true,
+  "productionAccess": false,
+  "privateContentRead": false,
+  "deployment": false,
+  "remotePush": false,
+  "externalProviderCalls": 0,
+  "checks": {
+    "application": {
+      "passed": 431,
+      "skipped": 3,
+      "log": "risu-group-reroll-app-final.log"
+    },
+    "backend": {
+      "passed": 236,
+      "skipped": 0,
+      "nativeGroupTests": 11,
+      "log": "risu-group-reroll-backend.log"
+    },
+    "browser": {
+      "passed": 1,
+      "skipped": 0,
+      "independentContexts": 2,
+      "physicalMobile": false,
+      "canonicalMessagesAfterReroll": 3,
+      "providerCalls": 4,
+      "oldDomRowsRetainedWhilePending": true,
+      "runtimeExceptions": 0,
+      "log": "risu-group-reroll-browser-held.log"
+    },
+    "differential": {
+      "passed": 2,
+      "syntheticHistories": 7,
+      "upstreamCommit": "f9728b14c733d073168d8d0c6a8f34f8febf0304",
+      "actualOriginalLoopCompared": true,
+      "loopIdenticalToUpstream": true,
+      "loopSha256": "d75faa4385bf7d4c83a5f0bca239d872f50d7dac5ee4cd87def0f99c8791cc45",
+      "log": "risu-group-reroll-boundary-final.log"
+    },
+    "types": {
+      "errors": 0,
+      "warnings": 0,
+      "log": "risu-group-reroll-check-final.log"
+    },
+    "builds": {
+      "native": "risu-group-reroll-native-build-final.log",
+      "entityWeb": "risu-group-reroll-entity-build.log",
+      "ordinaryWeb": "risu-group-reroll-ordinary-build.log",
+      "warnings": "existing generated CSS, chunk/module and plugin timing warnings remain; experimental Node SQLite warning remains"
+    },
+    "audit": {
+      "declarations": 168,
+      "originalBodies": 166,
+      "explicitPriorPolicies": 2,
+      "log": "risu-group-reroll-audit.log",
+      "newHelperScope": "separate actual-loop differential check, not an added structural-audit declaration"
+    }
+  },
+  "negativeControl": {
+    "log": "risu-group-reroll-before.log",
+    "expectedProviderCalls": 2,
+    "actualProviderCalls": 1,
+    "status": "expected_failure_reproduced",
+    "countedPassed": false
+  },
+  "fixtureCorrections": [
+    {
+      "log": "risu-group-reroll-native-tests.log",
+      "reason": "failed jobs resolve as completed protocol messages with state=failed; assert durable state/message and no new request"
+    },
+    {
+      "log": "risu-group-reroll-browser.log",
+      "reason": "listJobs expects a chat-ID string, not object"
+    },
+    {
+      "log": "risu-group-reroll-check.log",
+      "reason": "original persisted Message role is user/char; tail fixture now uses char with undefined saying rather than system"
+    }
+  ],
+  "originalPolicies": {
+    "groupContinue": "append next-speaker replies, not individual continuation",
+    "groupHtmlButton": "public original UI returns for groups; native API fails without explicit member context",
+    "firstReroll": "user or second-last-speaker boundary; private mutation and atomic final write"
+  },
+  "remaining": [
+    "previous/next variants and Prereroll cache",
+    "group automode and empty/inactive/orphan acceptance",
+    "interrupted compound recovery",
+    "complete member-definition read dependencies",
+    "large-history rewind/progress cost",
+    "general extensions",
+    "physical devices and representative latency/long tasks",
+    "all15 configured-trial acceptance"
+  ],
+  "sourceHashes": {
+    "src/ts/process/rerollBoundary.ts": "c829b8b05acb01f8628a511fafdac93b4ecbcb59c8d142f47cf38bda8c1bdf0a",
+    "src/ts/process/rerollBoundary.test.ts": "e262dd7266e27cbd56011acad9aed8a78430f8cd56a39275b5a431ae3bfae9b4",
+    "src/ts/runtime/nativeExtensionJob.ts": "5a6c7c6482b1490906775a1559f00c2e458db4b329d8e4267c18746a822a13a6",
+    "server/native/groupGeneration.test.cjs": "05f8ce82d51768c238341c6ec70cd649e838de48fad4a268476d0c132185c45c",
+    "server/browser/groupGenerationUi.test.cjs": "7ab8f8b4c6e92b2a7e9ef0ecd09b5ea9df42b0820cbba300fa90d7500251c5ca",
+    "docs/group-reroll-runtime.md": "bf02233555d6df3525510fc1ae2a538b73f9296e2b4aaba7ed3126390cc8d896",
+    "docs/server-runtime-plan.md": "98bad5c7bef6fe8e2f3d0b54cd1c64703e605d8923e44132bfbd7afd9ad93d09",
+    "docs/group-generation-runtime.md": "b69ceba5a4bb2f3a0985d555e11282b500d866fbf4ef48073d03dd837b24b2fd",
+    "docs/group-member-runtime.md": "f1c7915a01ab52cafb963bada640bd12709077db157b651788040b958d2826f8"
+  },
+  "logHashes": {
+    "risu-group-reroll-after.log": {
+      "bytes": 1272,
+      "sha256": "cd94bb8e3c8bc8431095f59a4d7a7d4efcd96f588c556be09f0dc118073a6303"
+    },
+    "risu-group-reroll-app-final.log": {
+      "bytes": 1067,
+      "sha256": "2dfa7b5c8466332f7432ebf37d49d20289ff730a83babf0994933ec1650b3c59"
+    },
+    "risu-group-reroll-app.log": {
+      "bytes": 1068,
+      "sha256": "d3af4ffbd50b1edd6f0b90201e1d593c1c8ec6dd011c6a9e77a5e527095d964f"
+    },
+    "risu-group-reroll-audit.log": {
+      "bytes": 56323,
+      "sha256": "ceb5609555a4bc7d58e4ec73e362733ba53304c3e3d0dd01cb25abb54fb7641d"
+    },
+    "risu-group-reroll-backend.log": {
+      "bytes": 111532,
+      "sha256": "8be2e04b0c7065892609bc3f177132b933a7289eb7c3634c478c4e2976b415e0"
+    },
+    "risu-group-reroll-before.log": {
+      "bytes": 2001,
+      "sha256": "0d5676359da2e4fba78552accaacba2eb92acaebce1b5f107798d6729dfd48d9"
+    },
+    "risu-group-reroll-boundary-final.log": {
+      "bytes": 420,
+      "sha256": "d6e0a340cdcad98d662b6c5ad2afdfc876fe792aa8abe581490869f38111cd85"
+    },
+    "risu-group-reroll-boundary.log": {
+      "bytes": 420,
+      "sha256": "2ef22033c5b89f1051bd955922aef88267757a1a537b333bc2ccca1c676c287d"
+    },
+    "risu-group-reroll-browser-final.log": {
+      "bytes": 1446,
+      "sha256": "da59c0069d99443837b06b221f66e71c6c1dfbcdd3419c79ef926eec0fe345d7"
+    },
+    "risu-group-reroll-browser-held.log": {
+      "bytes": 1454,
+      "sha256": "e0d140a07d0a2cca42dff8b69d6d44e0520d3f36457175e96b4adfab8c726fd2"
+    },
+    "risu-group-reroll-browser.log": {
+      "bytes": 1775,
+      "sha256": "66e0bf7df0cabb944e5cb5ba336519e2a6300ddfca0cc15b423c3bc14be2c898"
+    },
+    "risu-group-reroll-check-final.log": {
+      "bytes": 324,
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    "risu-group-reroll-check.log": {
+      "bytes": 694,
+      "sha256": "097ba2fa480c8b9e80e7c6287837f620b1c5a0d169744a3ed4a1285efe31b8cd"
+    },
+    "risu-group-reroll-entity-build.log": {
+      "bytes": 36062,
+      "sha256": "d1a516cf5dea2ae352a8f484f5554d4f3fdfda0a2eddd73b294a3d2087210a86"
+    },
+    "risu-group-reroll-format-final.log": {
+      "bytes": 102,
+      "sha256": "6ca2c7ff6be3d5c0d7370e72a78a9382d28ab570e8a78ada68900fc7fe781139"
+    },
+    "risu-group-reroll-format.log": {
+      "bytes": 214,
+      "sha256": "fce94265365169bc10ba32f36a3453fe8143f18c48d1c46bd1f1b8e2929cbb25"
+    },
+    "risu-group-reroll-native-build-final.log": {
+      "bytes": 633,
+      "sha256": "b92def10d378641698244bba20b91caa987ec0d7dbadb035f9ce9ad0b8e7d1c3"
+    },
+    "risu-group-reroll-native-build.log": {
+      "bytes": 633,
+      "sha256": "fa291f36183137bd60106c345d49e37e366b3a0f0411b3a5208bafd4ebc26ce3"
+    },
+    "risu-group-reroll-native-tests-final.log": {
+      "bytes": 11712,
+      "sha256": "2d5f9b3d85f44b36df6464770abc782365228a2ee5bd9882aee1632fb7e4009e"
+    },
+    "risu-group-reroll-native-tests.log": {
+      "bytes": 12388,
+      "sha256": "aef5ef5e995aa09df43a318b14bf42a9a7dbb36cd0ca19a35b56f9bc227c1564"
+    },
+    "risu-group-reroll-ordinary-build.log": {
+      "bytes": 39691,
+      "sha256": "b1a0f6f27b53821dd71ab2e640c68251183095869ee6050d439d73ee5a99d6d9"
+    }
+  },
+  "artifactHashes": {
+    "nativeBundleSha256": "3453f9d795b914fc35bb76902e1d294be977a681df66e03647c190b6dd2af0d4",
+    "entityIndexSha256": "7eb0b57e362548595b4f07793346912562946db46f7fbf074a33c6f6451f30aa"
+  }
+}

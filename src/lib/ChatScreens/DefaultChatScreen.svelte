@@ -8,7 +8,7 @@
     import { type Message } from "../../ts/storage/database.svelte";
     import { DBState } from 'src/ts/stores.svelte';
     import { getCharImage } from "../../ts/characters";
-    import { chatProcessStage, doingChat, localGenerationExecutionActive, sendChat } from "../../ts/process/index.svelte";
+    import { chatProcessStage, doingChat, sendChat } from "../../ts/process/index.svelte";
     import { sleep } from "../../ts/util";
     import { language } from "../../lang";
     import { isExpTranslator, translate } from "../../ts/translator/translator";
@@ -19,14 +19,7 @@
     import { stopTTS } from "src/ts/process/tts";
     import MainMenu from '../UI/MainMenu.svelte';
     import AssetInput from './AssetInput.svelte';
-    import {
-        aiLawApplies,
-        chatFoldedState,
-        chatFoldedStateMessageIndex,
-        downloadFile,
-        getCleanNodeDatabaseHead,
-        waitForNodeDatabasePersistence,
-    } from 'src/ts/globalApi.svelte';
+    import { aiLawApplies, chatFoldedState, chatFoldedStateMessageIndex, downloadFile } from 'src/ts/globalApi.svelte';
     import { runTrigger } from 'src/ts/process/triggers';
     import { v4 } from 'uuid';
     import { PreUnreroll, Prereroll } from 'src/ts/process/prereroll';
@@ -36,41 +29,11 @@
     import { ConnectionOpenStore } from 'src/ts/sync/multiuser';
     import { coldStorageHeader, preLoadChat } from 'src/ts/process/coldstorage.svelte';
     import Chats from './Chats.svelte';
+    import ChatStreamingControl from './ChatStreamingControl.svelte';
     import Button from '../UI/GUI/Button.svelte';
     import PluginDefinedIcon from '../Others/PluginDefinedIcon.svelte';
     import { getAdditionalChatLoadPages, getInitialChatLoadPages } from 'src/ts/chatLoadPages';
-    import {
-        cancelActiveRuntimeGeneration,
-        playRuntimeGenerationPresentations,
-        queueRuntimeGeneration,
-        shouldDelegateGeneration,
-        shouldRestoreCancelledRuntimeDraft,
-        shouldRestoreRuntimeDraft,
-        waitForRuntimeGenerationTerminal,
-    } from 'src/ts/runtime/generationDelegation.svelte';
-    import {
-        activeRuntimeGenerationCommands,
-        clearRuntimeGenerationPendingIntent,
-        getRuntimeGenerationTargetActivity,
-        registerRuntimeGenerationPendingIntent,
-        runtimeGenerationActive,
-        runtimeGenerationPendingIntents,
-    } from 'src/ts/runtime/generationActivity.svelte';
-    import {
-        isRuntimeGenerationKeepaliveSafe,
-        type RuntimeGenerationCreateInput,
-    } from 'src/ts/runtime/generationClient';
-    import {
-        bindRuntimeChatPresentationCommand,
-        createRuntimeChatPresentationOverlay,
-        getRuntimeChatPresentationOverlay,
-        removeRuntimeChatPresentationOverlay,
-        resolveRuntimeChatPresentationText,
-        reserveRuntimeChatPresentationRequest,
-        settleRuntimeChatOverlay,
-        visibleRuntimeChatPresentationOverlays,
-    } from 'src/ts/runtime/chatPresentationOverlay.svelte';
-    import { runtimeAssistantOutputPresentations } from 'src/ts/runtime/assistantOutputPresentation.svelte';
+    import { entityRuntimeEnabled, browserRuntime, RuntimeUIState, reportRuntimeError } from 'src/ts/runtime/browserRuntimeState.svelte';
 
     const loadPlaygroundMenu = () => import('../Playground/PlaygroundMenu.svelte').then(m => m.default);
     
@@ -96,91 +59,21 @@
     let isScrollingToMessage = $state(false)
     let { openModuleList = $bindable(false), openChatList = $bindable(false), customStyle = '' }: Props = $props();
     let currentCharacter = $derived(DBState.db.characters[$selectedCharID])
-    let currentChatRecord = $derived(currentCharacter?.chats[currentCharacter.chatPage])
     let currentChat = $derived(currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [])
-    let currentRuntimeGenerationActivity = $derived(getRuntimeGenerationTargetActivity(
-        $activeRuntimeGenerationCommands,
-        {
-            characterId: currentCharacter?.chaId,
-            chatId: currentChatRecord?.id,
-        },
-    ))
-    let currentRuntimePendingIntent = $derived(
-        $runtimeGenerationPendingIntents.find((intent) => (
-            intent.characterId === currentCharacter?.chaId
-            && intent.chatId === currentChatRecord?.id
-        )) ?? null,
-    )
-    let localRuntimeSubmissionActiveHere = $derived(
-        currentRuntimePendingIntent !== null,
-    )
-    let currentChatRuntimeActive = $derived(
-        currentRuntimeGenerationActivity.activeCommand !== null
-        || localRuntimeSubmissionActiveHere,
-    )
-    let currentChatRuntimeAutoActive = $derived(
-        currentRuntimeGenerationActivity.activeCommand?.action === 'auto',
-    )
-    let currentChatRuntimeInteractionActive = $derived(
-        currentRuntimeGenerationActivity.activeCommand?.action === 'manual-trigger'
-        || currentRuntimeGenerationActivity.activeCommand?.action === 'lua-button',
-    )
-    let delegatedRuntimeAdmissionActive = $derived(
-        currentRuntimeGenerationActivity.anyActive
-        || $runtimeGenerationPendingIntents.length > 0,
-    )
-    let generationAdmissionBlocked = $derived(
-        shouldDelegateGeneration()
-            ? delegatedRuntimeAdmissionActive || $doingChat || $localGenerationExecutionActive
-            : $doingChat,
-    )
-    let showCurrentChatGenerationControl = $derived(
-        shouldDelegateGeneration() ? currentChatRuntimeActive : $doingChat,
-    )
-    let runtimeGenerationActiveElsewhere = $derived(
-        shouldDelegateGeneration()
-        && (
-            currentRuntimeGenerationActivity.activeElsewhere
-            || ($runtimeGenerationPendingIntents.length > 0 && !localRuntimeSubmissionActiveHere)
-            || $localGenerationExecutionActive
-            || ($doingChat && !delegatedRuntimeAdmissionActive)
-        ),
-    )
-    let currentPresentationOverlays = $derived(
-        $visibleRuntimeChatPresentationOverlays.filter((overlay) => (
-            overlay.characterId === currentCharacter?.chaId
-            && overlay.chatId === currentCharacter?.chats[currentCharacter.chatPage]?.id
-        )),
-    )
-    let currentAssistantOutputs = $derived(
-        $runtimeAssistantOutputPresentations.filter((output) => (
-            output.characterId === currentCharacter?.chaId
-            && output.chatId === currentCharacter?.chats[currentCharacter.chatPage]?.id
-        )),
-    )
+    let presentedChat = $derived(entityRuntimeEnabled ? RuntimeUIState.messages : currentChat)
 
-    function clearLocalRuntimeSubmission(requestId: string) {
-        clearRuntimeGenerationPendingIntent(requestId)
-    }
-
-    function clearRuntimeIntent(requestId: string, controller: AbortController) {
-        clearLocalRuntimeSubmission(requestId)
-        if(abortController === controller){
-            abortController = null
-            abortControllerRuntimeTarget = null
-            abortControllerRuntimeCommandId = null
+    async function scrollToBottom() {
+        try {
+            if (
+                entityRuntimeEnabled &&
+                RuntimeUIState.historicalWindow &&
+                !(await browserRuntime().loadLatest())
+            )
+                return;
+            chatsInstance?.scrollToLatestMessage();
+        } catch (error) {
+            reportRuntimeError(error);
         }
-    }
-
-    function restoreDelegatedGenerationActivity() {
-        // Never let one finished/failed submission clear the global admission
-        // lock while another durable command is still queued or running.
-        $doingChat = $runtimeGenerationActive
-            || $runtimeGenerationPendingIntents.length > 0
-    }
-
-    function scrollToBottom() {
-        chatsInstance?.scrollToLatestMessage();
     }
     $effect(() => {
         if(ScrollToMessageStore.value !== -1){
@@ -262,8 +155,18 @@
     }
 
     async function sendMain(continueResponse:boolean) {
+        if (entityRuntimeEnabled) {
+            if ($doingChat) return;
+            try {
+                if (fileInput.length) throw new Error('Server asset upload is not integrated yet');
+                await browserRuntime().send(messageInput, continueResponse ? 'continue' : 'send');
+                messageInput = '';
+                messageInputTranslate = '';
+            } catch (error) { reportRuntimeError(error); }
+            return;
+        }
         let selectedChar = $selectedCharID
-        if(generationAdmissionBlocked){
+        if($doingChat){
             return
         }
         if(lastCharId !== $selectedCharID){
@@ -273,265 +176,10 @@
 
         let cha = DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].message
 
-        const delegateGeneration = shouldDelegateGeneration()
-        if(messageInput.startsWith('/') && !delegateGeneration){
+        if(messageInput.startsWith('/')){
             const commandProcessed = await processMultiCommand(messageInput)
             if(commandProcessed !== false){
                 messageInput = ''
-                return
-            }
-        }
-
-        // When the shared canonical snapshot is clean, hand the raw upstream
-        // input to the resident before mutating the browser copy. This closes
-        // the 500 ms save/decode/CAS window in which a mobile tab could be
-        // frozen after showing a sent bubble but before the server knew about
-        // the request. The temporary bubble is UI-only; the resident runs the
-        // real trigger/script/input pipeline exactly once and its committed
-        // snapshot replaces it on every device.
-        if(delegateGeneration){
-            const character = DBState.db.characters[selectedChar]
-            const chat = character?.chats?.[character.chatPage]
-            const pendingIntent = character && chat ? {
-                requestId: v4(),
-                controller: new AbortController(),
-            } : null
-            if(pendingIntent){
-                registerRuntimeGenerationPendingIntent({
-                    requestId: pendingIntent.requestId,
-                    characterId: character.chaId,
-                    chatId: chat.id,
-                    controller: pendingIntent.controller,
-                    input: messageInput,
-                    files: [...fileInput],
-                    createdAt: Date.now(),
-                })
-                abortController = pendingIntent.controller
-                abortControllerRuntimeTarget = {
-                    characterId: character.chaId,
-                    chatId: chat.id,
-                }
-                abortControllerRuntimeCommandId = null
-            }
-            let canonicalHead = getCleanNodeDatabaseHead()
-            if(character && chat && !canonicalHead){
-                // Finish an unrelated settings/chat save before accepting the
-                // raw intent. We do not show a sent bubble until the server
-                // snapshot to which this command is bound is known.
-                $doingChat = true
-                try {
-                    await waitForNodeDatabasePersistence()
-                    canonicalHead = getCleanNodeDatabaseHead()
-                } catch (error) {
-                    if(pendingIntent){
-                        clearRuntimeIntent(pendingIntent.requestId, pendingIntent.controller)
-                    }
-                    restoreDelegatedGenerationActivity()
-                    if(!pendingIntent?.controller.signal.aborted){
-                        alertError(error)
-                    }
-                    return
-                }
-                if(pendingIntent?.controller.signal.aborted){
-                    clearRuntimeIntent(pendingIntent.requestId, pendingIntent.controller)
-                    restoreDelegatedGenerationActivity()
-                    return
-                }
-                if(!canonicalHead){
-                    if(pendingIntent){
-                        clearRuntimeIntent(pendingIntent.requestId, pendingIntent.controller)
-                    }
-                    restoreDelegatedGenerationActivity()
-                    alertError('The canonical server database is not ready for generation')
-                    return
-                }
-            }
-            if(character && chat && canonicalHead && pendingIntent){
-                const originalInput = messageInput
-                const originalFiles = [...fileInput]
-                let commandAccepted = false
-                let restoreDraftAfterFailure = true
-                let terminalRevisionAdopted = false
-                let retainOverlayForFollower = false
-                const intentAbort = pendingIntent.controller
-                const requestId = pendingIntent.requestId
-                reserveRuntimeChatPresentationRequest(requestId)
-                let overlayIdentifier = requestId
-                const presentationText = resolveRuntimeChatPresentationText({
-                    input: originalInput,
-                    files: originalFiles,
-                    useSayNothing: DBState.db.useSayNothing,
-                    isGroup: character.type === 'group',
-                    lastRole: chat.message.at(-1)?.role,
-                    continueResponse,
-                })
-                let presentationCreated = false
-                const createPresentationOverlay = () => {
-                    if(presentationCreated || presentationText === ''){
-                        return
-                    }
-                    // queueRuntimeGeneration observes the accepted command
-                    // before resolving. On a large (post-ACK) request that
-                    // observer may already have reconstructed this exact
-                    // request, so treat it as the same overlay rather than a
-                    // duplicate submission.
-                    if(getRuntimeChatPresentationOverlay(requestId)){
-                        presentationCreated = true
-                        return
-                    }
-                    presentationCreated = true
-                    createRuntimeChatPresentationOverlay({
-                        requestId,
-                        characterId: character.chaId,
-                        chatId: chat.id,
-                        input: originalInput,
-                        files: originalFiles,
-                        displayText: presentationText,
-                        baseRevision: canonicalHead.revision,
-                    })
-                }
-                const runtimeInput: RuntimeGenerationCreateInput = {
-                    requestId,
-                    action: continueResponse ? 'continue' : 'send',
-                    characterId: character.chaId,
-                    chatId: chat.id,
-                    localPresentation: true,
-                    payload: {
-                        input: originalInput,
-                        files: originalFiles,
-                        databaseRevision: canonicalHead.revision,
-                    },
-                }
-                const keepaliveSafe = isRuntimeGenerationKeepaliveSafe(runtimeInput)
-                if(keepaliveSafe){
-                    createPresentationOverlay()
-                }
-                const commandPromise = queueRuntimeGeneration(runtimeInput, intentAbort.signal)
-
-                try {
-                    const command = await commandPromise
-                    commandAccepted = true
-                    overlayIdentifier = command.commandId
-                    if(abortController === intentAbort){
-                        abortControllerRuntimeCommandId = command.commandId
-                    }
-                    if(!keepaliveSafe){
-                        createPresentationOverlay()
-                    }
-                    bindRuntimeChatPresentationCommand(requestId, command)
-                    clearLocalRuntimeSubmission(requestId)
-                    if(messageInput === originalInput){
-                        messageInput = ''
-                        messageInputTranslate = ''
-                    }
-                    if(fileInput.length === originalFiles.length && fileInput.every(
-                        (file, index) => file === originalFiles[index],
-                    )){
-                        fileInput = []
-                    }
-                    rerolls = []
-                    await sleep(10)
-                    updateInputSizeAll()
-                    const terminal = await waitForRuntimeGenerationTerminal(command, intentAbort.signal)
-                    await playRuntimeGenerationPresentations(terminal)
-                    restoreDraftAfterFailure = terminal.state === 'completed'
-                        ? false
-                        : shouldRestoreRuntimeDraft(terminal)
-                    const terminalRevision = terminal.result?.databaseRevision
-                    settleRuntimeChatOverlay(command.commandId, {
-                        state: terminal.state,
-                        terminalRevision: typeof terminalRevision === 'number'
-                            ? terminalRevision
-                            : null,
-                        canonicalMutationPersisted:
-                            terminal.result?.canonicalMutationPersisted === true
-                            || terminal.state === 'completed',
-                    })
-                    if(typeof terminalRevision === 'number'){
-                        await waitForNodeDatabasePersistence(60_000, terminalRevision)
-                        terminalRevisionAdopted = true
-                    }
-                    if(terminal.state === 'completed'){
-                        removeRuntimeChatPresentationOverlay(command.commandId)
-                        const resultPreviousLength = terminal.result?.previousLength
-                        const currentMessages = DBState.db.characters
-                            .find((candidate) => candidate.chaId === character.chaId)
-                            ?.chats.find((candidate) => candidate.id === chat.id)?.message
-                        if(
-                            currentMessages
-                            && typeof resultPreviousLength === 'number'
-                            && resultPreviousLength < currentMessages.length
-                        ){
-                            rerolls.push(safeStructuredClone(currentMessages.slice(resultPreviousLength)))
-                            rerollid = rerolls.length - 1
-                        }
-                        lastCharId = $selectedCharID
-                        if(DBState.db.playMessage){
-                            const audio = new Audio(sendSound)
-                            audio.play().catch(() => {})
-                        }
-                        if(abortController === intentAbort){
-                            abortController = null
-                            abortControllerRuntimeTarget = null
-                            abortControllerRuntimeCommandId = null
-                        }
-                        return
-                    }
-                    if(terminal.state !== 'cancelled'){
-                        throw new Error(
-                            terminal.error
-                                ? `Server generation ${terminal.state}: ${terminal.error}`
-                                : `Server generation ended as ${terminal.state}`,
-                        )
-                    }
-                    if(shouldRestoreCancelledRuntimeDraft(terminal)){
-                        if(messageInput === ''){
-                            messageInput = originalInput
-                            messageInputTranslate = ''
-                        }
-                        if(fileInput.length === 0){
-                            fileInput = [...originalFiles]
-                        }
-                    }
-                } catch (error) {
-                    // If the resident already persisted this input but the
-                    // direct client temporarily failed its revision barrier,
-                    // leave presentation ownership with the global follower.
-                    // It retries adoption and removes the overlay only after
-                    // the canonical snapshot is actually visible here.
-                    retainOverlayForFollower = commandAccepted
-                        && !restoreDraftAfterFailure
-                        && !terminalRevisionAdopted
-                    if(!retainOverlayForFollower){
-                        removeRuntimeChatPresentationOverlay(overlayIdentifier)
-                    }
-                    if(commandAccepted){
-                        if(restoreDraftAfterFailure){
-                            if(messageInput === ''){
-                                messageInput = originalInput
-                                messageInputTranslate = ''
-                            }
-                            if(fileInput.length === 0){
-                                fileInput = [...originalFiles]
-                            }
-                        }
-                    }
-                    else{
-                        if(!intentAbort.signal.aborted){
-                            alertError(error)
-                        }
-                    }
-                }
-                if(!retainOverlayForFollower){
-                    removeRuntimeChatPresentationOverlay(overlayIdentifier)
-                }
-                if(abortController === intentAbort){
-                    abortController = null
-                    abortControllerRuntimeTarget = null
-                    abortControllerRuntimeCommandId = null
-                }
-                clearLocalRuntimeSubmission(requestId)
-                restoreDelegatedGenerationActivity()
                 return
             }
         }
@@ -584,42 +232,22 @@
         messageInputTranslate = ''
         DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].message = cha
         rerolls = []
-        await sleep(10)
-        updateInputSizeAll()
+        await tick()
         await sendChatMain(continueResponse)
 
     }
 
     async function reroll() {
-        if(generationAdmissionBlocked){
+        if (entityRuntimeEnabled) {
+            if (!$doingChat) try { await browserRuntime().moveReplyChoice('next'); } catch (error) { reportRuntimeError(error); }
+            return;
+        }
+        if($doingChat){
             return
         }
         if(lastCharId !== $selectedCharID){
             rerolls = []
             rerollid = -1
-        }
-        if(shouldDelegateGeneration()){
-            const character = DBState.db.characters[$selectedCharID]
-            const chat = character?.chats?.[character.chatPage]
-            if(!character || !chat){
-                return
-            }
-            try {
-                const persisted = await waitForNodeDatabasePersistence()
-                const command = await queueRuntimeGeneration({
-                    action: 'reroll',
-                    characterId: character.chaId,
-                    chatId: chat.id,
-                    localPresentation: true,
-                    payload: { databaseRevision: persisted?.revision ?? null },
-                })
-                const terminal = await waitForRuntimeGenerationTerminal(command)
-                await playRuntimeGenerationPresentations(terminal)
-            } catch (error) {
-                restoreDelegatedGenerationActivity()
-                alertError(error)
-            }
-            return
         }
         const genId = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)?.generationInfo?.generationId
         if(genId){
@@ -669,32 +297,16 @@
     }
 
     async function unReroll() {
-        if(generationAdmissionBlocked){
+        if (entityRuntimeEnabled) {
+            if (!$doingChat) try { await browserRuntime().moveReplyChoice('previous'); } catch (error) { reportRuntimeError(error); }
+            return;
+        }
+        if($doingChat){
             return
         }
         if(lastCharId !== $selectedCharID){
             rerolls = []
             rerollid = -1
-        }
-        if(shouldDelegateGeneration()){
-            const character = DBState.db.characters[$selectedCharID]
-            const chat = character?.chats?.[character.chatPage]
-            if(!character || !chat){
-                return
-            }
-            try {
-                const persisted = await waitForNodeDatabasePersistence()
-                await queueRuntimeGeneration({
-                    action: 'unreroll',
-                    characterId: character.chaId,
-                    chatId: chat.id,
-                    payload: { databaseRevision: persisted?.revision ?? null },
-                })
-            } catch (error) {
-                restoreDelegatedGenerationActivity()
-                alertError(error)
-            }
-            return
         }
         const genId = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)?.generationInfo?.generationId
         if(genId){
@@ -719,10 +331,13 @@
     }
 
     let abortController:null|AbortController = null
-    let abortControllerRuntimeTarget:null|{ characterId: string, chatId: string } = null
-    let abortControllerRuntimeCommandId:string|null = null
 
     async function sendChatMain(continued:boolean = false) {
+        if (entityRuntimeEnabled) {
+            const id = await browserRuntime().send('', continued ? 'continue' : 'send');
+            await browserRuntime().waitForJob(id);
+            return;
+        }
 
         let previousLength = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length
         messageInput = ''
@@ -733,7 +348,7 @@
                 continue:continued
             })
             if(previousLength < DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length){
-                rerolls.push(safeStructuredClone(DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message).slice(previousLength))
+                rerolls.push(safeStructuredClone(DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.slice(previousLength)))
                 rerollid = rerolls.length - 1
             }
         } catch (error) {
@@ -749,84 +364,13 @@
     }
 
     function abortChat(){
-        if(shouldDelegateGeneration()){
-            const character = DBState.db.characters[$selectedCharID]
-            const chat = character?.chats?.[character.chatPage]
-            if(!character || !chat){
-                return
-            }
-            if(currentRuntimePendingIntent){
-                if(messageInput === ''){
-                    messageInput = currentRuntimePendingIntent.input
-                    messageInputTranslate = ''
-                }
-                if(fileInput.length === 0){
-                    fileInput = [...currentRuntimePendingIntent.files]
-                }
-                currentRuntimePendingIntent.controller.abort('generation cancelled by user')
-                return
-            }
-            const currentActiveCommand = currentRuntimeGenerationActivity.activeCommand
-            if(
-                abortController
-                && abortControllerRuntimeCommandId !== null
-                && abortControllerRuntimeCommandId === currentActiveCommand?.commandId
-                && abortControllerRuntimeTarget?.characterId === character.chaId
-                && abortControllerRuntimeTarget.chatId === chat.id
-            ){
-                // The local signal is bound to this exact request. Falling
-                // through would also cancel an older remote command in the
-                // same chat because the global fallback prefers running work.
-                abortController.abort('generation cancelled by user')
-                return
-            }
-            void cancelActiveRuntimeGeneration({
-                characterId: character.chaId,
-                chatId: chat.id,
-            }).catch((error) => alertError(error))
-            return
-        }
+        if (entityRuntimeEnabled) { void browserRuntime().cancel().catch(reportRuntimeError); return; }
         if(abortController){
             abortController.abort()
         }
     }
 
     async function runAutoMode() {
-        if(shouldDelegateGeneration()){
-            if(currentChatRuntimeAutoActive){
-                const character = DBState.db.characters[$selectedCharID]
-                const chat = character?.chats?.[character.chatPage]
-                await cancelActiveRuntimeGeneration({
-                    characterId: character?.chaId,
-                    chatId: chat?.id,
-                })
-                return
-            }
-            if(generationAdmissionBlocked){
-                return
-            }
-            const character = DBState.db.characters[$selectedCharID]
-            const chat = character?.chats?.[character.chatPage]
-            if(!character || !chat){
-                return
-            }
-            try {
-                const persisted = await waitForNodeDatabasePersistence()
-                const command = await queueRuntimeGeneration({
-                    action: 'auto',
-                    characterId: character.chaId,
-                    chatId: chat.id,
-                    localPresentation: true,
-                    payload: { databaseRevision: persisted?.revision ?? null },
-                })
-                const terminal = await waitForRuntimeGenerationTerminal(command)
-                await playRuntimeGenerationPresentations(terminal)
-            } catch (error) {
-                restoreDelegatedGenerationActivity()
-                alertError(error)
-            }
-            return
-        }
         if(autoMode){
             autoMode = false
             return
@@ -868,28 +412,31 @@
     let inputTranslateHeight = $state("44px")
     let inputTranslateEle:HTMLTextAreaElement = $state()
 
-    function updateInputSizeAll() {
-        updateInputSize()
-        updateInputTranslateSize()
-    }
-
     function updateInputTranslateSize() {
-        if(inputTranslateEle) {
-            inputTranslateEle.style.height = "0";
-            inputTranslateHeight = (inputTranslateEle.scrollHeight) + "px";
-            inputTranslateEle.style.height = inputTranslateHeight
-        }
+      if (inputTranslateEle) {
+        inputTranslateEle.style.height = "0";
+        const height = inputTranslateEle.scrollHeight + "px";
+        inputTranslateEle.style.height = height;
+        inputTranslateHeight = height;
+      }
     }
     function updateInputSize() {
-        if(inputEle){
-            inputEle.style.height = "0";
-            inputHeight = (inputEle.scrollHeight) + "px";
-            inputEle.style.height = inputHeight
-        }
+      if (inputEle) {
+        inputEle.style.height = "0";
+        const height = inputEle.scrollHeight + "px";
+        inputEle.style.height = height;
+        inputHeight = height;
+      }
     }
 
-    $effect.pre(() => {
-        updateInputSizeAll()
+    // Measure after Svelte has applied bound values, including programmatic clears.
+    $effect(() => {
+      messageInput;
+      updateInputSize();
+    });
+    $effect(() => {
+      messageInputTranslate;
+      updateInputTranslateSize();
     });
 
     async function updateInputTransateMessage(reverse: boolean) {
@@ -1064,6 +611,10 @@
         <div class="h-full w-full flex flex-col-reverse overflow-y-auto relative default-chat-screen" onscroll={(e) => {
             //@ts-expect-error scrollHeight/clientHeight/scrollTop don't exist on EventTarget, but target is HTMLElement here
             const scrolled = (e.target.scrollHeight - e.target.clientHeight + e.target.scrollTop)
+            if (entityRuntimeEnabled && scrolled < 100 && RuntimeUIState.hasEarlier &&
+                !RuntimeUIState.historicalWindow && RuntimeUIState.scopeReady &&
+                !RuntimeUIState.loadingHistory)
+                void browserRuntime().loadEarlier().catch(reportRuntimeError);
             if(scrolled < 100 && DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length > loadPages){
                 loadPages += getAdditionalChatLoadPages(DBState.db)
             }
@@ -1136,47 +687,29 @@
                                                 messageInput += `{{file::${res.name}::${res.data}}}`
                                             }
                                         }
-                                        updateInputSizeAll()
                                     }
                                     reader.readAsArrayBuffer(file)
                                 }
                             }
                         }
                     }}
-                          oninput={()=>{updateInputSizeAll();updateInputTransateMessage(false)}}
+                          oninput={()=>{updateInputTransateMessage(false)}}
                           style:height={inputHeight}
                 ></textarea>
 
 
-                {#if showCurrentChatGenerationControl || doingChatInputTranslate}
+                {#if $doingChat || doingChatInputTranslate}
                     <button
                             aria-labelledby="cancel"
-                            data-runtime-generation-stop={showCurrentChatGenerationControl ? 'current-chat' : undefined}
                             class="peer-focus:border-textcolor  flex justify-center border-y border-darkborderc items-center text-textcolor p-3 hover:bg-blue-500 hover:text-white transition-colors" onclick={abortChat}
                             style:height={inputHeight}
                     >
-                        {#if currentChatRuntimeInteractionActive}
-                            <XIcon size="20" />
-                        {:else}
-                        <div
-                            class="loadmove chat-process-stage-{$chatProcessStage}"
-                            class:autoload={shouldDelegateGeneration() ? currentChatRuntimeAutoActive : autoMode}
-                        ></div>
-                        {/if}
+                        <div class="loadmove chat-process-stage-{$chatProcessStage}" class:autoload={autoMode}></div>
                     </button>
                 {:else}
                     <button
                             onclick={send}
-                            disabled={runtimeGenerationActiveElsewhere}
-                            aria-disabled={runtimeGenerationActiveElsewhere}
-                            aria-label={runtimeGenerationActiveElsewhere
-                                ? 'A response is being generated in another chat'
-                                : 'Send message'}
-                            title={runtimeGenerationActiveElsewhere
-                                ? 'A response is being generated in another chat'
-                                : undefined}
-                            data-runtime-generation-blocked={runtimeGenerationActiveElsewhere ? 'another-chat' : undefined}
-                            class="flex justify-center border-y border-darkborderc items-center text-textcolor p-3 peer-focus:border-textcolor hover:bg-blue-500 hover:text-white transition-colors button-icon-send disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-textcolor"
+                            class="flex justify-center border-y border-darkborderc items-center text-textcolor p-3 peer-focus:border-textcolor hover:bg-blue-500 hover:text-white transition-colors button-icon-send"
                             style:height={inputHeight}
                     >
                         <Send />
@@ -1208,6 +741,7 @@
                     </div>
                 {/if}
             </div>
+            <ChatStreamingControl />
             {#if DBState.db.useAutoTranslateInput && DBState.db.characters[$selectedCharID]?.chaId !== '§playground'}
                 <div class="flex items-center mt-2 mb-2">
                     <label for='messageInputTranslate' class="text-textcolor ml-4">
@@ -1228,7 +762,7 @@
                                 e.preventDefault()
                             }
                         }}
-                              oninput={()=>{updateInputSizeAll();updateInputTransateMessage(true)}}
+                              oninput={()=>{updateInputTransateMessage(true)}}
                               placeholder={language.enterMessageForTranslateToEnglish}
                               style:height={inputTranslateHeight}
                     ></textarea>
@@ -1258,7 +792,6 @@
                                 {/if}
                                 <button class="absolute -right-1 -top-1 p-1 bg-darkbg text-textcolor rounded-md transition-colors hover:text-draculared focus:text-draculared" onclick={() => {
                                     fileInput.splice(i, 1)
-                                    updateInputSizeAll()
                                 }}>
                                     <XIcon size={18} />
                                 </button>
@@ -1281,7 +814,6 @@
                                 fileType = 'audio'
                         }
                         messageInput += `<span class='notranslate' translate='no'>{{${fileType}::${additionalAsset[0]}}}</span> *${additionalAsset[0]} added*`
-                        updateInputSizeAll()
                     }}/>
                 </div>
             {/if}
@@ -1325,11 +857,39 @@
                 </button>
             {/if}
             
+            {#if entityRuntimeEnabled && RuntimeUIState.historicalWindow}
+                <div
+                    class="flex gap-2 p-2 text-textcolor runtime-history-navigation"
+                    aria-busy={RuntimeUIState.loadingHistory}
+                >
+                    <button
+                        class="bg-darkbutton rounded p-2 runtime-history-earlier"
+                        disabled={!RuntimeUIState.hasEarlier ||
+                            RuntimeUIState.loadingHistory}
+                        onclick={() =>
+                            browserRuntime().loadEarlier().catch(reportRuntimeError)}
+                        >{language.loadMore} ◀</button
+                    >
+                    <button
+                        class="bg-darkbutton rounded p-2 runtime-history-later"
+                        disabled={!RuntimeUIState.hasLater || RuntimeUIState.loadingHistory}
+                        onclick={() =>
+                            browserRuntime().loadLater().catch(reportRuntimeError)}
+                        >{language.loadMore} ▶</button
+                    >
+                    <button
+                        class="bg-darkbutton rounded p-2 runtime-history-latest"
+                        disabled={RuntimeUIState.loadingHistory}
+                        onclick={scrollToBottom}
+                        >{language.newMessage}{RuntimeUIState.newerMessageCount
+                            ? ` (${RuntimeUIState.newerMessageCount})`
+                            : ""} ↓</button
+                    >
+                </div>
+            {/if}
             <Chats
                 bind:this={chatsInstance}
-                messages={currentChat}
-                presentationOverlays={currentPresentationOverlays}
-                assistantOutputs={currentAssistantOutputs}
+                messages={presentedChat}
                 loadPages={loadPages}
                 onReroll={reroll}
                 unReroll={unReroll}
@@ -1340,7 +900,7 @@
                 bind:hasNewUnreadMessage={showNewMessageButton}
             />
 
-            {#if DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length <= loadPages}
+            {#if (!entityRuntimeEnabled || !RuntimeUIState.hasEarlier) && DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length <= loadPages}
                 {#if DBState.db.characters[$selectedCharID].type !== 'group' }
                     <Chat
                         character={createSimpleCharacter(DBState.db.characters[$selectedCharID])}
@@ -1473,7 +1033,7 @@
                         {#if (DBState.db.supaModelType !== 'none' && DBState.db.hypav2) || DBState.db.hypaV3}
                             <div class="flex items-center cursor-pointer hover:text-green-500 transition-colors" onclick={() => {
                                 if (DBState.db.hypav2) {
-                                    DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].hypaV2Data ??= {
+                                    if (!entityRuntimeEnabled) DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].hypaV2Data ??= {
                                         lastMainChunkID: 0,
                                         mainChunks: [],
                                         chunks: [],
@@ -1521,7 +1081,6 @@
                                 messageInput += `{{file::${res.name}::${res.data}}}`
                             }
                         }
-                        updateInputSizeAll()
                     }}>
 
                         <ImagePlusIcon />
@@ -1538,7 +1097,7 @@
 
 
                     <div class="flex items-center cursor-pointer hover:text-green-500 transition-colors" onclick={() => {
-                        DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].modules ??= []
+                        if (!entityRuntimeEnabled) DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].modules ??= []
                         openModuleList = true
                         openMenu = false
                     }}>
@@ -1547,7 +1106,7 @@
                     </div>
 
                     {#if DBState.db.sideMenuRerollButton}
-                        <div class="flex items-center cursor-pointer hover:text-green-500 transition-colors" onclick={reroll}>
+                        <div class="flex items-center cursor-pointer hover:text-green-500 transition-colors" aria-disabled={entityRuntimeEnabled && !!RuntimeUIState.replyChoice?.busy} onclick={reroll}>
                             <RefreshCcwIcon />
                             <span class="ml-2">{language.reroll}</span>
                         </div>

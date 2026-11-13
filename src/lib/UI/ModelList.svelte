@@ -17,9 +17,10 @@
         blankable?: boolean
         excludesPrefix?: string
         noMargin?: boolean
+        ariaLabel?: string
     }
 
-    let { value = $bindable(""), onChange = (v) => {}, onclick, blankable, excludesPrefix, noMargin }: Props = $props();
+    let { value = $bindable(""), onChange = (v) => {}, onclick, blankable, excludesPrefix, noMargin, ariaLabel }: Props = $props();
     let openOptions = $state(false)
 
     function changeModel(name:string){
@@ -110,6 +111,7 @@
 {/if}
 
 <button onclick={() => {openOptions = true}}
+    aria-label={ariaLabel}
     class={{
         "drop-shadow-lg p-3 flex justify-center items-center ml-2 mr-2 rounded-lg bg-darkbutton border-darkborderc border": true,
         "my-4": !noMargin,

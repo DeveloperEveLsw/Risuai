@@ -1,0 +1,253 @@
+{
+  "verifiedAt": "2026-10-04T16:52:28.408492+00:00",
+  "scope": "local_public_code_and_authored_synthetic_fixtures",
+  "candidateBaseCommit": "c84f932b0c0b5d95bf26fd6624edeb0cc7c4e207",
+  "schemaVersion": 21,
+  "application": {
+    "pass": 551,
+    "skipped": 3,
+    "files": 65
+  },
+  "backend": {
+    "tests": 407,
+    "pass": 407,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "browser": {
+    "tests": 26,
+    "pass": 26,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "uniqueRegressionPasses": 984,
+  "applicationFormattedRecheck": {
+    "path": "evidence/provisional-display-app-formatted-20261005.log",
+    "sha256": "8bd1c9efde6e9e407e457aade21b32219616a256c1519e694904f5ff30bf4633",
+    "terminalExitCode": 0,
+    "duplicateCountContribution": 0
+  },
+  "focusedRecheck": {
+    "path": "evidence/provisional-candidate-fifth-20261005.log",
+    "sha256": "e4cabfa3b6963264c75a634d6bf1451b74b4d741826af58d1853e1438c6146d1",
+    "pass": 3,
+    "duplicateCountContribution": 0
+  },
+  "gateExecution": {
+    "path": "evidence/provisional-display-gates-20261005.json",
+    "sha256": "89a414b0c41cc0445fe82ae054fa400e9d2372002a750cead83e7f94e06aee82"
+  },
+  "gates": [
+    {
+      "name": "native-build",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-native-build-20261005.log",
+      "sha256": "5bd963a38be69a8e03254016bbd692fa45dd11045658dc9e3a2245609536c045"
+    },
+    {
+      "name": "app",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-app-20261005.log",
+      "sha256": "e9aab1d3bfff9a8fef66277e6bcfd4dd5fdd39a2c1cb4a6320ef10919984584d"
+    },
+    {
+      "name": "backend-serial",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-backend-serial-20261005.log",
+      "sha256": "3def4eb0906ed6ba2b3706d496d63ac5a13c2f5839236703179359dba2d99ef2"
+    },
+    {
+      "name": "type",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-type-20261005.log",
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    {
+      "name": "entity-build",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-entity-build-20261005.log",
+      "sha256": "0af9678aecac77e3c2dcda65aab29b4f9b9eba4a3d19814ee2c54a2c0e6de92f"
+    },
+    {
+      "name": "ordinary-build",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-ordinary-build-20261005.log",
+      "sha256": "5dae0551db1c1529796e895b26201ecc0b1363bdf09e886c006271a664887796"
+    },
+    {
+      "name": "browser-serial",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-browser-serial-20261005.log",
+      "sha256": "dbe51c234f2609f4dd73c052d359fa3ab82cf42adca4af7e8b8cd2ca9959685b"
+    },
+    {
+      "name": "engine-audit",
+      "exitCode": 0,
+      "path": "evidence/provisional-display-engine-audit-20261005.log",
+      "sha256": "75dc3758c9e8b79a5b823e5719d903cd8ff0c90a3047bfc0d7d10d8a7fafec5a"
+    }
+  ],
+  "audit": {
+    "declarations": 169,
+    "original": 167,
+    "existingExplicitPolicies": 2,
+    "verifiedAt": "2026-10-04T16:51:29.392Z"
+  },
+  "sourceFiles": [
+    {
+      "path": "development/risuai/src/ts/runtime/provisionalDisplayScope.ts",
+      "sha256": "8d3e19801de0282569689b6b6aa6b882c0fcdbcaa458499a5440876c092d38b7"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/provisionalDisplayScope.test.ts",
+      "sha256": "af26aa3ec7c7dd1dcc0164beb5a77a900af99c2125281f819071993f1036f033"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/browserRuntimeController.svelte.ts",
+      "sha256": "cd10bd1915d0dc37fae3076d96a3e588a8d90d1e3ea83fb3f11b9dce48d18e1a"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/browserRuntimeState.svelte.ts",
+      "sha256": "a15a03a017380695dfcbbae29d833a7459627f55338c8c53669b35282ad07197"
+    },
+    {
+      "path": "development/risuai/src/ts/process/scriptings.ts",
+      "sha256": "f75837304f83ab0d62053bb93725f5abc3b476c2eebc53075c4dc028f251f6cd"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/browserDisplayLua.test.ts",
+      "sha256": "514624d44ea5e57315440f7301fbf1e1e9db9219bfa027eb4484f09c95567a17"
+    },
+    {
+      "path": "development/risuai/server/browser/displayProvisionalUi.test.cjs",
+      "sha256": "b155af18a9e1401c62ad861ce05b869880e27e8de992365dc66c6c4491b51c91"
+    },
+    {
+      "path": "development/risuai/server/browser/displayHeaderHarness.svelte.ts",
+      "sha256": "e72f6a0d5df678cee019edfd94b19100d46e1f7ecb0f58c4a3950876a54f8257"
+    },
+    {
+      "path": "development/risuai/server/browser/displayHeaderUi.test.cjs",
+      "sha256": "5324ddc00ddcc88a54e074ed4fd896b5d343c72179a0f06051e65f880b504c3a"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/displayScopeCache.svelte.ts",
+      "sha256": "34f91237a3fd2cd87aef02ec56e7b3a6e2eed85effa83a0684bc2c794f6ee14b"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/displayReadDependencies.ts",
+      "sha256": "586ed4865c891607447ef17f482653dd34775810da576c196113e02242031c47"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/browserDisplayLua.ts",
+      "sha256": "0f38227bc78c4ced453bde55bf5ed30f071d13f39ecfbc321428468119a0cca8"
+    },
+    {
+      "path": "development/risuai/src/ts/runtime/canonicalDisplayHistory.ts",
+      "sha256": "40ace21dbdb8223a0fd2445c31482c72ba5f474b35abcc0ca2b6dbbb45fa3d82"
+    },
+    {
+      "path": "development/risuai/src/ts/parser/parser.svelte.ts",
+      "sha256": "56d722ddd8c15752c748b62aba532a062abbe66bd8c5ae4a601616b20e0f466b"
+    },
+    {
+      "path": "development/risuai/src/lib/ChatScreens/Chat.svelte",
+      "sha256": "06b1af8b63f4ceafd299331643e1f558d05215c7d729d93273e87ae4a7d776f7"
+    },
+    {
+      "path": "development/risuai/src/lib/ChatScreens/ChatBody.svelte",
+      "sha256": "2501e1ae5243b0df8f0a15ccd948de7f562d9544eb340176d282f174ebdb577f"
+    }
+  ],
+  "baseline": {
+    "path": "evidence/provisional-baseline-20261005.log",
+    "sha256": "1ac75dba3c38029b1fc9f93ec9357205dfd27a2554072a09c87c1af122a3d346",
+    "originalOffPendingRowEmpty": true,
+    "providerCalls": 0,
+    "samePendingDisplayExpectationInFinalTest": true
+  },
+  "preservedInitialFailures": [
+    {
+      "path": "evidence/provisional-baseline-20261005.log",
+      "sha256": "1ac75dba3c38029b1fc9f93ec9357205dfd27a2554072a09c87c1af122a3d346"
+    },
+    {
+      "path": "evidence/provisional-candidate-first-20261005.log",
+      "sha256": "b9ed734dc67e45ed2671ba08cd4810efc968ce33ba43b04b4d7487748ec1bc6b"
+    },
+    {
+      "path": "evidence/provisional-unit-first-20261005.log",
+      "sha256": "ef7c47c42a998c85a65f04f96bab6045bef63418182580b602037b4a0490ea34"
+    },
+    {
+      "path": "evidence/provisional-types-first-20261005.log",
+      "sha256": "5ea4a9f2424a7d1d5be8a88dd560eed921d22a52c7c46eee4ebb23a5ccb7691b"
+    },
+    {
+      "path": "evidence/provisional-candidate-second-20261005.log",
+      "sha256": "20ecf8650ff2ccb03ff333c153aac3f29cb17aee01830150a4e692bf332ce2ac"
+    },
+    {
+      "path": "evidence/provisional-candidate-third-20261005.log",
+      "sha256": "d66c9a2675a25223e3df9a33b627ff6be7db3a8cfaf8fd6bb03373805f2190cd"
+    },
+    {
+      "path": "evidence/provisional-candidate-fourth-20261005.log",
+      "sha256": "dbdae3b6a960dc56bff8fd441cc6dbc4af822b9193a8de93f6719cf19ae5b713"
+    }
+  ],
+  "failureInterpretation": [
+    "Baseline off mode had an owned pending row but no body before HTTP admission.",
+    "Initial browser fixture called nonexistent getChat; corrected to real snapshot and observed array/row shapes.",
+    "The initial memo reused frozen children but not the preview rows array; registering that private root fixes equal snapshot identity.",
+    "Initial CBS test-host types omitted the required character resolver; authored test bindings corrected.",
+    "Original asset HTML splits strong elements and inserts a newline; the witness reads the full body and token, preserving Lua/index/image/identity requirements.",
+    "Original native input CBS resolves the variable before persistence; test now checks the actual native source plus the untouched admitted command, rather than incorrectly expecting unresolved canonical CBS.",
+    "Focused cases pass before the broad run; post-format application cases are repeated once without increasing the unique count."
+  ],
+  "presentation": {
+    "modes": ["off", "balanced"],
+    "forcedRawMode": false,
+    "ownedPendingBeforeHttpAdmission": true,
+    "nativeProgressBeforeCompletion": true,
+    "originalCbsRegexLuaAndAssetDecode": true,
+    "independentContextsPerMode": 2,
+    "peerToggleWhileProviderHeld": true,
+    "stableRowsAndImageAcrossDeltaAndCanonical": true,
+    "persistentPreviewEffects": 0,
+    "canonicalSourceRevision": "original",
+    "previewSourceRevision": 0
+  },
+  "all15": {
+    "unchangedSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+    "unchecked": 15,
+    "wholeGoalComplete": false
+  },
+  "performance": {
+    "newRepresentativeLatencyObservations": 0,
+    "speedupClaimed": false,
+    "physicalMobileVerified": false,
+    "stutteringResolved": false,
+    "previous144WarmObservationsAreHistorical": true
+  },
+  "latestPermissionReply": {
+    "character": "주식회사 넥서스v2.5",
+    "acknowledged": true,
+    "existingConfirmedRepair": {
+      "path": "reports/nexus-request-lua-repair-20261004.md",
+      "sha256": "91be862b244b281113339433b5315127be997566626431ce31e476b420208d2a"
+    },
+    "repeatedPrivateInspectionThisFollowup": false
+  },
+  "productionAccess": false,
+  "privateReads": false,
+  "realModelCalls": false,
+  "deployed": false,
+  "remotePush": false
+}

@@ -95,6 +95,7 @@ export const displayThemeSettingsItems: SettingItem[] = [
         labelKey: 'textColor',
         bindKey: 'textTheme',
         classes: 'mt-4',
+        reactivePresentation: true,
         onChange: () => updateTextThemeAndCSS(),
         options: {
             selectOptions: [
@@ -118,6 +119,7 @@ export const displayThemeSettingsItems: SettingItem[] = [
         labelKey: 'font',
         bindKey: 'font',
         classes: 'mt-4',
+        reactivePresentation: true,
         onChange: () => updateTextThemeAndCSS(),
         options: {
             selectOptions: [
@@ -134,6 +136,7 @@ export const displayThemeSettingsItems: SettingItem[] = [
         fallbackLabel: '',
         bindKey: 'customFont',
         condition: (ctx) => ctx.db.font === 'custom',
+        reactivePresentation: true,
         onChange: () => updateTextThemeAndCSS(),
         keywords: ['font', 'custom'],
     },
@@ -170,6 +173,7 @@ export const displaySizeSettingsItems: SettingItem[] = [
         type: 'slider',
         labelKey: 'textAreaSize',
         bindKey: 'textAreaSize',
+        reactivePresentation: true,
         onChange: () => updateGuisize(),
         options: {
             min: -5,
@@ -183,6 +187,7 @@ export const displaySizeSettingsItems: SettingItem[] = [
         type: 'slider',
         labelKey: 'textAreaTextSize',
         bindKey: 'textAreaTextSize',
+        reactivePresentation: true,
         onChange: () => updateGuisize(),
         options: {
             min: 0,
@@ -196,6 +201,7 @@ export const displaySizeSettingsItems: SettingItem[] = [
         type: 'slider',
         labelKey: 'sideBarSize',
         bindKey: 'sideBarSize',
+        reactivePresentation: true,
         onChange: () => updateGuisize(),
         options: {
             min: 0,
@@ -223,6 +229,7 @@ export const displaySizeSettingsItems: SettingItem[] = [
         type: 'slider',
         labelKey: 'animationSpeed',
         bindKey: 'animationSpeed',
+        reactivePresentation: true,
         onChange: () => updateAnimationSpeed(),
         options: { min: 0, max: 1, step: 0.05, fixed: 2 },
         keywords: ['animation', 'speed'],
@@ -253,7 +260,7 @@ export const displayOtherSettingsItems: SettingItem[] = [
         type: 'check',
         labelKey: 'fullscreen',
         bindKey: 'fullScreen',
-        onChange: () => changeFullscreen(),
+        onChange: (_value, ctx) => changeFullscreen(ctx.db),
         keywords: ['fullscreen'],
     },
     { id: 'display.showMemoryLimit', type: 'check', labelKey: 'showMemoryLimit', bindKey: 'showMemoryLimit', keywords: ['memory', 'limit'] },
@@ -303,6 +310,7 @@ export const displayOtherSettingsItems: SettingItem[] = [
         type: 'text',
         labelKey: 'leadingDoubleQuote',
         condition: (ctx) => ctx.db.customQuotes,
+        runtimeField: 'customQuotesData',
         getValue: (db) => db.customQuotesData?.[0] ?? '',
         setValue: (db, value: string) => {
             db.customQuotesData ??= ['"', '"', "'", "'"];
@@ -315,6 +323,7 @@ export const displayOtherSettingsItems: SettingItem[] = [
         type: 'text',
         labelKey: 'trailingDoubleQuote',
         condition: (ctx) => ctx.db.customQuotes,
+        runtimeField: 'customQuotesData',
         getValue: (db) => db.customQuotesData?.[1] ?? '',
         setValue: (db, value: string) => {
             db.customQuotesData ??= ['"', '"', "'", "'"];
@@ -327,6 +336,7 @@ export const displayOtherSettingsItems: SettingItem[] = [
         type: 'text',
         labelKey: 'leadingSingleQuote',
         condition: (ctx) => ctx.db.customQuotes,
+        runtimeField: 'customQuotesData',
         getValue: (db) => db.customQuotesData?.[2] ?? '',
         setValue: (db, value: string) => {
             db.customQuotesData ??= ['"', '"', "'", "'"];
@@ -339,6 +349,7 @@ export const displayOtherSettingsItems: SettingItem[] = [
         type: 'text',
         labelKey: 'trailingSingleQuote',
         condition: (ctx) => ctx.db.customQuotes,
+        runtimeField: 'customQuotesData',
         getValue: (db) => db.customQuotesData?.[3] ?? '',
         setValue: (db, value: string) => {
             db.customQuotesData ??= ['"', '"', "'", "'"];
@@ -366,6 +377,7 @@ export const displayOtherSettingsItems: SettingItem[] = [
         helpKey: 'customCSS',
         bindKey: 'customCSS',
         classes: 'mt-4',
+        reactivePresentation: true,
         onChange: () => updateTextThemeAndCSS(),
         keywords: ['custom', 'css'],
     },

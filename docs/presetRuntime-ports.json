@@ -1,0 +1,38 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/storage/database.svelte.ts",
+  "core": "src/ts/storage/presetRuntime.ts",
+  "factory": "createPresetRuntime",
+  "functions": ["saveCurrentPreset", "setPreset", "changeToPreset"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "DBState",
+      "specifier": "../stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "safeStructuredClone",
+      "specifier": "../polyfill",
+      "original": "safeStructuredClone"
+    },
+    {
+      "name": "normalizePromptTemplate",
+      "specifier": "./database.svelte",
+      "original": "normalizePromptTemplate"
+    },
+    {
+      "name": "LLMFormat",
+      "specifier": "../model/modellist",
+      "original": "LLMFormat"
+    }
+  ],
+  "globals": [],
+  "expressionPorts": [
+    {
+      "name": "readResourceValue",
+      "parameters": ["value"],
+      "expression": "value"
+    }
+  ]
+}

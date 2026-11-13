@@ -1,0 +1,40 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/hypav3.ts",
+  "core": "src/ts/process/memory/hypaSummaryRuntime.ts",
+  "factory": "createHypaSummaryRuntime",
+  "functions": [
+    "sanitizeSummaryContent",
+    "summarize",
+    "getCurrentHypaV3Preset"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "type": "typeof getDatabase"
+    },
+    {
+      "name": "parseChatML",
+      "type": "typeof parseChatML"
+    },
+    {
+      "name": "requestChatData",
+      "type": "typeof requestChatData"
+    },
+    {
+      "name": "chatCompletion",
+      "type": "typeof chatCompletion"
+    },
+    {
+      "name": "inlayTokenRegex",
+      "type": "RegExp"
+    },
+    {
+      "name": "logPrefix",
+      "type": "string"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": true
+}

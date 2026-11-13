@@ -1,6 +1,12 @@
 <script lang="ts">
     import { DynamicGUI, settingsOpen, sideBarStore, ShowRealmFrameStore, openPresetList, openPersonaList, MobileGUI, CustomGUISettingMenuStore, loadedStore, alertStore, LoadingStatusState, bookmarkListOpen, popupStore, easyPanelStore, popUpEditorStore, loadoutModalStore, irisStore, customSideBarConfigDialogStore } from './ts/stores.svelte';
     import Sidebar from './lib/SideBars/Sidebar.svelte';
+    import { entityRuntimeEnabled, RuntimeUIState } from './ts/runtime/browserRuntimeState.svelte';
+    import { getSettingDatabase } from './ts/runtime/fieldControls';
+    import { updateTextThemeAndCSS } from './ts/gui/colorscheme';
+    import { updateGuisize } from './ts/gui/guisize';
+    import { updateAnimationSpeed } from './ts/gui/animation';
+    import RuntimeStatus from './lib/Others/RuntimeStatus.svelte';
     import { DBState } from './ts/stores.svelte';
     import ChatScreen from './lib/ChatScreens/ChatScreen.svelte';
     import AlertComp from './lib/Others/AlertComp.svelte';
@@ -45,6 +51,18 @@
     let aprilFools = $state(new Date().getMonth() === 3 && new Date().getDate() === 1)
     let aprilFoolsPage = $state(0)
     let keepingSessionAlive = $state(false)
+
+    // Track only each helper's actual setting reads. Pending intent, remote changes
+    // and storage/conflict rollback use the same presentation path.
+    $effect(() => {
+        if (entityRuntimeEnabled && RuntimeUIState.ready) updateTextThemeAndCSS(getSettingDatabase(DBState.db));
+    });
+    $effect(() => {
+        if (entityRuntimeEnabled && RuntimeUIState.ready) updateGuisize(getSettingDatabase(DBState.db));
+    });
+    $effect(() => {
+        if (entityRuntimeEnabled && RuntimeUIState.ready) updateAnimationSpeed(getSettingDatabase(DBState.db));
+    });
 
     const getMainDropEffect = (e:DragEvent): DataTransfer['dropEffect'] => {
         const types = Array.from(e.dataTransfer?.types ?? [])
@@ -122,6 +140,7 @@
     }
 
 }}>
+    <RuntimeStatus />
     {#if !import.meta.env.VITE_RISU_LEGAL_CONFIGURED}
         <Legal />
     {:else if aprilFools}

@@ -1,3 +1,5 @@
+import { defaultColorScheme, type ColorScheme } from "./defaultColorScheme";
+export { defaultColorScheme, type ColorScheme } from "./defaultColorScheme";
 import { get, writable } from "svelte/store";
 import { getDatabase, setDatabase } from "../storage/database.svelte";
 import { downloadFile } from "../globalApi.svelte";
@@ -5,33 +7,6 @@ import { BufferToText, selectSingleFile } from "../util";
 import { alertError } from "../alert";
 import { isLite } from "../lite";
 import { CustomCSSStore, DBState, SafeModeStore } from "../stores.svelte";
-
-export interface ColorScheme{
-    bgcolor: string;
-    darkbg: string;
-    borderc: string;
-    selected: string;
-    draculared: string;
-    textcolor: string;
-    textcolor2: string;
-    darkBorderc: string;
-    darkbutton: string;
-    type:'light'|'dark';
-}
-
-
-export const defaultColorScheme: ColorScheme = {
-    bgcolor: "#282a36",
-    darkbg: "#21222c",
-    borderc: "#6272a4",
-    selected: "#44475a",
-    draculared: "#ff5555",
-    textcolor: "#f8f8f2",
-    textcolor2: "#64748b",
-    darkBorderc: "#4b5563",
-    darkbutton: "#374151",
-    type:'dark'
-}
 
 const colorShemes = {
     "default": defaultColorScheme,
@@ -332,8 +307,7 @@ export async function importColorScheme(){
     }
 }
 
-export function updateTextThemeAndCSS(){
-    let db = DBState.db
+export function updateTextThemeAndCSS(db = DBState.db){
     const root = document.querySelector(':root') as HTMLElement;
     if(!root){
         return

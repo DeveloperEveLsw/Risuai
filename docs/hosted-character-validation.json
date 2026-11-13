@@ -1,0 +1,518 @@
+{
+  "characterId": "c8b12b52-e867-4fcf-b98a-829e40109451",
+  "characterName": "어서오세요, 폐기센터에.",
+  "scope": "current hosting and restored backup; dedicated new validation chats",
+  "otherCharacterContentAccess": "forbidden; user reports only",
+  "snapshotSha256": "5b89e97b31a39e279b1a0225d7f328ffc423a9500385a62f61ab3add8c6916f5",
+  "snapshotCounts": {
+    "characters": 15,
+    "chats": 39,
+    "messages": 404,
+    "resources": 61,
+    "jobs": 3
+  },
+  "all15AcceptanceRequirementsPreserved": true,
+  "baseline": {
+    "characterId": "c8b12b52-e867-4fcf-b98a-829e40109451",
+    "chatId": "codex-validation-20261004-main",
+    "startedAt": "2026-10-03T19:31:33.777Z",
+    "privateBodiesPrinted": false,
+    "otherCharacterBodiesRead": false,
+    "targetMatched": true,
+    "structure": {
+      "regexTypes": [
+        "editdisplay",
+        "editrequest"
+      ],
+      "triggerTypes": [
+        "start"
+      ],
+      "modules": 0,
+      "greetingBytes": 31
+    },
+    "baseline": {
+      "requestId": "codex-validation-20261004-plugin-baseline",
+      "state": "failed",
+      "elapsedMs": 515,
+      "code": "ENGINE_ERROR",
+      "error": "A complete server plugin host is required for native generation",
+      "blockedBeforeProvider": true
+    },
+    "finishedAt": "2026-10-03T19:31:34.332Z"
+  },
+  "browserToggle": {
+    "characterId": "c8b12b52-e867-4fcf-b98a-829e40109451",
+    "chatId": "codex-validation-20261004-main",
+    "startedAt": "2026-10-03T19:39:30.044Z",
+    "privateBodiesPrinted": false,
+    "pages": [
+      {
+        "device": 0,
+        "otherCharacterBodiesRequested": 0,
+        "uncaughtErrors": 0,
+        "authenticatedReadyMs": 9628,
+        "characterAndChatLoadMs": 668,
+        "rendered": {
+          "htmlButtons": 0,
+          "toggles": 3,
+          "toggleAlts": [
+            "👿헬레나 프로필",
+            "😈헬레나 에셋 끄기",
+            "😈NSFW 에셋 활성화"
+          ],
+          "images": 0,
+          "failedImages": 0,
+          "engineError": false
+        }
+      },
+      {
+        "device": 1,
+        "otherCharacterBodiesRequested": 0,
+        "uncaughtErrors": 0,
+        "authenticatedReadyMs": 8743,
+        "characterAndChatLoadMs": 773,
+        "rendered": {
+          "htmlButtons": 0,
+          "toggles": 3,
+          "toggleAlts": [
+            "👿헬레나 프로필",
+            "😈헬레나 에셋 끄기",
+            "😈NSFW 에셋 활성화"
+          ],
+          "images": 0,
+          "failedImages": 0,
+          "engineError": false
+        }
+      }
+    ],
+    "stage": "completed",
+    "localToggle": {
+      "scope": "validation chat only; existing non-NSFW checkbox",
+      "isolation": {
+        "originalExists": false
+      },
+      "samples": [
+        {
+          "feedbackMs": 1.7,
+          "synchronizedMs": 613
+        },
+        {
+          "feedbackMs": 11.5,
+          "synchronizedMs": 624
+        },
+        {
+          "feedbackMs": 9.9,
+          "synchronizedMs": 272
+        },
+        {
+          "feedbackMs": 12.8,
+          "synchronizedMs": 161
+        },
+        {
+          "feedbackMs": 12,
+          "synchronizedMs": 218
+        },
+        {
+          "feedbackMs": 1.8,
+          "synchronizedMs": 219
+        }
+      ],
+      "initial": false,
+      "final": false,
+      "confirmedField": {
+        "fields": [
+          {
+            "scope": "chat",
+            "entityId": "codex-validation-20261004-main",
+            "key": "useLocallySetGlobalVariables",
+            "exists": true,
+            "value": true,
+            "revision": 1,
+            "entityEpoch": 0
+          }
+        ]
+      }
+    },
+    "independentAuthenticatedContexts": 2,
+    "currentBaselineOnly": true,
+    "finishedAt": "2026-10-03T19:39:54.383Z"
+  },
+  "nativeAdmission": {
+    "scope": "exact reviewed module-manager bundle with empty persona_modules/global_presets and no injection bookkeeping; disabled plugins follow upstream enabled filter",
+    "scriptSha256": "5aab73060f2448bab14a731caf79c8001d5a8acde51bcbfc80b2d7e593533c5b",
+    "generalPluginHostImplemented": false,
+    "pluginEnabledOrCodeChanged": false,
+    "completePluginUiVerified": false
+  },
+  "newSourceChecks": {
+    "backendPassed": 198,
+    "applicationPassed": 16,
+    "serverNode24BackendPassed": 198,
+    "typesErrors": 0,
+    "typesWarnings": 0,
+    "nativeBuild": "passed",
+    "algorithmAudit": "160 declarations checked; not full integration proof",
+    "serverSourceFilesHashVerified": 13,
+    "nativeBundleSha256": "d1ebb1b56e39284f1761f8946e83b809caeeaa03d30e8b1216f58e0ab05c9ed4"
+  },
+  "pluginPreflight": {
+    "enabledPlugins": 1,
+    "pluginsRequiringHost": 0,
+    "privateBodiesPrinted": false,
+    "priorRowsChanged": {
+      "characters": 0,
+      "chats": 0,
+      "messages": 0,
+      "resources": 0
+    },
+    "activeJobs": 0,
+    "integrity": "ok",
+    "fkViolations": 0,
+    "snapshot": "/data/validation-20261004/before-plugin-admission.sqlite",
+    "snapshotSha256": "ca8bf3a27557167f2c19343a4d3697aa3bde03aa3d6691081b0ce527e7fe06d1"
+  },
+  "vertexNative": {
+    "status": "server_verified",
+    "algorithmDeclarations": 166,
+    "backendPassed": 201,
+    "relatedApplicationPassed": 21,
+    "typesErrors": 0,
+    "typesWarnings": 0,
+    "nativeBuild": "passed",
+    "realGeneration": "pending",
+    "scope": "native text generation, explicit missing inlay/MCP capabilities",
+    "serverNode24BackendPassed": 201,
+    "sourceFilesHashVerified": 77
+  },
+  "vertexPreflight": {
+    "enabledPlugins": 1,
+    "pluginsRequiringHost": 0,
+    "privateBodiesPrinted": false,
+    "priorRowsChanged": {
+      "characters": 0,
+      "chats": 0,
+      "messages": 0,
+      "resources": 0
+    },
+    "activeJobs": 0,
+    "integrity": "ok",
+    "fkViolations": 0,
+    "snapshot": "/data/validation-20261004/before-vertex-native.sqlite",
+    "snapshotSha256": "5de093b833a70f5408c9f0b5717658aeb3d84ccd39b8770a63efd47bf9df3172"
+  },
+  "vertexState": {
+    "status": "server_verified",
+    "backendPassed": 202,
+    "typesErrors": 0,
+    "typesWarnings": 0,
+    "composedOAuthRegression": "passed; refresh and actual generation persist through real context",
+    "relatedApplicationPassed": 21,
+    "relatedApplicationEvidence": "previous Google unit/extension/context run; unchanged tests",
+    "nativeBuild": "passed",
+    "serverNode24BackendPassed": 202,
+    "sourceFilesHashVerified": 5
+  },
+  "vertexStatePreflight": {
+    "enabledPlugins": 1,
+    "pluginsRequiringHost": 0,
+    "privateBodiesPrinted": false,
+    "priorRowsChanged": {
+      "characters": 0,
+      "chats": 0,
+      "messages": 0,
+      "resources": 0
+    },
+    "activeJobs": 0,
+    "integrity": "ok",
+    "fkViolations": 0,
+    "snapshot": "/data/validation-20261004/before-vertex-state.sqlite",
+    "snapshotSha256": "797ce90f6b447edf3bf42cfc635936bdb424ef972f65002a00635ce035c51ff2"
+  },
+  "vertexNativeActualGeneration": {
+    "characterId": "c8b12b52-e867-4fcf-b98a-829e40109451",
+    "chatId": "codex-validation-20261004-main",
+    "startedAt": "2026-10-03T20:01:43.218Z",
+    "privateBodiesPrinted": false,
+    "otherCharacterBodiesRead": false,
+    "targetMatched": true,
+    "structure": {
+      "regexTypes": [
+        "editdisplay",
+        "editrequest"
+      ],
+      "triggerTypes": [
+        "start"
+      ],
+      "modules": 0,
+      "greetingBytes": 31
+    },
+    "baseline": {
+      "requestId": "codex-validation-20261004-plugin-vertex-native",
+      "state": "failed",
+      "elapsedMs": 1286,
+      "code": "ENGINE_ERROR",
+      "missingCapability": "setDatabase",
+      "errorBytes": 53
+    },
+    "savedMessages": {
+      "count": 0,
+      "totalTextBytes": 0,
+      "providerCalls": null
+    },
+    "finishedAt": "2026-10-03T20:01:44.555Z"
+  },
+  "processIsolation": {
+    "status": "server_verified",
+    "backendPassed": 205,
+    "nativeBundle": "unchanged from c553aa5",
+    "gemmaAndOnnxRegression": "four sequential/concurrent generations plus cancellation and killed process; synthetic provider only",
+    "threadReproduction": {
+      "node": "v24.19.0",
+      "tests": [
+        {
+          "loaded": true
+        },
+        {
+          "loaded": false,
+          "code": "ERR_DLOPEN_FAILED",
+          "selfRegister": true
+        }
+      ],
+      "providerRequests": 0,
+      "privateDataRead": false
+    },
+    "serverNode24BackendPassed": 205,
+    "sourceFilesHashVerified": 10
+  },
+  "processPreflight": {
+    "enabledPlugins": 1,
+    "pluginsRequiringHost": 0,
+    "privateBodiesPrinted": false,
+    "priorRowsChanged": {
+      "characters": 1,
+      "chats": 0,
+      "messages": 0,
+      "resources": 1
+    },
+    "unexpectedPriorRowsChanged": {
+      "characters": 0,
+      "chats": 0,
+      "messages": 0,
+      "resources": 0
+    },
+    "activeJobs": 0,
+    "integrity": "ok",
+    "fkViolations": 0,
+    "snapshot": "/data/validation-20261004/before-process-confirmed-2.sqlite",
+    "snapshotSha256": "e4decc4ece3beb80de54d173dc2ba36c150644c22139d13097831c6da390815e",
+    "expectedMutationPolicy": [
+      "Vertex cache fields",
+      "exact upstream loadoutApplyOptions default addition",
+      "designated character trigger lowLevelAccess=false from original editLua mapping; all other trigger fields unchanged"
+    ]
+  },
+  "actualUiGeneration": {
+    "requestId": "e9cda43f-cb7b-494f-97ba-7c284c9737e8",
+    "admissionMs": 103,
+    "final": {
+      "id": "e9cda43f-cb7b-494f-97ba-7c284c9737e8",
+      "state": "completed",
+      "code": null,
+      "missingCapability": null,
+      "providerCalls": 2
+    },
+    "elapsedMs": 8807,
+    "saved": {
+      "messages": [
+        {
+          "id": "4a0f3801-c5f0-4451-b026-628cc1e542d6",
+          "role": "user",
+          "bytes": 88
+        },
+        {
+          "id": "0239b3fc-dda1-417f-80cf-6ae102db1597",
+          "role": "char",
+          "bytes": 1626
+        }
+      ],
+      "revision": 24
+    },
+    "views": [
+      {
+        "rows": [
+          {
+            "id": "0239b3fc-dda1-417f-80cf-6ae102db1597",
+            "textLength": 968,
+            "images": 0,
+            "buttons": 0
+          },
+          {
+            "id": "4a0f3801-c5f0-4451-b026-628cc1e542d6",
+            "textLength": 61,
+            "images": 0,
+            "buttons": 0
+          }
+        ],
+        "images": 0,
+        "failedImages": 0,
+        "htmlButtons": 0,
+        "pendingImages": 0
+      },
+      {
+        "rows": [
+          {
+            "id": "0239b3fc-dda1-417f-80cf-6ae102db1597",
+            "textLength": 968,
+            "images": 0,
+            "buttons": 0
+          },
+          {
+            "id": "4a0f3801-c5f0-4451-b026-628cc1e542d6",
+            "textLength": 61,
+            "images": 0,
+            "buttons": 0
+          }
+        ],
+        "images": 0,
+        "failedImages": 0,
+        "htmlButtons": 0,
+        "pendingImages": 0
+      }
+    ]
+  },
+  "backgroundFailure": {
+    "requestId": "33717802-e69d-48e3-a645-1271cf267c55",
+    "admissionMs": 103,
+    "beforeClosing": {
+      "id": "33717802-e69d-48e3-a645-1271cf267c55",
+      "state": "running",
+      "code": null,
+      "missingCapability": null,
+      "providerCalls": null
+    },
+    "closingStartedAt": "2026-10-03T20:06:28.631Z",
+    "allOwnedBrowserTabsClosedAt": "2026-10-03T20:06:28.668Z",
+    "final": {
+      "id": "33717802-e69d-48e3-a645-1271cf267c55",
+      "state": "failed",
+      "code": "ERR_DLOPEN_FAILED",
+      "missingCapability": null,
+      "providerCalls": null
+    },
+    "saved": {
+      "messages": [
+        {
+          "id": "4a0f3801-c5f0-4451-b026-628cc1e542d6",
+          "role": "user",
+          "bytes": 88
+        },
+        {
+          "id": "0239b3fc-dda1-417f-80cf-6ae102db1597",
+          "role": "char",
+          "bytes": 1626
+        }
+      ],
+      "revision": 24
+    }
+  },
+  "readSnapshotFix": {
+    "status": "server_verified",
+    "backendPassed": 206,
+    "serverNode24BackendPassed": 206,
+    "nativeBundle": "unchanged from c553aa5",
+    "schemaChanged": false,
+    "reproduction": "readCharacterSnapshot BEGIN calls getCharacter BEGIN IMMEDIATE; no provider request",
+    "fix": "call transaction-free characterView inside existing read transaction",
+    "regression": "read-only lazy lookup, matching definition/field guards, reread after edit, missing identity and failure rollback",
+    "sourceFilesHashVerified": 5,
+    "designatedCharacterReadProbe": {
+      "success": true,
+      "identityMatches": true,
+      "repeatedReadPassed": true,
+      "fieldGuardsPresent": true,
+      "providerCalls": 0,
+      "privateBodiesPrinted": false
+    },
+    "hostedGeneration": "pending deployment"
+  },
+  "snapshotPreflight": {
+    "enabledPlugins": 1,
+    "pluginsRequiringHost": 0,
+    "privateBodiesPrinted": false,
+    "priorRowsChanged": {
+      "characters": 1,
+      "chats": 0,
+      "messages": 0,
+      "resources": 1
+    },
+    "unexpectedPriorRowsChanged": {
+      "characters": 0,
+      "chats": 0,
+      "messages": 0,
+      "resources": 0
+    },
+    "activeJobs": 0,
+    "integrity": "ok",
+    "fkViolations": 0,
+    "snapshot": "/data/validation-20261004/before-process-confirmed-snapshot.sqlite",
+    "snapshotSha256": "93ab0a7bc99a4e18428673a3ee145a7ffc170c9c9f05368275fc780f2059b7a7",
+    "expectedMutationPolicy": [
+      "Vertex cache fields",
+      "exact upstream loadoutApplyOptions default addition",
+      "designated character trigger lowLevelAccess=false from original editLua mapping; all other trigger fields unchanged"
+    ]
+  },
+  "backgroundFailureHistory": [
+    {
+      "requestId": "33717802-e69d-48e3-a645-1271cf267c55",
+      "admissionMs": 103,
+      "beforeClosing": {
+        "id": "33717802-e69d-48e3-a645-1271cf267c55",
+        "state": "running",
+        "code": null,
+        "missingCapability": null,
+        "providerCalls": null
+      },
+      "closingStartedAt": "2026-10-03T20:06:28.631Z",
+      "allOwnedBrowserTabsClosedAt": "2026-10-03T20:06:28.668Z",
+      "final": {
+        "id": "33717802-e69d-48e3-a645-1271cf267c55",
+        "state": "failed",
+        "code": "ERR_DLOPEN_FAILED",
+        "missingCapability": null,
+        "providerCalls": null
+      },
+      "saved": {
+        "messages": [
+          {
+            "id": "4a0f3801-c5f0-4451-b026-628cc1e542d6",
+            "role": "user",
+            "bytes": 88
+          },
+          {
+            "id": "0239b3fc-dda1-417f-80cf-6ae102db1597",
+            "role": "char",
+            "bytes": 1626
+          }
+        ],
+        "revision": 24
+      }
+    },
+    {
+      "requestId": "0a68bbf1-cd57-4837-9476-26383dc2bbf8",
+      "state": "failed",
+      "code": "ERR_SQLITE_ERROR",
+      "message": "cannot start a transaction within a transaction",
+      "stage": "lazy character lookup before provider call",
+      "providerCalls": 0,
+      "uncommittedOutput": false,
+      "privateBodiesPrinted": false
+    }
+  ],
+  "actualVertexAuthorization": {
+    "authorized": true,
+    "source": "user explicitly permits real Vertex requests in verification",
+    "creditExpiry": "2026-10 end (user stated)",
+    "automaticReplayOfUncertainRequests": false
+  }
+}

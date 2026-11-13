@@ -1,0 +1,271 @@
+{
+  "verifiedAt": "2026-10-04T04:27:05.656636+00:00",
+  "baseCommit": "66cf8ba60c43c41978adf55b26bc6f7bf36b5512",
+  "schema": 20,
+  "schemaMigration": false,
+  "scope": "local public original source and authored synthetic fixtures only",
+  "previousGoalTurn": "verified progress: 66cf8ba interactive implementation with applied/readback FLRK",
+  "all15Preserved": true,
+  "completionBlockHash": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "wholeGoalComplete": false,
+  "policyChange": "Declared variable API point reads, including observed pin/default absence and setter equality/pin dependencies, must still match the captured execution snapshot at final persistence. Unread keys and captured same-incarnation character/settings configuration retain earlier merge/snapshot policies.",
+  "app": {
+    "passed": 460,
+    "existingSkipped": 3,
+    "filesPassed": 55
+  },
+  "backend": {
+    "tests": 333,
+    "pass": 333,
+    "fail": 0,
+    "skipped": 0
+  },
+  "builtBrowser": {
+    "tests": 8,
+    "pass": 8,
+    "fail": 0,
+    "skipped": 0,
+    "independentAuthenticatedContexts": 2,
+    "actualOriginalHtmlLua": true,
+    "peerAuthenticatedHttpVariableEdit": true,
+    "staleReadFailedAndRetained": true,
+    "staleRecoveryUnavailable": true,
+    "explicitFreshInvocationUsesNewValue": true,
+    "bothDeviceCanonicalOutputs": true,
+    "sameButtonAndOwningRowDom": true,
+    "browserRuntimeExceptions": []
+  },
+  "newCoverage": {
+    "pointReadUnitTests": 6,
+    "entityTests": 5,
+    "actualNativeLuaTests": 7,
+    "changedOriginalProviderCbsLuaCase": 1,
+    "builtUiFixture": 1,
+    "syntheticProviderCallsInChangedGenerationCase": 1,
+    "realModelCalls": 0
+  },
+  "beforeControl": {
+    "tests": 7,
+    "pass": 2,
+    "fail": 5,
+    "skipped": 0,
+    "observations": [
+      {
+        "scenario": "ordinary variable read changed by a peer",
+        "state": "completed",
+        "messages": 1,
+        "derived": "before"
+      },
+      {
+        "scenario": "shared global read changed by a peer",
+        "state": "completed",
+        "messages": 1,
+        "derived": "before"
+      },
+      {
+        "scenario": "absent local pin becomes present after global fallback",
+        "state": "completed",
+        "messages": 1,
+        "derived": "before"
+      },
+      {
+        "scenario": "empty local pin becomes truthy after global fallback",
+        "state": "completed",
+        "messages": 1,
+        "derived": "before"
+      },
+      {
+        "scenario": "missing ordinary value becomes present after default fallback",
+        "state": "completed",
+        "messages": 1,
+        "derived": "captured-default"
+      },
+      {
+        "scenario": "truthy local pin ignores an unread global edit",
+        "state": "completed",
+        "messages": 1,
+        "derived": "pinned"
+      },
+      {
+        "scenario": "unrelated key edits still merge",
+        "state": "completed",
+        "messages": 1,
+        "derived": "before"
+      }
+    ],
+    "baselineNativeArtifact": "e7a41e0dbf69cb15a049a842065a49ea054b2e53790fd30e27e6dc034d978fa8"
+  },
+  "afterNativeObservations": [
+    {
+      "scenario": "ordinary variable read changed by a peer",
+      "state": "failed",
+      "code": "REVISION_CONFLICT",
+      "messages": 0
+    },
+    {
+      "scenario": "shared global read changed by a peer",
+      "state": "failed",
+      "code": "REVISION_CONFLICT",
+      "messages": 0
+    },
+    {
+      "scenario": "absent local pin becomes present after global fallback",
+      "state": "failed",
+      "code": "REVISION_CONFLICT",
+      "messages": 0
+    },
+    {
+      "scenario": "empty local pin becomes truthy after global fallback",
+      "state": "failed",
+      "code": "REVISION_CONFLICT",
+      "messages": 0
+    },
+    {
+      "scenario": "missing ordinary value becomes present after default fallback",
+      "state": "failed",
+      "code": "REVISION_CONFLICT",
+      "messages": 0
+    },
+    {
+      "scenario": "truthy local pin ignores an unread global edit",
+      "state": "completed",
+      "messages": 1,
+      "derived": "pinned"
+    },
+    {
+      "scenario": "unrelated key edits still merge",
+      "state": "completed",
+      "messages": 1,
+      "derived": "before"
+    }
+  ],
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed; temporary output removed"
+  },
+  "format": {
+    "authoredSourceFiles": 9,
+    "result": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorExplicitPolicies": 2,
+    "fullCompatibilityProven": false
+  },
+  "negativeControl": {
+    "intervention": "Remove final transaction variable-read validation, retaining the final lazy native emitter and actual Lua fixture",
+    "candidateHash": "fb0f6d7d528c69eacdc8fafe48d84a1d0d857cad77cd49274f9ef93e7a994264",
+    "nativeArtifactHash": "691c734c94c3d51b62bef54cefa17e71bf7a02a2762f7ab98c7a86f771f5f25e",
+    "negativeExitCode": 1,
+    "restoredHash": "fb0f6d7d528c69eacdc8fafe48d84a1d0d857cad77cd49274f9ef93e7a994264",
+    "verifiedFailure": "Real Lua completed and stored one derived-before message despite confirmed peer edit; fixture requires failed/REVISION_CONFLICT",
+    "restoredExitCode": 0
+  },
+  "sourceFileHashes": {
+    "docs/engine-extraction-audit.json": "52b1cc63deaeaf01bffc56228c3011484cd6a18bd38af0287fcda6d5c26ad138",
+    "docs/incarnation-guards-runtime.md": "0fab9ea69bf3016a589465f99b00227f5f882233f5455679f546c65ccc32f4d0",
+    "docs/server-runtime-plan.md": "0558786015829351a1115c2a67f6dc2b47ae8f452a682ee6a5f7bbcda00dd290",
+    "docs/variable-read-runtime.md": "76669f93de0d9c4638fe03f1f8f473c7838200b3d6ff34b6277af3ad13f2133b",
+    "server/browser/variableReadsUi.test.cjs": "4ff7ed9ab314ae70b21fe66fb82fb89a874833779191a85bc32b3b4ae23ff3d7",
+    "server/entity/variableReads.cjs": "609c97cbc9c496fece674b5e277bb6f2556d784e8ce42fe7f149368c0a1a5bd1",
+    "server/entity/variableReads.test.cjs": "0604b88086768a42761d2cfebfa619d3bd5a769e9559dca6064341bd2edcc3c1",
+    "server/entity/writeSet.cjs": "fb0f6d7d528c69eacdc8fafe48d84a1d0d857cad77cd49274f9ef93e7a994264",
+    "server/native/generationWorker.test.cjs": "c81d86558868e051672af3dc37e74bf5081bd374e5c5d1c4cdfa9a4f3cb6d135",
+    "server/native/variableReads.test.cjs": "ce9f7d8f15987e635780e5da8f4cc8514fdba8578f9cf418a10a959a98771725",
+    "src/ts/runtime/executionContext.ts": "3116b6029c4cea5f6734863625d4da9b0e65a7ea51418a89f421d7e854afecb0",
+    "src/ts/runtime/variableReadDependencies.test.ts": "a72423e42113ce9a4170d342cd413536d707de1e1d1c112006588b0b96c35252",
+    "src/ts/runtime/variableReadDependencies.ts": "53854683116e9b2603c1445a98437b1784ae3f2773755a49af3772d20bb06c98"
+  },
+  "artifactHashes": {
+    "nativeExtensionJob": "691c734c94c3d51b62bef54cefa17e71bf7a02a2762f7ab98c7a86f771f5f25e",
+    "entityWebIndex": "6cf65729d1373235e82f4e0070cacecf68120fbc72db9a1b3300dfd497ee6385"
+  },
+  "rawLogHashes": {
+    "app-final-expanded.log": "bab1749e64b10693d6b559345155cb9370614ccb2113e26abb42ec8bc693d916",
+    "app-final-lazy.log": "63a9cea89a73c3e646f90f6befa754c355ccbeaa93eeca8f96ef958fa236a193",
+    "app-final.log": "e353adeff1c48f013d226b354489a1f0545abe7ef065b1e201c6e08207a16caa",
+    "backend-final-fixed.log": "30de1b935e17609cc56c6e37e7f8de2d13c30bb93fef0b7514ed384c21e8fcd7",
+    "backend-final-lazy.log": "2883818aa92ba3058f1303c4e0efbbba86d7e7f6fbd5467aca24bcb097436583",
+    "backend-final.log": "a87e3ba745b8b972edbf7cf6c555d7ffb2158aa637123fef3638e903e92ce5da",
+    "built-ui-final-lazy.log": "eb4fa39e2b8bb91305ad4cbbda145a715ea993415104d27908e670c16e6e26e2",
+    "built-ui-final.log": "c3db016260073d59512a2466c7e7237ed3830d4b6d240e8b1aa13ed2af1d5d38",
+    "check-final-lazy.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "check-final.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "check.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "engine-audit-final.log": "f94517c97b2f235cf90f329df7837ef5781e6b14cbfcd7bc681468efba7a7f43",
+    "engine-audit.log": "7e76f5a989ca25bee74bdecc20837958f7ac900c3cc4bc4a2547b5ecb96efd1a",
+    "entity-build-final.log": "ce330bc1febfdb6c0572e39222707153b83747ce54cafdb180ebad1abdb183fc",
+    "entity-build.log": "41771dc860acd123b40ce2f33f36295f91ede77dc0a8f3d3355bdd097f209881",
+    "focused.log": "07bb38b75fb1ff7170fba07ad5f81cb77842a71db0fcb11476853b8491b7bd5f",
+    "format-final.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "format.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "native-before-fixed-fixture.log": "d0adeb751747a82768baec93227dc46a6ccf9c091127f08909975ed593d7175f",
+    "native-before.log": "c9818df057f24a8a93bce2f296574d5236e4421b460fa2bcf2924c267dd75a51",
+    "native-build-final.log": "9029261f158e407478db0d7621c1a2d9b2bdcac1e403c0fb03359693daa02001",
+    "native-build.log": "e82448b906071aa290bdfb6656b94d6a08b0d49bfa95f3aa4145ab07ee744296",
+    "negative-control-final.json": "5a3303e335f38686c8e96a2713f52690f57773773844b3d7b05094a511d15dfd",
+    "negative-control.json": "3feb1eec14231276235bcc80b49476b717bc1e3d81ccea9e74ab109027634372",
+    "ordinary-build-final.log": "65bf4b4ff0734e4685e6d0a15c9f519c57c009a156f281313ee906acb776fb0d",
+    "ordinary-build.log": "c814c425dd9b8e3cee43e8b9a215645d331781dff6110e49c0dbae6f190c3e17",
+    "provider-read-fixed.log": "660124c33fd692f4b40a15d075f89741a5eb4363be74d61869dfaa0f1150f488",
+    "ui-dom-diagnostic.log": "3878b0f68a8444452d358f2fbeed4009a699b8b0fc5d50b5a041207b43863bfd",
+    "ui-focused-fixed.log": "72879eb6444299e801ea12dab204dcbe3f90e0769c82fd267b1a1bf62870fe74",
+    "ui-focused.log": "7f76514f28bdfd068737a879d5089dd5a41aa182fc87a52fc7adf754519239cb",
+    "unit-focused.log": "11cbf4021bfbd6f4589519c5fcf77e1b4262ee41c79986ad7f409afd77c6b58c",
+    "validation-negative-final.log": "6a503f322095ef21d405cfd700b09c67804cc32fae3417f4cca70344c9b3c05c",
+    "validation-negative.log": "d717acbc9187d14eff518aef598aacd509fede688ec915322295264fbb3438d8",
+    "validation-restored-final.log": "c3e598132b62d8cd7a93cfc5b1e7b690cec061c852b149059c47e74a4d98f56b",
+    "validation-restored.log": "581aa168763ec75b9971c98aa3d2f9d6e7acbf80d575749eb358258aebd1651e"
+  },
+  "priorProtocolBrowserEvidence": {
+    "commit": "7bef4987799048a2786910647e5031e16914aa99",
+    "scenariosPassed": 18,
+    "reportedIncludingParent": 19,
+    "rerunInThisMilestone": false
+  },
+  "initialFailuresRetained": [
+    "native-before.log: fixture accessed the readVariables response as an array; corrected its variables member. Independent corrected baseline has 5 stale application failures and 2 passing positive controls",
+    "backend-final.log: 332 pass/1 fail; existing native generation test deliberately expected the earlier snapshot completion policy. Updated it to require retained failure/no partial writes, preserving peer values and one synthetic provider request",
+    "ui-focused.log and ui-dom-diagnostic.log: first-row selector differs from the original owning row after a new response is placed first. Diagnostics prove same button and old owning row remained connected; corrected selector targets the button owning row"
+  ],
+  "untouched": {
+    "productionAccessed": false,
+    "productionQueried": false,
+    "productionChanged": false,
+    "productionDeployed": false,
+    "remotePushed": false,
+    "privateContentReadOrImported": false,
+    "realModelCalls": 0
+  },
+  "limits": [
+    "Declared variable API boundary is tracked; arbitrary raw DBState reads, whole-map enumeration/replacement and general plugin hosts still require provenance/collection coverage",
+    "4096 distinct per-job point reads/256-character keys are explicit limits, not representative latency/RAM measurements",
+    "Current same-incarnation character/settings configuration uses its captured snapshot; complete resource lifetime/field/collection/membership read closure remains unproven",
+    "Trusted legacy internal write sets without variableReads retain prior compatibility policy; their acceptance does not prove read provenance",
+    "Observed variable edits can now fail a previously accepted generation after an external request; computed output is retained, never automatically rerun, and stale recovery remains unavailable",
+    "Prior live interaction VM/RAM/crash and sequential HTTP pump policies remain unchanged",
+    "Local production-front health still hardcodes schema14 while DB is schema20; correcting metadata is a tracked next action",
+    "Continuation/structural variants, full import-export/storage/retention, physical mobile, representative latency/long tasks and practical user acceptance remain required",
+    "All15 full-goal conditions remain active; no schema migration in this milestone, prior schema20 rollback still requires a matching DB snapshot for schema19"
+  ],
+  "persistentTrackerAllocation": "lazy on first persistent API observation; display mode never constructs it",
+  "finalGateLogs": {
+    "app": "app-final-lazy.log",
+    "backend": "backend-final-lazy.log",
+    "builtUi": "built-ui-final-lazy.log",
+    "types": "check-final-lazy.log",
+    "nativeBuild": "native-build-final.log",
+    "entityBuild": "entity-build-final.log",
+    "ordinaryBuild": "ordinary-build-final.log",
+    "audit": "engine-audit-final.log",
+    "format": "format-final.log",
+    "negative": "validation-negative-final.log",
+    "restored": "validation-restored-final.log"
+  }
+}

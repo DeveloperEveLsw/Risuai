@@ -1,0 +1,203 @@
+{
+  "verifiedAt": "2026-10-04T04:10:32.837436+00:00",
+  "baseCommit": "a31ca68689e7f3e6ce581f6ea2fbc91b43bd7110",
+  "schema": 20,
+  "scope": "local public original source and authored synthetic fixtures only",
+  "all15Preserved": true,
+  "completionBlockHash": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "wholeGoalComplete": false,
+  "app": {
+    "passed": 454,
+    "existingSkipped": 3,
+    "filesPassed": 54
+  },
+  "backend": {
+    "tests": 321,
+    "pass": 321,
+    "fail": 0,
+    "skipped": 0
+  },
+  "builtBrowser": {
+    "tests": 7,
+    "pass": 7,
+    "fail": 0,
+    "skipped": 0,
+    "independentAuthenticatedContexts": 2,
+    "actualOriginalHtmlLua": true,
+    "typedResults": "Unicode input / selected zero-based index string 1 / false confirmation",
+    "allTabExitAndPrunedJournalBootstrap": true,
+    "firstPeerAnswerWins": true,
+    "lostReceiptSameIdReplay": true,
+    "nextQuestionUnaffectedByReplay": true,
+    "samePrefixRowAndDom": true,
+    "capturedCancelWhileViewingOtherCharacter": true,
+    "cancelledPartialVariablesNotPersisted": true,
+    "sameOriginRestartClosesWaitingInteraction": true,
+    "destroyedVmNotReplayed": true,
+    "browserRuntimeExceptions": []
+  },
+  "newCoverage": {
+    "entityTests": 8,
+    "nativeProcessTests": 7,
+    "authenticatedHttpTests": 1,
+    "interactionProjectionUnitTests": 5,
+    "providerSideEffectGuardUnitTests": 2,
+    "builtUiFixture": 1,
+    "nativeAndEntityCountsIncludedInBackend": true
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed; isolated temporary output removed"
+  },
+  "format": {
+    "authoredSourceFiles": 42,
+    "result": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorExplicitPolicies": 2,
+    "fullCompatibilityProven": false
+  },
+  "negativeControls": [
+    {
+      "name": "input-binding",
+      "path": "server/native/extensionWorker.cjs",
+      "candidateHash": "4dec41c713d2d3cddb22e8cb339649c8d7418a4c376db6d3a609156d3dc17aee",
+      "negativeExitCode": 1,
+      "restoredHash": "4dec41c713d2d3cddb22e8cb339649c8d7418a4c376db6d3a609156d3dc17aee",
+      "verifiedFailure": "Server capability is required: alertInput",
+      "restoredExitCode": 0
+    },
+    {
+      "name": "display-clock",
+      "path": "server/entity/displayEffects.cjs",
+      "candidateHash": "672562c15099135a3713e253d5c79632b970280b1facb3a8e4a05ce30d663cb4",
+      "negativeExitCode": 1,
+      "restoredHash": "672562c15099135a3713e253d5c79632b970280b1facb3a8e4a05ce30d663cb4",
+      "verifiedFailure": "5 !== 2",
+      "restoredExitCode": 0
+    }
+  ],
+  "sourceFileHashes": {
+    "docs/engine-extraction-audit.json": "4f6695f8e0c77e3ec48ef4d49c1f8a227f21ad41ab06dda04340d4ffc0d95e2f",
+    "docs/interaction-runtime.md": "92b477e187e91e8899a1f7d0ee88b8c1f70dccdc3dc88d5105486308ce1d7679",
+    "docs/notification-runtime.md": "aaca88506a1f1d24cd8fc14322f45f3102994f97d0de202fbdd5c8552b8e0f50",
+    "docs/server-runtime-plan.md": "deefd38d805d24fa9221594d84291b1b900513c68c5771710e9cf55d1c60d62e",
+    "server/browser/interactionsUi.test.cjs": "b402a418d5e8e5bf61e52a7c3d41253443898696b6081b18b33b734848c74285",
+    "server/entity/assets.test.cjs": "d64ff4a56f7ddbf154b3a2d7b1e4b614b6db6fbfdb188ae5dccad5bd9d38e9c0",
+    "server/entity/bookkeeping.test.cjs": "be0be6bad41e86e33b997587733773b524ae16501592438bf1a361d2faf0a3c1",
+    "server/entity/bookmarks.test.cjs": "67a4ac65d5be58d983cfebfb1cc54a8349c49ec8f7f9a2cd2814efe4211f8835",
+    "server/entity/catalog.test.cjs": "67088b9001cb8b34443e43ad1b7df1f163860177dc45325a7584ffe11c2ab5db",
+    "server/entity/chatNavigation.test.cjs": "df3527d7d13999fe4640487ddd71e2070b63114028caf594f34a9096a8261847",
+    "server/entity/displayEffects.cjs": "672562c15099135a3713e253d5c79632b970280b1facb3a8e4a05ce30d663cb4",
+    "server/entity/displayEffects.test.cjs": "ce82997e0dd8f5b56e86c44f14e9d51b5410cc1d3059d4acdcc7d404d1063a8b",
+    "server/entity/displayMessageIntents.test.cjs": "63f8ad05429122c32297ec42ab00af3c7d7e81ea8ec65033d4ddd8f100841248",
+    "server/entity/fields.test.cjs": "26de2b308a9fd8dbe285fce685496102ad480d77a87d2c7bd0ca92a3bbacd603",
+    "server/entity/groupMembers.test.cjs": "4f407b6dcaa3bf5d8849597ad45a2d358512c825a131ab37897e1ef97ed2be1f",
+    "server/entity/interactions.cjs": "bff745fb808694625a92133f3defe582f0756f55ea9fab2e4d0cc735fe5acf9f",
+    "server/entity/interactions.test.cjs": "14de912c48d0f7ac2f0b3517952d49f9b20db9a875244318941ccbb3db4b13c0",
+    "server/entity/jobProgress.test.cjs": "fcb33c4270d4c20367cadf500aed106afe8a70f340cc816e90d5418d3274cffb",
+    "server/entity/jobResults.test.cjs": "d49c932c00568d3fccd2623ee739370a90ca995276c55252170cfeaa115f76e5",
+    "server/entity/lifecycle.test.cjs": "b95a62ba92e8f9451d38225afc2385486865a775ff197901a84052aaee1626be",
+    "server/entity/notices.test.cjs": "508c415f92521f0c85a95f3f02d8d10266223b90a57bae458fad8e1418ff0120",
+    "server/entity/replyBatches.test.cjs": "0dc863848b624da72e994c62b21a58a523f9350e71725259f587f6c9a17e6bf9",
+    "server/entity/replyChoices.test.cjs": "f8d3c28b50e55294f5fd6bd40c971360480f9be9cb9f296cb95796fdc3971aa3",
+    "server/entity/schema.sql": "b7bc438daa2974aabb01c95a7897842b8f2a885662128ffd30ceb9f678cd7161",
+    "server/entity/store.cjs": "c765b48db75eca7bbcf6bce99e367053ec11994f0cfcdea43a6986eef59e84dc",
+    "server/entity/store.test.cjs": "c01dfcbafe63709bc5693595fd7e5a4ab3d137f79c9cda1315dbab8d6ecdb317",
+    "server/entity/variableConcurrency.test.cjs": "1362fdd297e5c9e21afa8affd650938e7f57a094307dcf437e1110f605e52ef9",
+    "server/entity/variables.test.cjs": "ae5dff350c2f961996df355495edb8f4cdaddfe07171a1615eff86fe38307097",
+    "server/entity/worker.cjs": "2aba29932d4b0562208ee9128a300ed562c845c59f012360baab3e5755e124e8",
+    "server/native/extensionWorker.cjs": "4dec41c713d2d3cddb22e8cb339649c8d7418a4c376db6d3a609156d3dc17aee",
+    "server/native/extensionWorker.test.cjs": "a0f39a52aacd021bf194c59ed9f4b76b9dad6a43bb952eb017a998077888890c",
+    "server/native/interactions.cjs": "c90c7d49ff2ccb475898c7eb9e05b75dc68a5d4c13a11e4fed781931b8840906",
+    "server/native/interactions.test.cjs": "7dc4d23ff63242306bb92912038fe10e33b5b771b43e082ca6714961369f0cda",
+    "server/native/processWorker.cjs": "45b0f6734bc119c17ebf419ecd0190d77cfca3ef3e0669677487c218685b270d",
+    "server/native/scheduler.cjs": "6e96bede686a5d0923325ab68914009f889dbf37d4b4bfb11784af2ff9d66b1b",
+    "server/runtime/interactions.test.cjs": "a6a5936d9365ac6e87a337ce50b53a0c47c5794f6d95bfd28cd17d8c750111ad",
+    "server/runtime/service.cjs": "8176021d547ad14504afc0bb44fb9fba73cb9a3aa0377e93042574426e262bcd",
+    "src/lib/Others/RuntimeInteractions.svelte": "5f7b145c95841de282ac86a000298a2cd2c27f4ace3246233b4ee6f6139228a8",
+    "src/lib/Others/RuntimeStatus.svelte": "a9c99eca7e355e60aec3316bc7ee329cd76d6094ddc3a3d4f90540771ea960e5",
+    "src/ts/runtime/browserRuntimeController.svelte.ts": "686e90dcf843eb651b542e27e333f8d2f42bf2a402089bab12b5351eb4a7205b",
+    "src/ts/runtime/browserRuntimeState.svelte.ts": "e1b8020757cf2ad87a50e566b9e11ee24a5f220193c40b836d96a0bdf5ee6238",
+    "src/ts/runtime/extensionRuntime.ts": "6ed9920d8e31028df7ddf4ba56d4f88db670833d36a682c209aa82b8ab9d55dc",
+    "src/ts/runtime/nativeTransport.test.ts": "57a017473089013a69157e4d2cc96feadd8410f08824c5323fbc2cc716079863",
+    "src/ts/runtime/nativeTransport.ts": "16bf55813e33db714419a038cc0ad9da154569aaf96e9b2cad32ecd602a49d16",
+    "src/ts/runtime/runtimeInteractions.test.ts": "96a289d107f44fd184de11fb3c087591d1f03cfd58f898173d1a506c7794c34e",
+    "src/ts/runtime/runtimeInteractions.ts": "e4179ca4dbed865ad97b6a716d3b00887bae23dc5ecb3b84936be4f4dc2665e8",
+    "src/ts/runtime/runtimeSyncClient.ts": "298a609bd53b929aad7d9902f8a5c67c373427ce66b8c3b1682c5ef22c067c40"
+  },
+  "artifactHashes": {
+    "nativeExtensionJob": "e7a41e0dbf69cb15a049a842065a49ea054b2e53790fd30e27e6dc034d978fa8",
+    "entityWebIndex": "6cf65729d1373235e82f4e0070cacecf68120fbc72db9a1b3300dfd497ee6385"
+  },
+  "rawLogHashes": {
+    "app-final.log": "df5ab153a59323259ad8b1b792e401c26b951045d5e9ff0ba59eb2388555a457",
+    "app-focused.log": "80946cbc35bcc76306b2c6471c6ea0f13705724c51c6be62540ae2bc6589ddf9",
+    "backend-final-cancel.log": "149cecfa8675e69e81c02cf74d84295c225d2ef1f76c29b7df6dddfb44feefd3",
+    "backend-final.log": "40a1191689ee16adf1cc30fcd472d985ebd5c278e1afb417150b965806fb42f1",
+    "backend-fixed.log": "bd2a696de36d8ee6131200bb1b26214b56dbae83a445c8989ef89f08a1d83e2b",
+    "built-ui-before-cancel.log": "1422a84126aa6bbfcf32d8b88cdaf6cd012aa55cebc1810c3608f748f53941f8",
+    "built-ui-final.log": "945cef66d9b101ad9cc47dce002fa7e3d3b49e14bec1642a09ea751204448bc1",
+    "check-final.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "check-fixed.log": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8",
+    "check-initial.log": "9f76d97ad19dfaa2191aab0c79d4db09eceb5aadadb14cb86a32034fc95686dd",
+    "display-clock-negative.log": "50452a7fc4a8ad170b7ec54dae17554f466cac454397b02d183ae8836a0b436f",
+    "display-clock-restored.log": "9eb73987f195939bdd5f0d719beb71af7a5fa2167785d74d5cc4d8b8863ce883",
+    "engine-audit.log": "87c19f4ca5d9a3b4b106ac21ea2aa6edf3a5d560a157fdfa0ac18bf8fa50fe66",
+    "entity-build-final.log": "1d5c74076fd47621edf14bdb0305b1d6f8654f26d725316f1efd577f1e17a46c",
+    "entity-build.log": "fd6ca9a11698b3985d62b2fa113c1ff79fa45895b3f5f5b4c89f06a7d0791ce7",
+    "entity-focused-fixed.log": "7f9a3ed613fb10870ddc1dfc4b6bd9086aaff6fb0210ceb8a14e7afb08ead4c3",
+    "entity-focused.log": "82c91fd8df2d74eba02b71ac22cc172d8cf686bf79474657b1faa0d2f2d76ba9",
+    "format-final.log": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+    "http-focused.log": "4182a40cee7e58ea212fa223bce02f824ac9cb2f5b48245831e0578c8873376f",
+    "input-binding-negative.log": "5856b1c38ec842286719c9131c989585b7387a27d323c3eb740d037d716d5dec",
+    "input-binding-restored.log": "cc6b68cd539972d13a2627e050fce26180efec4762672b07a3bd6f90747edfcc",
+    "native-build-fixed.log": "5626fb3879086a51942d7c6151fb2ac260faff12f60bea2d70ef3e76e4ee2a72",
+    "native-build.log": "65263eec56502cceb1a9a035d128c2a29b50f3b590def82bac086754cb4afb44",
+    "native-focused-fixed.log": "9d396d44b3dbfaeb2a5532a918a89ee6d898d330a4dbc1797c030d4726ab8560",
+    "native-focused-initial.log": "421c7b5d6b1395180ab262548cb28a1fe1024be4c77cdea1c27a2e6b07965454",
+    "negative-controls.json": "de13bb0f213ddc411b2e28b7625b430498f0f08e9d321f839ba1190cbe15653b",
+    "ordinary-build.log": "2323486ffe365dea8c460e604c4db2b177f1e29b0e879d48470c8532d3f5a64b",
+    "ui-initial.log": "7be35a673344b6aac5ba1cccf3e5df43565ec1edc83dd0287122a67e062ae690"
+  },
+  "priorProtocolBrowserEvidence": {
+    "commit": "7bef4987799048a2786910647e5031e16914aa99",
+    "scenariosPassed": 18,
+    "reportedIncludingParent": 19,
+    "rerunInThisMilestone": false
+  },
+  "initialFailuresRetained": [
+    "entity-focused.log: interaction events advanced display input clock (5 versus 2); corrected display event exclusion",
+    "check-initial.log: self-closing option Svelte warning; explicit closing element corrected",
+    "native-focused-initial.log: an unawaited async rejection leaked during abort despite nominal test passes; observed returned Promise rejection without swallowing awaited error, rebuilt and reran clean",
+    "backend-final.log: twelve obsolete schema19 assertions and the old unsupported-input message; updated schema20 assertions and the real old-schema lifecycle fixture, plus explicit unawaited-policy expectation"
+  ],
+  "untouched": {
+    "productionAccessed": false,
+    "productionQueried": false,
+    "productionChanged": false,
+    "productionDeployed": false,
+    "remotePushed": false,
+    "privateContentReadOrImported": false,
+    "realModelCalls": 0
+  },
+  "limits": [
+    "Questions/answers are durable, but a destroyed Lua VM/call stack is not serialized or automatically replayed; actual worker death/restart is interrupted",
+    "Abrupt supervisor loss can retain a pending question until ownership death is observed or lease expiry",
+    "Stored answers before a crash do not prove later canonical writes completed; partial final writes are rejected",
+    "Waiting releases execution slots but retains RAM; finite process-count capacity is not a measured RAM budget",
+    "Interactive Lua must use original async wrapper and await; unawaited/concurrent calls explicitly fail and block further external effects",
+    "Sequential HTTP receipt pump/config barriers remain; a held HTTP response can delay another command from the same browser",
+    "Descriptor limits do not implement history retention/export or a total archive/answer storage budget",
+    "General plugins/browser capabilities, complete read dependencies, continuation/structural variants and full import-export fidelity remain unfinished",
+    "Physical mobile/background behavior and representative latency/long tasks/user acceptance remain required; small loopback tests do not prove universal stutter elimination",
+    "Schema20 rollback requires matching pre-migration DB snapshot and prior runtime; original 15 full-goal requirements remain active"
+  ]
+}

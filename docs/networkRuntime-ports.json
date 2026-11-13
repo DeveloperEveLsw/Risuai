@@ -1,0 +1,22 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/request/openAI/shared.ts",
+  "core": "src/ts/process/request/openAI/networkRuntime.ts",
+  "factory": "createNetworkRuntime",
+  "functions": ["getLocalNetworkRequestOptions"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "isLocalNetworkUrl",
+      "specifier": "src/ts/network/localNetwork",
+      "original": "isLocalNetworkUrl"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

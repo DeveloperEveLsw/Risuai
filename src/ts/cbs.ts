@@ -1,9 +1,7 @@
 import type { Database, character, loreBook } from './storage/database.svelte';
-import type { CbsConditions } from './parser/parser.svelte';
+import type { CbsConditions } from './parser/cbsRuntime';
 import type { RisuModule } from './process/modules';
 import type { LLMModel } from './model/modellist';
-import { get } from 'svelte/store';
-import { CurrentTriggerIdStore } from './stores.svelte';
 
 export const defaultCBSRegisterArg: CBSRegisterArg = {
     registerFunction: () => { throw new Error('registerFunction not implemented') },
@@ -33,6 +31,7 @@ export const defaultCBSRegisterArg: CBSRegisterArg = {
     getModuleLorebooks: () => [],
     pickHashRand: () => Math.random(),
     getSelectedCharID: () => 0,
+    getCurrentTriggerId: () => null,
     callInternalFunction: (args: string[]) => {return ''},
     isTauri: false,
     isNodeServer: false,
@@ -106,6 +105,7 @@ export type CBSRegisterArg = {
     getModuleLorebooks: () => loreBook[],
     pickHashRand: (seed: number, hash: string) => number,
     getSelectedCharID: () => number,
+    getCurrentTriggerId?: () => string | null,
     getModelInfo: (model: string) => LLMModel
     callInternalFunction: (args: string[]) => string,
     isTauri: boolean,
@@ -184,7 +184,7 @@ export function registerCBS(arg:CBSRegisterArg) {
     registerFunction({
         name: 'trigger_id',
         callback: (str, matcherArg, args, vars) => {
-            const currentTriggerId = get(CurrentTriggerIdStore)
+            const currentTriggerId = arg.getCurrentTriggerId?.() ?? null
             return currentTriggerId ?? 'null'
         },
         alias: ['triggerid'],

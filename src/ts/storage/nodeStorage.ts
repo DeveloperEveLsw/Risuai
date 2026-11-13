@@ -1,55 +1,11 @@
 import { language } from "src/lang"
 import { alertError, alertInput, waitAlert } from "../alert"
 import { base64url, getKeypairStore, saveKeypairStore } from "../util"
-import {
-    NodeDatabaseSync,
-    type NodeDatabaseCommitOptions,
-} from "./nodeDatabaseSync"
-import { isServerResidentExecutor } from "../platform"
 
-export const NODE_DATABASE_STORAGE_KEY = 'database/database.bin'
-
-const MAX_WRITE_RATE_LIMIT_RETRIES = 3
-const DEFAULT_WRITE_RETRY_DELAY_MS = 60_000
-
-function writeRetryDelay(response: Response): number {
-    const retryAfter = response.headers.get('retry-after')?.trim()
-    if (retryAfter && /^\d+$/.test(retryAfter)) {
-        const seconds = Number(retryAfter)
-        if (Number.isSafeInteger(seconds) && seconds <= 2_147_483) {
-            return seconds * 1000 + 250
-        }
-        return DEFAULT_WRITE_RETRY_DELAY_MS
-    }
-    if (retryAfter) {
-        const retryAt = Date.parse(retryAfter)
-        const delay = retryAt - Date.now()
-        if (Number.isFinite(delay) && delay <= 2_147_483_000) {
-            return Math.max(0, delay) + 250
-        }
-    }
-    return DEFAULT_WRITE_RETRY_DELAY_MS
-}
-
-export interface NodeStorageOptions {
-    databaseSync?: NodeDatabaseSync
-}
 
 export class NodeStorage{
 
     authChecked = false
-    readonly databaseSync: NodeDatabaseSync
-    private hubSessionExpiresAt = 0
-    private hubSessionRequest: Promise<void> | null = null
-    private writeRetryUntil = 0
-
-    constructor(options: NodeStorageOptions = {}) {
-        this.databaseSync = options.databaseSync ?? new NodeDatabaseSync({
-            getAuth: () => this.getProxyAuth(),
-            getKeyPair: () => this.getKeyPair(),
-        })
-    }
-
     JSONStringlifyAndbase64Url(obj:any){
         return base64url(Buffer.from(JSON.stringify(obj), 'utf-8'))
     }
@@ -84,45 +40,10 @@ export class NodeStorage{
     async getProxyAuth() {
         await this.checkAuth()
         const auth = await this.createAuth()
-        await this.ensureHubSession(auth)
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('risuauth', auth)
+        }
         return auth
-    }
-
-    private async ensureHubSession(auth: string) {
-        if (this.hubSessionExpiresAt > Date.now() + 60_000) {
-            return
-        }
-        if (this.hubSessionRequest) {
-            await this.hubSessionRequest
-            return
-        }
-        this.hubSessionRequest = (async () => {
-            try {
-                const response = await fetch('/api/hub-session', {
-                    method: 'POST',
-                    headers: { 'risu-auth': auth },
-                })
-                if (!response.ok) {
-                    throw new Error(`Hub session setup failed (${response.status})`)
-                }
-                const body = await response.json() as { expiresAt?: unknown }
-                if (
-                    typeof body.expiresAt !== 'number'
-                    || !Number.isSafeInteger(body.expiresAt)
-                    || body.expiresAt <= Date.now()
-                ) {
-                    throw new Error('Hub session setup returned an invalid expiry')
-                }
-                this.hubSessionExpiresAt = body.expiresAt
-            } catch (error) {
-                // The JWT on programmatic hub requests remains valid, and an
-                // optional Hub outage must never block canonical DB loading.
-                console.warn('[Node Storage] Could not prepare the Hub resource session:', error)
-            } finally {
-                this.hubSessionRequest = null
-            }
-        })()
-        await this.hubSessionRequest
     }
 
     async getKeyPair():Promise<CryptoKeyPair>{
@@ -148,56 +69,26 @@ export class NodeStorage{
 
     }
 
-    async setItem(key:string, value:Uint8Array, options: NodeDatabaseCommitOptions = {}) {
-        if (key === NODE_DATABASE_STORAGE_KEY) {
-            await this.databaseSync.commit(value, options)
-            return
-        }
+    async setItem(key:string, value:Uint8Array) {
         await this.checkAuth()
-        for (let attempt = 0; ; attempt++) {
-            // All concurrent asset saves on this storage instance share the
-            // cooldown, including writes that were still queued when it began.
-            while (Date.now() < this.writeRetryUntil) {
-                await new Promise<void>((resolve) =>
-                    setTimeout(resolve, this.writeRetryUntil - Date.now()),
-                )
+        const da = await fetch('/api/write', {
+            method: "POST",
+            body: value as any,
+            headers: {
+                'content-type': 'application/octet-stream',
+                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
+                'risu-auth': await this.createAuth()
             }
-            const response = await fetch('/api/write', {
-                method: 'POST',
-                body: value as any,
-                headers: {
-                    'content-type': 'application/octet-stream',
-                    'file-path': Buffer.from(key, 'utf-8').toString('hex'),
-                    // Refresh the five-minute credential after waiting.
-                    'risu-auth': await this.createAuth(),
-                },
-            })
-            if (response.status === 429 && attempt < MAX_WRITE_RATE_LIMIT_RETRIES) {
-                this.writeRetryUntil = Math.max(
-                    this.writeRetryUntil,
-                    Date.now() + writeRetryDelay(response),
-                )
-                await response.body?.cancel()
-                continue
-            }
-            const data = await response.json().catch(() => null)
-            if (!response.ok || data?.error) {
-                const detail = typeof data?.error === 'string'
-                    ? data.error
-                    : response.statusText || 'Unknown server error'
-                throw new Error(`Storage write failed (HTTP ${response.status}) for ${key}: ${detail}`)
-            }
-            if (data === null) {
-                throw new Error(`Storage write returned invalid JSON for ${key}`)
-            }
-            return
+        })
+        if(da.status < 200 || da.status >= 300){
+            throw "setItem Error"
+        }
+        const data = await da.json()
+        if(data.error){
+            throw data.error
         }
     }
     async getItem(key:string):Promise<Buffer> {
-        if (key === NODE_DATABASE_STORAGE_KEY) {
-            const data = await this.databaseSync.read()
-            return data === null ? null : Buffer.from(data)
-        }
         await this.checkAuth()
         const da = await fetch('/api/read', {
             method: "GET",
@@ -235,13 +126,10 @@ export class NodeStorage{
     }
     async removeItem(key:string|string[]){
         await this.checkAuth()
-        const encodedKeys = (Array.isArray(key) ? key : [key])
-            .map((entry) => Buffer.from(entry, 'utf-8').toString('hex'))
-            .join('$$')
         const da = await fetch('/api/remove', {
             method: "GET",
             headers: {
-                'file-path': encodedKeys,
+                'file-path': Buffer.from(Array.isArray(key) ? key.join('$$') : key, 'utf-8').toString('hex'),
                 'risu-auth': await this.createAuth()
             }
         })
@@ -279,18 +167,6 @@ export class NodeStorage{
             else if(data.status === 'incorrect'){
                 const keypair = await this.getKeyPair()
                 const publicKey = await crypto.subtle.exportKey('jwk', keypair.publicKey)
-                if(isServerResidentExecutor){
-                    const executorLogin = await fetch('/api/executor_login', {
-                        method: 'POST',
-                        body: JSON.stringify({ publicKey }),
-                        headers: { 'content-type': 'application/json' },
-                    })
-                    if(!executorLogin.ok){
-                        throw new Error(`Resident executor enrollment failed (${executorLogin.status})`)
-                    }
-                    this.authChecked = true
-                    return await this.createAuth()
-                }
                 const input = await digestPassword(await alertInput(language.inputNodePassword))
 
                 const s = await fetch('/api/login',{
@@ -329,10 +205,6 @@ export class NodeStorage{
 }
 
 const sharedNodeStorage = new NodeStorage()
-
-export function getSharedNodeStorage() {
-    return sharedNodeStorage
-}
 
 export async function getNodeServerProxyAuth() {
     return await sharedNodeStorage.getProxyAuth()

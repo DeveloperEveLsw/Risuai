@@ -1,0 +1,11 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/util.ts",
+  "core": "src/ts/utilBinaryRuntime.ts",
+  "factory": "createUtilBinaryRuntime",
+  "functions": [
+    "base64url"
+  ],
+  "classes": [],
+  "ports": []
+}

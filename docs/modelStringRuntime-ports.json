@@ -1,0 +1,17 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/models/modelString.ts",
+  "core": "src/ts/process/models/modelStringRuntime.ts",
+  "factory": "createModelStringRuntime",
+  "functions": ["getGenerationModelString"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

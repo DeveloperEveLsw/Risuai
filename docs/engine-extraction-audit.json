@@ -1,0 +1,1378 @@
+{
+  "verifiedAt": "2026-10-21T17:15:20.939Z",
+  "baseline": "f9728b14c733d073168d8d0c6a8f34f8febf0304",
+  "results": [
+    {
+      "source": "src/ts/process/index.svelte.ts",
+      "function": "findMessageIndexByChatId",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "0cd9459016db7db09d5d7f938d4b87b8ef74bb86af7d49c2fc3acbcbff0af2dd",
+      "extractedHash": "0cd9459016db7db09d5d7f938d4b87b8ef74bb86af7d49c2fc3acbcbff0af2dd"
+    },
+    {
+      "source": "src/ts/process/index.svelte.ts",
+      "function": "runChatOutputListeners",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "895020544e1050940649753fe0ef064fc35954eb4a52705773136fbc3db6a013",
+      "extractedHash": "895020544e1050940649753fe0ef064fc35954eb4a52705773136fbc3db6a013"
+    },
+    {
+      "source": "src/ts/process/index.svelte.ts",
+      "function": "sendChat",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "3e39279c76756709e428f19e0c81afdf7c6eb0ec9812fff2c13282b0ac3f3858",
+      "extractedHash": "3e39279c76756709e428f19e0c81afdf7c6eb0ec9812fff2c13282b0ac3f3858"
+    },
+    {
+      "source": "src/ts/process/index.svelte.ts",
+      "function": "systemizeChat",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "41fe909b3d89982fdf3c4418a297f2d90ff784882649dbdee22d7dc6831dd52f",
+      "extractedHash": "41fe909b3d89982fdf3c4418a297f2d90ff784882649dbdee22d7dc6831dd52f"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleById",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "138ea90909ece1a04289ab6122875e5161672de1920abe3490f270c44bf4e039",
+      "extractedHash": "138ea90909ece1a04289ab6122875e5161672de1920abe3490f270c44bf4e039"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleByIds",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "fef97295c39321c14973e13a773cc937f031d57462efd5eb5af6f75a3678ae1b",
+      "extractedHash": "fef97295c39321c14973e13a773cc937f031d57462efd5eb5af6f75a3678ae1b"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "deduplicateModuleById",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "54aab592fa5e3c58a7e79d1bce2e3b66a3c9f4e36a64460e5d17a07d793b0635",
+      "extractedHash": "54aab592fa5e3c58a7e79d1bce2e3b66a3c9f4e36a64460e5d17a07d793b0635"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModules",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2f232d333c44cbc45a5a22296838367c4fe9411956f252d189f44ec6e85ad7e2",
+      "extractedHash": "2f232d333c44cbc45a5a22296838367c4fe9411956f252d189f44ec6e85ad7e2"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleLorebooks",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "25ae50d9010884da9c86bcf2b247e1caaaf690514c891a634c6b97858b4d94ef",
+      "extractedHash": "25ae50d9010884da9c86bcf2b247e1caaaf690514c891a634c6b97858b4d94ef"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleAssets",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "68d9fecb116e9ba1aefd56e31720b2c9e7efa8940683d17091284630c54e1baf",
+      "extractedHash": "68d9fecb116e9ba1aefd56e31720b2c9e7efa8940683d17091284630c54e1baf"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleTriggers",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "73333c644b39bac1a97f49d73385d5a99ef026e259451e2ab17bfd94d7fa478a",
+      "extractedHash": "73333c644b39bac1a97f49d73385d5a99ef026e259451e2ab17bfd94d7fa478a"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleRegexScripts",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4a6082ef33662a8943e9b222c109e7a74d31a083abea281985aedb7fa48bf13b",
+      "extractedHash": "4a6082ef33662a8943e9b222c109e7a74d31a083abea281985aedb7fa48bf13b"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleToggles",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2c9520a782d6d4ad5f7527d9fa2238c94ec847470b1da72ea537a94e5619d6b3",
+      "extractedHash": "2c9520a782d6d4ad5f7527d9fa2238c94ec847470b1da72ea537a94e5619d6b3"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "getModuleMcps",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c3a9d865544a39b5503b423e551f043315d276e1e37a1517442fbc37fbf17bc6",
+      "extractedHash": "c3a9d865544a39b5503b423e551f043315d276e1e37a1517442fbc37fbf17bc6"
+    },
+    {
+      "source": "src/ts/process/modules.ts",
+      "function": "refreshModules",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "0412642f489175ee507c2d8f8c0d8d60f6ff7089ddbd547d7e4bad9adab763a0",
+      "extractedHash": "0412642f489175ee507c2d8f8c0d8d60f6ff7089ddbd547d7e4bad9adab763a0"
+    },
+    {
+      "source": "src/ts/process/scripts.ts",
+      "function": "processScript",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "fbfdcc6a86d5581189eccb31e5bff248931c0e5d12cbd4c0fae430a5ad13f17f",
+      "extractedHash": "fbfdcc6a86d5581189eccb31e5bff248931c0e5d12cbd4c0fae430a5ad13f17f"
+    },
+    {
+      "source": "src/ts/process/scripts.ts",
+      "function": "generateScriptCacheKey",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "fa2afbf704fc08796233e3ac64ec9201790293657f20e86c5dec3d084a562e34",
+      "extractedHash": "fa2afbf704fc08796233e3ac64ec9201790293657f20e86c5dec3d084a562e34"
+    },
+    {
+      "source": "src/ts/process/scripts.ts",
+      "function": "cacheScript",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "7b33eb5a9458bbccad2b598b45face837b26df091fc8da7837792ee6f804b687",
+      "extractedHash": "7b33eb5a9458bbccad2b598b45face837b26df091fc8da7837792ee6f804b687"
+    },
+    {
+      "source": "src/ts/process/scripts.ts",
+      "function": "getScriptCache",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "36340cda12af73789fe1fce1ea59495c565292afaa82f0731e1330619a8fe577",
+      "extractedHash": "36340cda12af73789fe1fce1ea59495c565292afaa82f0731e1330619a8fe577"
+    },
+    {
+      "source": "src/ts/process/scripts.ts",
+      "function": "resetScriptCache",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a566aacce172d1450f9a18cd8e089b1295b7fc93c57cb9ded7ef1ae5dedd0472",
+      "extractedHash": "a566aacce172d1450f9a18cd8e089b1295b7fc93c57cb9ded7ef1ae5dedd0472"
+    },
+    {
+      "source": "src/ts/process/scripts.ts",
+      "function": "processScriptFull",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2ebfe58a4b38714a9969e3c30ebab2184d881e737ba9749dcb535b13168bef64",
+      "extractedHash": "2ebfe58a4b38714a9969e3c30ebab2184d881e737ba9749dcb535b13168bef64"
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "runScripted",
+      "originalAlgorithmPreserved": false,
+      "originalHash": "07a3b48ac7ac1954ba0dd835306d46a25c0d09695a7c2bd87021215cb9e6a474",
+      "extractedHash": "2f6813633785f7f225ad857a8461c9b1e465203222d97cbfc21602dff79d66d1",
+      "verifiedInvocationPolicy": "Invocation access tokens are revoked in finally; caught Lua failures notify the transactional host without changing ordinary fallback results.",
+      "behavioralTests": [
+        "src/ts/process/scriptingRuntime.test.ts",
+        "src/ts/runtime/browserDisplayLua.test.ts"
+      ]
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "makeLuaFactory",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "624dde35b462f014816976a6c34b91ce78682e00a988927b5154a560f97b91cf",
+      "extractedHash": "624dde35b462f014816976a6c34b91ce78682e00a988927b5154a560f97b91cf"
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "ensureLuaFactory",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "6828231131cddafac313a1bf2e92c36de8c6ae5599b504e224558743808a3bc7",
+      "extractedHash": "6828231131cddafac313a1bf2e92c36de8c6ae5599b504e224558743808a3bc7"
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "getOrCreateEngineState",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f52536543f9e9ed77c68619b1f4341e7403735a343b36d4a5b816fb91f2f3e98",
+      "extractedHash": "f52536543f9e9ed77c68619b1f4341e7403735a343b36d4a5b816fb91f2f3e98"
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "luaCodeWrapper",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c24228e6e6664d869407bffe78d6fc3749e5fabae8036fdaf318935dad14382f",
+      "extractedHash": "c24228e6e6664d869407bffe78d6fc3749e5fabae8036fdaf318935dad14382f"
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "runLuaEditTrigger",
+      "originalAlgorithmPreserved": false,
+      "originalHash": "ed1d6801398254047e15c1a3b06f30950e063a28f0d83bde2cbb2581cd7db2b7",
+      "extractedHash": "73d2d3c92866a08e20d35b5ce9f8771a2b733fa18046dd63e8f3258da97a21ac",
+      "verifiedInvocationPolicy": "Caught setup/compile failures notify the transactional host before returning the original display input.",
+      "behavioralTests": [
+        "src/ts/process/scriptingRuntime.test.ts",
+        "src/ts/runtime/browserDisplayLua.test.ts"
+      ]
+    },
+    {
+      "source": "src/ts/process/scriptings.ts",
+      "function": "runLuaButtonTrigger",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "dc9ca66cdd9848d0bad1a1286efcf43f75e5ab0a8b67fa2376758b4168ea1cee",
+      "extractedHash": "dc9ca66cdd9848d0bad1a1286efcf43f75e5ab0a8b67fa2376758b4168ea1cee"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "checkPersonaBinded",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a3ce0a8d61a41b1d70dc5de5afb41b21d9353f332c1646ce4cb56d9967380fe2",
+      "extractedHash": "a3ce0a8d61a41b1d70dc5de5afb41b21d9353f332c1646ce4cb56d9967380fe2"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "getUserName",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c180dc85c71b0f9fea670cbc0073aff9447f18e9a4ca00ffab667c098df77dc1",
+      "extractedHash": "c180dc85c71b0f9fea670cbc0073aff9447f18e9a4ca00ffab667c098df77dc1"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "getUserIcon",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "942425cd6b42975e40df417b1cb795f4919823eea3366320f3349b24675b13db",
+      "extractedHash": "942425cd6b42975e40df417b1cb795f4919823eea3366320f3349b24675b13db"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "getPersonaPrompt",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "fb7adcd851246abcbd26545decb74b8da3e1fca5f945c1e4d9eb199efd22bd85",
+      "extractedHash": "fb7adcd851246abcbd26545decb74b8da3e1fca5f945c1e4d9eb199efd22bd85"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "getUserIconProtrait",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "d40d734ff4aab8ab2d058837b389e172f3c5a17f9d2f1ba84659a76770f583bb",
+      "extractedHash": "d40d734ff4aab8ab2d058837b389e172f3c5a17f9d2f1ba84659a76770f583bb"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "findCharacterbyId",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "77838fb6d0a16ce7f7fc79db5e3507b19e49167d4bcee94feb9677849d1eaed4",
+      "extractedHash": "77838fb6d0a16ce7f7fc79db5e3507b19e49167d4bcee94feb9677849d1eaed4"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "findCharacterIndexbyId",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "0f47d9b9076295452620b508e3efb602994710c87e2f69e75d7952948d73e1e9",
+      "extractedHash": "0f47d9b9076295452620b508e3efb602994710c87e2f69e75d7952948d73e1e9"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "getCharacterIndexObject",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "e3c56a04b8bc63761f33fcf8f03dc44bc6ae596fdae084c355d3cc8a959a1080",
+      "extractedHash": "e3c56a04b8bc63761f33fcf8f03dc44bc6ae596fdae084c355d3cc8a959a1080"
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "getAuthorNoteDefaultText",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8b59cb5420e6815e3e6193140182d00c0909977599a22e78a59ac044376edbc5",
+      "extractedHash": "8b59cb5420e6815e3e6193140182d00c0909977599a22e78a59ac044376edbc5"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "getChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "e6636492bc86613d7bee8bc7b3b13807681c8dee3962050ebf1d3a88305639fa",
+      "extractedHash": "e6636492bc86613d7bee8bc7b3b13807681c8dee3962050ebf1d3a88305639fa"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "setChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c73d4a74ec46ec781b8cfbc87b93bb193fd4ad400611979f74f7a588ef0b3a10",
+      "extractedHash": "c73d4a74ec46ec781b8cfbc87b93bb193fd4ad400611979f74f7a588ef0b3a10"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "getGLChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f9aedee8f21b73bede73f6400e133e5d907d7ab01cbe4866334f8b9b91bf91fe",
+      "extractedHash": "f9aedee8f21b73bede73f6400e133e5d907d7ab01cbe4866334f8b9b91bf91fe"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "setGLChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "73252a2061c975c4c7a7ca817df8f2b3999a680c2a9a160a41ae9d9d0aa74f61",
+      "extractedHash": "73252a2061c975c4c7a7ca817df8f2b3999a680c2a9a160a41ae9d9d0aa74f61"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "getGlobalChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "bb9ff134bce6bf17bb12d4a8ca2f76dfcc4e212928d925f06b080503ff0c5f91",
+      "extractedHash": "bb9ff134bce6bf17bb12d4a8ca2f76dfcc4e212928d925f06b080503ff0c5f91"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "setGlobalChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "46571d12f0f49b2aca4573d73f6d1356adcadab884ed9b06be3c53e9e0e01dd0",
+      "extractedHash": "46571d12f0f49b2aca4573d73f6d1356adcadab884ed9b06be3c53e9e0e01dd0"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "isLocallyHandledGlobalChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "68ddab56f98988f883a357aab170efb1a055b7db64947bc96798904372619656",
+      "extractedHash": "68ddab56f98988f883a357aab170efb1a055b7db64947bc96798904372619656"
+    },
+    {
+      "source": "src/ts/parser/chatVar.svelte.ts",
+      "function": "removeLocallyHandledGlobalChatVar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8085121a8b5fd0e9ea0bcc64a7a3f99247c7340d3cdb2fbcabcc8b0ed0218840",
+      "extractedHash": "8085121a8b5fd0e9ea0bcc64a7a3f99247c7340d3cdb2fbcabcc8b0ed0218840"
+    },
+    {
+      "source": "src/ts/characters.ts",
+      "function": "createBlankChar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "ed859a574ff41f9d38d9c0c25d659733f80b47feae45c4f0957ffa1c4e25df80",
+      "extractedHash": "ed859a574ff41f9d38d9c0c25d659733f80b47feae45c4f0957ffa1c4e25df80"
+    },
+    {
+      "source": "src/ts/process/triggers.ts",
+      "function": "collectStreamingText",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "999365f195886e03dd1c71c1abb58ab13db95fa21e73a990b2d325fc4a61965c",
+      "extractedHash": "999365f195886e03dd1c71c1abb58ab13db95fa21e73a990b2d325fc4a61965c"
+    },
+    {
+      "source": "src/ts/process/triggers.ts",
+      "function": "runTrigger",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4b5718aa88b284b66cf2f0d3a5473cebfc1248e49a26252e566ed0c0ac61cb05",
+      "extractedHash": "4b5718aa88b284b66cf2f0d3a5473cebfc1248e49a26252e566ed0c0ac61cb05"
+    },
+    {
+      "source": "src/ts/process/lorebook.svelte.ts",
+      "function": "loadLoreBookV3Prompt",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "ec28d49cb0004de0d2cf4925f98e81d151e0af3413d8b8f32a03a71807e27def",
+      "extractedHash": "ec28d49cb0004de0d2cf4925f98e81d151e0af3413d8b8f32a03a71807e27def"
+    },
+    {
+      "source": "src/ts/model/modellist.ts",
+      "function": "getModelInfo",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b070be09d5647e55c7636d8328efffd755f67052ba164d8c446559d59fe19c1c",
+      "extractedHash": "b070be09d5647e55c7636d8328efffd755f67052ba164d8c446559d59fe19c1c"
+    },
+    {
+      "source": "src/ts/parser/chatML.ts",
+      "function": "parseChatML",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "7d28780e6c99fb1c4b3b482e9ff2411bd7b824a5ad2fb58b478018be3ef1740f",
+      "extractedHash": "7d28780e6c99fb1c4b3b482e9ff2411bd7b824a5ad2fb58b478018be3ef1740f"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "getHash",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c8bbfc88c90560ac5c9ec3616c48cd04fe8be2138b6add7014bcdd33be70eba1",
+      "extractedHash": "c8bbfc88c90560ac5c9ec3616c48cd04fe8be2138b6add7014bcdd33be70eba1"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "encodeWithTokenizer",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "adf99624c8d52fb818ef4dc230be17126d9f6451980b1eeee1a8339def0e5485",
+      "extractedHash": "adf99624c8d52fb818ef4dc230be17126d9f6451980b1eeee1a8339def0e5485"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "encode",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "540a5908f20b01fb7148b8ed3e14c4518b813997a0b9fd224fcff436c19f8527",
+      "extractedHash": "540a5908f20b01fb7148b8ed3e14c4518b813997a0b9fd224fcff436c19f8527"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tokenizeGoogleCloud",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "5060cb3c50b5ad70a55efdd29c24bad702e6f275265f5b55618e11bb58c81eb3",
+      "extractedHash": "5060cb3c50b5ad70a55efdd29c24bad702e6f275265f5b55618e11bb58c81eb3"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "gemmaTokenize",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "0be32c83aa90b1d94bea44a725c6a3fd791a2957c4276011309b3bc16cdc0883",
+      "extractedHash": "0be32c83aa90b1d94bea44a725c6a3fd791a2957c4276011309b3bc16cdc0883"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tikJS",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "81f029ea35c94727776347b12af9e9227a994faec12407301e2badb0af0847eb",
+      "extractedHash": "81f029ea35c94727776347b12af9e9227a994faec12407301e2badb0af0847eb"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "geminiTokenizer",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "13e7d5fdb02b757f88245d833e6ddbb2a6aed48757a0c4a05cb95871767a38c1",
+      "extractedHash": "13e7d5fdb02b757f88245d833e6ddbb2a6aed48757a0c4a05cb95871767a38c1"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tokenizeWebTokenizers",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "86bea2852740e94ae8b39406e951c5ee30b0ba7c3abc0a86e7274464bbae7001",
+      "extractedHash": "86bea2852740e94ae8b39406e951c5ee30b0ba7c3abc0a86e7274464bbae7001"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tokenizerChar",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f16ae27c14e3a5b8f7577c4fa892cde60758fb3ca13ef57e6f0870cebb90c4a6",
+      "extractedHash": "f16ae27c14e3a5b8f7577c4fa892cde60758fb3ca13ef57e6f0870cebb90c4a6"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tokenize",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "89fbe81879d79a0dc0db4e8a1776538bf2f65e5d05f227d8a59b2fc52eb7db9b",
+      "extractedHash": "89fbe81879d79a0dc0db4e8a1776538bf2f65e5d05f227d8a59b2fc52eb7db9b"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tokenizeAccurate",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f6cd5ca2ca103d146f424fb4c720a9266b4289cdd94876db4c6b5d8ad2ab2864",
+      "extractedHash": "f6cd5ca2ca103d146f424fb4c720a9266b4289cdd94876db4c6b5d8ad2ab2864"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "tokenizeNum",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "22e4bc9196ab79c8bf718752288699b0c376b53d744bfa25ff08c9ecb0b03a25",
+      "extractedHash": "22e4bc9196ab79c8bf718752288699b0c376b53d744bfa25ff08c9ecb0b03a25"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "strongBan",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f78fc62505870d1169d2310b8d00a61fb9667d9cbc7bda2aaf9fe3f477a96f60",
+      "extractedHash": "f78fc62505870d1169d2310b8d00a61fb9667d9cbc7bda2aaf9fe3f477a96f60"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "getCharToken",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "252c01f67d9fbc33e233daae976de0a7f0c737d4affc9cef7ffd496f8171b3cc",
+      "extractedHash": "252c01f67d9fbc33e233daae976de0a7f0c737d4affc9cef7ffd496f8171b3cc"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "getChatToken",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f4993deff0c022862f38b7d408e699dd88a23b4f17e91f8270a0c67156a0a26f",
+      "extractedHash": "f4993deff0c022862f38b7d408e699dd88a23b4f17e91f8270a0c67156a0a26f"
+    },
+    {
+      "source": "src/ts/tokenizer.ts",
+      "function": "ChatTokenizer",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f422647f051e42869d353a2b795b6756fe8ebf04911adbad1d3f55fb16201478",
+      "extractedHash": "f422647f051e42869d353a2b795b6756fe8ebf04911adbad1d3f55fb16201478"
+    },
+    {
+      "source": "src/ts/process/request/shared.ts",
+      "function": "isReasoningCapabilityParameter",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a210e9866ae1b2f57d8f543e854cc8b688d065b1cf58e34b16dc2b8a888007dd",
+      "extractedHash": "a210e9866ae1b2f57d8f543e854cc8b688d065b1cf58e34b16dc2b8a888007dd"
+    },
+    {
+      "source": "src/ts/process/request/shared.ts",
+      "function": "setObjectValue",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a0f3ca11149ee5fdd2c148d8092a24dbf433c7accab1e585f601f0c77aa7cf05",
+      "extractedHash": "a0f3ca11149ee5fdd2c148d8092a24dbf433c7accab1e585f601f0c77aa7cf05"
+    },
+    {
+      "source": "src/ts/process/request/shared.ts",
+      "function": "getAdditionalParameters",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "61dbba2c2240b20d6e3e936ec89eb32ead21d0ebed96c6538b69660de7323dfc",
+      "extractedHash": "61dbba2c2240b20d6e3e936ec89eb32ead21d0ebed96c6538b69660de7323dfc"
+    },
+    {
+      "source": "src/ts/process/request/shared.ts",
+      "function": "applyAdditionalParameters",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "9d3db29f3494b7f58537265ac53deb56597ddd0c83b3d0fa3b535c9c30b474fe",
+      "extractedHash": "9d3db29f3494b7f58537265ac53deb56597ddd0c83b3d0fa3b535c9c30b474fe"
+    },
+    {
+      "source": "src/ts/process/request/shared.ts",
+      "function": "applyParameters",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "15768ff1236266238654a44c29c3b2f24daf34f2bb2aaea81e003d92ce7ed183",
+      "extractedHash": "15768ff1236266238654a44c29c3b2f24daf34f2bb2aaea81e003d92ce7ed183"
+    },
+    {
+      "source": "src/ts/process/request/openAI/shared.ts",
+      "function": "getLocalNetworkRequestOptions",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "7d2399a70fea417dcb9b0575c8e86f32db5347c4b3ad98a8d23faff4e0e8f7a3",
+      "extractedHash": "7d2399a70fea417dcb9b0575c8e86f32db5347c4b3ad98a8d23faff4e0e8f7a3"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "responseTextContentToString",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8b0965f807288b9f3acf10adf0b40214a1da28385bb4fd9213c5fca6a48d1474",
+      "extractedHash": "8b0965f807288b9f3acf10adf0b40214a1da28385bb4fd9213c5fca6a48d1474"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "decodeRememberedToolCallsForResponses",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "88d97e087779b684e16ddb3b175695e91a14a2b6a6026020e06bc9ce26bc75ce",
+      "extractedHash": "88d97e087779b684e16ddb3b175695e91a14a2b6a6026020e06bc9ce26bc75ce"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "buildResponseInputItems",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "068f68600ed4e3a097b1a8f86866e529764814deb8dbcd394bc85dc08a11d054",
+      "extractedHash": "068f68600ed4e3a097b1a8f86866e529764814deb8dbcd394bc85dc08a11d054"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "getResponsesRequestURL",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a8b05f6f7ffdf80e3b1804114cf4420c11bfc34dcdcedd957a715ff29ae4f8eb",
+      "extractedHash": "a8b05f6f7ffdf80e3b1804114cf4420c11bfc34dcdcedd957a715ff29ae4f8eb"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "buildResponsesHeaders",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b4f2cec7270dcf2a62c50bd04331f53bc9cbb5cbcb077d0aaf064a261d121e8b",
+      "extractedHash": "b4f2cec7270dcf2a62c50bd04331f53bc9cbb5cbcb077d0aaf064a261d121e8b"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "getResponsesRequestModel",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4fa0ea86987290b1a9e283117f7d5fc24bcbe04e5fb1a5c634ff43ce81665055",
+      "extractedHash": "4fa0ea86987290b1a9e283117f7d5fc24bcbe04e5fb1a5c634ff43ce81665055"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "sanitizeResponsesContinuationItem",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c18e76193eb0f8b14bf8b60acf5cc7b28e09c94f8451ba9cb93cdd60bdc06d32",
+      "extractedHash": "c18e76193eb0f8b14bf8b60acf5cc7b28e09c94f8451ba9cb93cdd60bdc06d32"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "cloneResponsesBodyForRequest",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "5528c410cd04318a9d958ec65444e40ba73dc069083911a11eae3c5cd473266e",
+      "extractedHash": "5528c410cd04318a9d958ec65444e40ba73dc069083911a11eae3c5cd473266e"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "toExternalResponsesBody",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "1f96fda10777a2c0f73f798418c31f9f7aaf7e93b00d825a02c54ada64f34743",
+      "extractedHash": "1f96fda10777a2c0f73f798418c31f9f7aaf7e93b00d825a02c54ada64f34743"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "buildResponsesBody",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b8f5a9f6d510db53c278ec3adc7e88f9b0b8d130ecd1c9ccf73c6cf32f993e08",
+      "extractedHash": "b8f5a9f6d510db53c278ec3adc7e88f9b0b8d130ecd1c9ccf73c6cf32f993e08"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "collectResponsesReasoningText",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "3963746588ddff0ec1dfde46727079d982472d1a73a586cd3d090eb290614c46",
+      "extractedHash": "3963746588ddff0ec1dfde46727079d982472d1a73a586cd3d090eb290614c46"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "extractResponsesReasoningTexts",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "e0af99635c65541aaa1f436dbeb312d79c85fec66a3813cd81177457498f4860",
+      "extractedHash": "e0af99635c65541aaa1f436dbeb312d79c85fec66a3813cd81177457498f4860"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "extractResponsesText",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "60552791f131c75ff6aa45f890b5e57e7bc94e7d59af74f7f87d9e2cee2e3865",
+      "extractedHash": "60552791f131c75ff6aa45f890b5e57e7bc94e7d59af74f7f87d9e2cee2e3865"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "extractResponsesFunctionCalls",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "527f21739be9f3335be3a2b4e341971f0466fcbeea73a310e1e8339b1b38c50e",
+      "extractedHash": "527f21739be9f3335be3a2b4e341971f0466fcbeea73a310e1e8339b1b38c50e"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "appendResponsesToolOutputs",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4f426d42d7a09572fece92fd8c7ff1f9cf025a6f8590820d04fde57131464a27",
+      "extractedHash": "4f426d42d7a09572fece92fd8c7ff1f9cf025a6f8590820d04fde57131464a27"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "requestHTTPResponsesAPI",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4eddb8758ceeade5d925d4c3cc25cfd33472c34aecee26267fd495f61358ef55",
+      "extractedHash": "4eddb8758ceeade5d925d4c3cc25cfd33472c34aecee26267fd495f61358ef55"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "getResponsesTranStream",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "cc089a4dc2e2742372e96ebf29316bb2308a79324b00b8ec04acf0559d62fbe5",
+      "extractedHash": "cc089a4dc2e2742372e96ebf29316bb2308a79324b00b8ec04acf0559d62fbe5"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "wrapResponsesToolStream",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f19ce8bdee1c32fd62a89f4b5a7785cda46246aa9a3d009aeeb3e34565700a5d",
+      "extractedHash": "f19ce8bdee1c32fd62a89f4b5a7785cda46246aa9a3d009aeeb3e34565700a5d"
+    },
+    {
+      "source": "src/ts/process/request/openAI/responses.ts",
+      "function": "requestOpenAIResponseAPI",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2edd96cc7c6bec2a77e601851fb7cb727d39fd1155c38f7cb372cef4c94e2d09",
+      "extractedHash": "2edd96cc7c6bec2a77e601851fb7cb727d39fd1155c38f7cb372cef4c94e2d09"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "isOfficialOpenAIURL",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a96727559e90f2d68a03d20666e1531d01f0165cbf3d827ed470b3aea957b283",
+      "extractedHash": "a96727559e90f2d68a03d20666e1531d01f0165cbf3d827ed470b3aea957b283"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "shouldUseOpenAIFlexProcessing",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2c44f912da4680769cf6892323e752d09f232314a7b99aba92dcc102a90a23e8",
+      "extractedHash": "2c44f912da4680769cf6892323e752d09f232314a7b99aba92dcc102a90a23e8"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "requestOpenAI",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a7be3568e8716efb7785b548413eff7665cc374d2e0769113121f93dfc80c1c3",
+      "extractedHash": "a7be3568e8716efb7785b548413eff7665cc374d2e0769113121f93dfc80c1c3"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "requestHTTPOpenAI",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "d9c5c4dcfb4573923d4a0e9bd8ae565f85bc0a896f3035735a6055db33a8cad2",
+      "extractedHash": "d9c5c4dcfb4573923d4a0e9bd8ae565f85bc0a896f3035735a6055db33a8cad2"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "requestOpenAILegacyInstruct",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f95dcfb9db0dc487a0adb9b99d11b186be18eb0fcef254557865e6f03810f854",
+      "extractedHash": "f95dcfb9db0dc487a0adb9b99d11b186be18eb0fcef254557865e6f03810f854"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "getTranStream",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8cacdf613fc763367ed42eeb5424102f5aacd96d62e2942acd6e84751f52994b",
+      "extractedHash": "8cacdf613fc763367ed42eeb5424102f5aacd96d62e2942acd6e84751f52994b"
+    },
+    {
+      "source": "src/ts/process/request/openAI/requests.ts",
+      "function": "wrapToolStream",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "88d2f454bc9336ab328c7a7073b8054478ed52bbcc5dc5d195fc278d30a2c738",
+      "extractedHash": "88d2f454bc9336ab328c7a7073b8054478ed52bbcc5dc5d195fc278d30a2c738"
+    },
+    {
+      "source": "src/ts/process/request/google.ts",
+      "function": "requestGoogleCloudVertex",
+      "originalAlgorithmPreserved": false,
+      "originalHash": "f7e2e7160934dcd12a7c9cd76377e3f86f8ebc3a17b235b4e257a9dd2b89ae19",
+      "extractedHash": "383eb8752506bef668c4f654fc1689059c73e682c94e216b0cb5b99527a1ee7c",
+      "verifiedInvocationPolicy": "Gemini 4 Argon only: shared final request policy runs after additional parameters and string-body hooks, before OAuth; it preserves low/medium/high, omits forced defaults, removes unsupported sampling/budget/candidate fields, clamps only output upper bounds, preserves complete assistant-ended history with a user continuation, rejects explicit cache references without provider admission and selects global/us/eu Vertex locations. Other Gemini models retain upstream ordering and parameters.",
+      "behavioralTests": [
+        "src/ts/process/request/gemini4ArgonPolicy.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "src/ts/process/request/jsonSse.test.ts",
+        "server/native/generationWorker.test.cjs",
+        "server/browser/vertexStreamingUi.test.cjs"
+      ]
+    },
+    {
+      "source": "src/ts/process/request/google.ts",
+      "function": "requestGoogle",
+      "originalAlgorithmPreserved": false,
+      "originalHash": "2b956a54d9acbcd28a34d1730c4f6f4c2006e200a743e4a5610e855d43eb77b2",
+      "extractedHash": "1ff9a8fbc8d386a98c9f8d8f41868035d82eada6e871fcdabb8cc12fb91f7cfc",
+      "verifiedInvocationPolicy": "Pipe rejection is observed through its readable stream without an unhandled side promise. The shared Argon policy is reapplied at dispatch, transport body hooks cannot undo it, and Argon quota failures are returned without recursive provider replay. Original request/tool dispatch and earlier Gemini model policies remain unchanged.",
+      "behavioralTests": [
+        "src/ts/process/request/gemini4ArgonPolicy.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "src/ts/process/request/jsonSse.test.ts",
+        "server/native/generationWorker.test.cjs",
+        "server/browser/vertexStreamingUi.test.cjs"
+      ]
+    },
+    {
+      "source": "src/ts/process/request/google.ts",
+      "function": "initStreamState",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "19babb727abb125256ee7406daaf31388c5fdaf05fcb131b19c31703cc3f1a51",
+      "extractedHash": "19babb727abb125256ee7406daaf31388c5fdaf05fcb131b19c31703cc3f1a51"
+    },
+    {
+      "source": "src/ts/process/request/google.ts",
+      "function": "getTranStream",
+      "originalAlgorithmPreserved": false,
+      "originalHash": "0403d855a49244f612e110359ca5951a76943954b4c97ce911233dddccc53ea0",
+      "extractedHash": "1db883170f388fd67c3043e85c82b207700feba111e87fa1671d523f4ac822c3",
+      "verifiedInvocationPolicy": "Incremental UTF-8/JSON SSE decoding processes each event once, emits immutable cumulative snapshots and rejects provider error events rather than accepting a partial answer.",
+      "behavioralTests": [
+        "src/ts/process/request/jsonSse.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "server/browser/vertexStreamingUi.test.cjs",
+        "server/native/generationWorker.test.cjs"
+      ]
+    },
+    {
+      "source": "src/ts/process/request/google.ts",
+      "function": "wrapToolStream",
+      "originalAlgorithmPreserved": false,
+      "originalHash": "ea2c8903ebb78ac06f525d7f8a20f03fe4a3d9d3a9578b2c5715c7c34c348789",
+      "extractedHash": "7de6af3c3469c638cead9d431c423d7fd4fbe9dcea9323868a786fc3c9883339",
+      "verifiedInvocationPolicy": "Pipe rejection is observed through its readable stream without an unhandled side promise. Argon tool follow-up bodies run the original string hooks once, then the shared final request policy before transport; response parsing, signature handling and original tool execution remain unchanged.",
+      "behavioralTests": [
+        "src/ts/process/request/gemini4ArgonPolicy.test.ts",
+        "src/ts/process/request/googleRuntime.test.ts",
+        "src/ts/process/request/jsonSse.test.ts",
+        "server/native/generationWorker.test.cjs",
+        "server/browser/vertexStreamingUi.test.cjs"
+      ]
+    },
+    {
+      "source": "src/ts/util.ts",
+      "function": "base64url",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "474cddf94d98b6de1ccd2a24b484c92559c3c0b3f5df063c1bc2f589cc6c1eea",
+      "extractedHash": "474cddf94d98b6de1ccd2a24b484c92559c3c0b3f5df063c1bc2f589cc6c1eea"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "getOllamaThinkMode",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "1c8657b2c28321541916a7591afd9b2c25e9883230e064a7ffadbd9b39f156fb",
+      "extractedHash": "1c8657b2c28321541916a7591afd9b2c25e9883230e064a7ffadbd9b39f156fb"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "formatThinkingOutput",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "bda6bd1e367fe2a7ee1d8ab3a95583b118bf37e253caa40cdeba136727a61e48",
+      "extractedHash": "bda6bd1e367fe2a7ee1d8ab3a95583b118bf37e253caa40cdeba136727a61e48"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "normalizeFetchHeaders",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a7b55ff823d15b564f2b8d8da0cc43d690da66bc704b9b91e39b51179340aa87",
+      "extractedHash": "a7b55ff823d15b564f2b8d8da0cc43d690da66bc704b9b91e39b51179340aa87"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "ollamaCloudFetch",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "3483b43a7340a356ee5769edf0e7f7d7d8c992acad86932e7387e9c448776781",
+      "extractedHash": "3483b43a7340a356ee5769edf0e7f7d7d8c992acad86932e7387e9c448776781"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "normalizeOllamaStreamResponse",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "ef500ec6979b1b0830a76fe78d786b1632dd4f7f369f77c72d1990c92a74735e",
+      "extractedHash": "ef500ec6979b1b0830a76fe78d786b1632dd4f7f369f77c72d1990c92a74735e"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestChatData",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "877a49dfd192f61116ae5bd686fc807d046641823dae44cc9c2528a295633f98",
+      "extractedHash": "877a49dfd192f61116ae5bd686fc807d046641823dae44cc9c2528a295633f98"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "reformater",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "160a2c43c31061b4cbc4f372add12ecdbcc3a845873af1f02ed11db8a382585d",
+      "extractedHash": "160a2c43c31061b4cbc4f372add12ecdbcc3a845873af1f02ed11db8a382585d"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestChatDataMain",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "d662bc6946aff1e43c97169b9b3a5bb736d2f021f09e8758a6f893dff68e083d",
+      "extractedHash": "d662bc6946aff1e43c97169b9b3a5bb736d2f021f09e8758a6f893dff68e083d"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestNovelAI",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "12697797a371ba0d2df0170e05890eeeb7a82505b79e3463b427f30fe8baebd5",
+      "extractedHash": "12697797a371ba0d2df0170e05890eeeb7a82505b79e3463b427f30fe8baebd5"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestOobaLegacy",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "addfe31558265c359b1ce2f9264fa7d5e8c68124795a2b0cbeeb8cc71c5b8d3a",
+      "extractedHash": "addfe31558265c359b1ce2f9264fa7d5e8c68124795a2b0cbeeb8cc71c5b8d3a"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestOoba",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b1ebec073dc2dda841dd88c25840c01dbb55b326c21ae7f462ebe86d98f4bcc1",
+      "extractedHash": "b1ebec073dc2dda841dd88c25840c01dbb55b326c21ae7f462ebe86d98f4bcc1"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestPlugin",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "9f6ab88292b0db92fa9a705a5783f83780ec9750251148efdab126f28b066848",
+      "extractedHash": "9f6ab88292b0db92fa9a705a5783f83780ec9750251148efdab126f28b066848"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestEcho",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "933976b123ae5a392de1417272059c58fef6a50707a8e2f23506ea5d69fdec04",
+      "extractedHash": "933976b123ae5a392de1417272059c58fef6a50707a8e2f23506ea5d69fdec04"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestKobold",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "9e884a3ec45d2d8a5195ad51ecec63ba8633e7391e7100b29046837aa7c83b79",
+      "extractedHash": "9e884a3ec45d2d8a5195ad51ecec63ba8633e7391e7100b29046837aa7c83b79"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestNovelList",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "f19780dd723f2b5a2dc8f2dcc1c64482ff5393cf47a5e645dc0e07d7b5a4c8da",
+      "extractedHash": "f19780dd723f2b5a2dc8f2dcc1c64482ff5393cf47a5e645dc0e07d7b5a4c8da"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestOllama",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2fc25516226256d6316af15092f35ab8f8f7135ca18a642dc8e2585791c949e8",
+      "extractedHash": "2fc25516226256d6316af15092f35ab8f8f7135ca18a642dc8e2585791c949e8"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestCohere",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "47036e936e015f8d0865908adcc1ac05b4594791c75ebd4199f833b7fade16c5",
+      "extractedHash": "47036e936e015f8d0865908adcc1ac05b4594791c75ebd4199f833b7fade16c5"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestHorde",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "2909fb98f00c39240de86708fa7c9aa3276a415c638c0afcf26e9fbc90582505",
+      "extractedHash": "2909fb98f00c39240de86708fa7c9aa3276a415c638c0afcf26e9fbc90582505"
+    },
+    {
+      "source": "src/ts/process/request/request.ts",
+      "function": "requestWebLLM",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "5e609658c708fe9a8bc15f2c0c4cf145df6c017689406e950a86ecf1c8a56eca",
+      "extractedHash": "5e609658c708fe9a8bc15f2c0c4cf145df6c017689406e950a86ecf1c8a56eca"
+    },
+    {
+      "source": "src/ts/process/exampleMessages.ts",
+      "function": "exampleMessage",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "210e2c3accee6890c8c7ca5ecc0cffca6e5ac81f81495fe3d3b148efa5b19ced",
+      "extractedHash": "210e2c3accee6890c8c7ca5ecc0cffca6e5ac81f81495fe3d3b148efa5b19ced"
+    },
+    {
+      "source": "src/ts/process/models/modelString.ts",
+      "function": "getGenerationModelString",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "d93e40fc7aa50f723a0b05171480c90291ead8360edcb6de80f4be18e00e61e8",
+      "extractedHash": "d93e40fc7aa50f723a0b05171480c90291ead8360edcb6de80f4be18e00e61e8"
+    },
+    {
+      "source": "src/ts/process/templates/chatTemplate.ts",
+      "function": "applyChatTemplate",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "026c75104d27e830212662fa7972e0e8d0a3db01a1bbd87ddb62c6a278e64b55",
+      "extractedHash": "026c75104d27e830212662fa7972e0e8d0a3db01a1bbd87ddb62c6a278e64b55"
+    },
+    {
+      "source": "src/ts/process/inlayScreen.ts",
+      "function": "runInlayScreen",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "1ed0acba87442058afff06b24364acac7faf0543cb1c654db9e1a3d9a99df1d5",
+      "extractedHash": "1ed0acba87442058afff06b24364acac7faf0543cb1c654db9e1a3d9a99df1d5"
+    },
+    {
+      "source": "src/ts/process/inlayScreen.ts",
+      "function": "updateInlayScreen",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "44c5b1f49864abdb13ecdcceff3981a0a0148a6abfed0e1eb39723cff1ec3e5d",
+      "extractedHash": "44c5b1f49864abdb13ecdcceff3981a0a0148a6abfed0e1eb39723cff1ec3e5d"
+    },
+    {
+      "source": "src/ts/process/embedding/addinfo.ts",
+      "function": "additionalInformations",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "24655aafb707d8578e900fb09627ae94739f4d4d2245a7fa43d47fc51ad28f8f",
+      "extractedHash": "24655aafb707d8578e900fb09627ae94739f4d4d2245a7fa43d47fc51ad28f8f"
+    },
+    {
+      "source": "src/ts/process/memory/hypamemory.ts",
+      "function": "similarity",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "41fcc45e0cb64ee30ceb29a72f52d7f305b57ea5ced30ae1615ef9ac85709cc6",
+      "extractedHash": "41fcc45e0cb64ee30ceb29a72f52d7f305b57ea5ced30ae1615ef9ac85709cc6"
+    },
+    {
+      "source": "src/ts/process/memory/hypamemory.ts",
+      "function": "cosineSimilarity",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "fba9f59df87c2ce244bf12c76079f9b7243a6c0fab9a2a0966935acf3bdc0f9c",
+      "extractedHash": "fba9f59df87c2ce244bf12c76079f9b7243a6c0fab9a2a0966935acf3bdc0f9c"
+    },
+    {
+      "source": "src/ts/process/memory/hypamemory.ts",
+      "function": "contextHash",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "de0c320dd9af286ad98f4e5ee6a1bfbe6c1e03ca3f9f0cced132ac6fd5aa61bb",
+      "extractedHash": "de0c320dd9af286ad98f4e5ee6a1bfbe6c1e03ca3f9f0cced132ac6fd5aa61bb"
+    },
+    {
+      "source": "src/ts/process/memory/hypamemory.ts",
+      "function": "HypaProcesser",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4a102f3d8bd18e4a30779e69cf7207e654c4bd7fc1e599990d805e663092059e",
+      "extractedHash": "4a102f3d8bd18e4a30779e69cf7207e654c4bd7fc1e599990d805e663092059e"
+    },
+    {
+      "source": "src/ts/process/templates/jsonSchema.ts",
+      "function": "convertInterfaceToSchema",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "75c3f9ed5b5377104a4d3fd1a267be7b5d80349057c02f6fcabb00a5fda6a668",
+      "extractedHash": "75c3f9ed5b5377104a4d3fd1a267be7b5d80349057c02f6fcabb00a5fda6a668"
+    },
+    {
+      "source": "src/ts/process/templates/jsonSchema.ts",
+      "function": "getOpenAIJSONSchema",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "6d5724d6b17aab09010f7de7c900ee0f70ec84433d314021d146d6df256ab428",
+      "extractedHash": "6d5724d6b17aab09010f7de7c900ee0f70ec84433d314021d146d6df256ab428"
+    },
+    {
+      "source": "src/ts/process/templates/jsonSchema.ts",
+      "function": "getGeneralJSONSchema",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8ee1d68843c564ed3a0d1cfef7d5c1b9c673f11b62285f9bfa05a4a2ca713c3a",
+      "extractedHash": "8ee1d68843c564ed3a0d1cfef7d5c1b9c673f11b62285f9bfa05a4a2ca713c3a"
+    },
+    {
+      "source": "src/ts/process/templates/jsonSchema.ts",
+      "function": "extractJSON",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "18e8d8c839fed730124a1ec3b2bd223e8424a5a0a64806ef7c837e09882197b9",
+      "extractedHash": "18e8d8c839fed730124a1ec3b2bd223e8424a5a0a64806ef7c837e09882197b9"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "setDatabase",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "008779cfee5ae33739abbe5f370865b4471882da123463784a5da9f927e5dbf0",
+      "extractedHash": "008779cfee5ae33739abbe5f370865b4471882da123463784a5da9f927e5dbf0"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "normalizePromptRole",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "125f00556ff3efc5127c1436480317102954efddd74bf293da9939e892e8e5c6",
+      "extractedHash": "125f00556ff3efc5127c1436480317102954efddd74bf293da9939e892e8e5c6"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "normalizeCacheRole",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "df328548280006e943074aae7724605d44f30cf9361143cf6cbc988f5f716777",
+      "extractedHash": "df328548280006e943074aae7724605d44f30cf9361143cf6cbc988f5f716777"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "normalizePromptTemplate",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "1c2bd197b00d3b892674465b313ce8aae4208a9dd7df735bf5975ed4f2bd1bb2",
+      "extractedHash": "1c2bd197b00d3b892674465b313ce8aae4208a9dd7df735bf5975ed4f2bd1bb2"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "saveCurrentPreset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "5b82984a7641704b34c81e1b1bf8f7557610ba0cb0e27e32fe0f42dcb8bc78ff",
+      "extractedHash": "5b82984a7641704b34c81e1b1bf8f7557610ba0cb0e27e32fe0f42dcb8bc78ff"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "setPreset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "20d5cf91c15deed0c45449e1662b1d46bf7dc0a2ac1d3aa7cdd6f34e5b49a884",
+      "extractedHash": "20d5cf91c15deed0c45449e1662b1d46bf7dc0a2ac1d3aa7cdd6f34e5b49a884"
+    },
+    {
+      "source": "src/ts/storage/database.svelte.ts",
+      "function": "changeToPreset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "1692dbf585faaf7b23205e0c639f70c66aebec153f8ca85eb0c08277d5b2b90c",
+      "extractedHash": "1692dbf585faaf7b23205e0c639f70c66aebec153f8ca85eb0c08277d5b2b90c"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "createHypaV3Preset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8abf9a2a1d0f09c10cd6ed45731f377f77e8af92404af51054d5176b2ee35e0d",
+      "extractedHash": "8abf9a2a1d0f09c10cd6ed45731f377f77e8af92404af51054d5176b2ee35e0d"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "sanitizeSummaryContent",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4ef4e6ab834ead8d3f0e09ee413287254500998661612f1d9e7b39634b113c1e",
+      "extractedHash": "4ef4e6ab834ead8d3f0e09ee413287254500998661612f1d9e7b39634b113c1e"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "summarize",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "15cee2aa721efe0bd497c22410f4f47918d22fbd0f55136a5366558e0aa58297",
+      "extractedHash": "15cee2aa721efe0bd497c22410f4f47918d22fbd0f55136a5366558e0aa58297"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "getCurrentHypaV3Preset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "e110703cfa1316f5184d8dbdb11480cc74322c63e1f6929c4841ad3d17166671",
+      "extractedHash": "e110703cfa1316f5184d8dbdb11480cc74322c63e1f6929c4841ad3d17166671"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "splitBySeparator",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4c6dad25830360b1b414f034a005f8d612d0680401e72ac33c0a35ab8fa79fbd",
+      "extractedHash": "4c6dad25830360b1b414f034a005f8d612d0680401e72ac33c0a35ab8fa79fbd"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "hypaMemoryV3",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "92e7761bfdc5bbe4dfa3d37dc02cc09acc323c13efd7fd47bb5535b254ec429a",
+      "extractedHash": "92e7761bfdc5bbe4dfa3d37dc02cc09acc323c13efd7fd47bb5535b254ec429a"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "hypaMemoryV3MainExp",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "609c58a0f0f724649a2b43866f3674d6ae8ed62f7ac010d08e4e30df095bd00c",
+      "extractedHash": "609c58a0f0f724649a2b43866f3674d6ae8ed62f7ac010d08e4e30df095bd00c"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "hypaMemoryV3Main",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "174939b9d58bdb96dfe53de3b1ac97bdc41435f3ccc37a0bdade989d31e1fbba",
+      "extractedHash": "174939b9d58bdb96dfe53de3b1ac97bdc41435f3ccc37a0bdade989d31e1fbba"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "toHypaV3Data",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "66221a18b75561484bc3bd35e65d2adb5d2a3e9c644556f985b9a640e50fa161",
+      "extractedHash": "66221a18b75561484bc3bd35e65d2adb5d2a3e9c644556f985b9a640e50fa161"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "toSerializableHypaV3Data",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "7a60634cf64be1bccde040c9b71d7d8cf76d101d89627077ac9cb530a5051be9",
+      "extractedHash": "7a60634cf64be1bccde040c9b71d7d8cf76d101d89627077ac9cb530a5051be9"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "cleanOrphanedSummary",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "9d3e55ca0d1a9ae9b80acfe1ee122b0cb6060eb7d867f1bd8b28987f291c502d",
+      "extractedHash": "9d3e55ca0d1a9ae9b80acfe1ee122b0cb6060eb7d867f1bd8b28987f291c502d"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "isSubset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "a3ecad467a508e7363be02904a18288c283178cec05fe8114bef342d0aa792cb",
+      "extractedHash": "a3ecad467a508e7363be02904a18288c283178cec05fe8114bef342d0aa792cb"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "wrapWithXml",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "9a3bf03ae7cd1900c3e38572a0a99969b6530c6f9c991241444eeaea47211ed1",
+      "extractedHash": "9a3bf03ae7cd1900c3e38572a0a99969b6530c6f9c991241444eeaea47211ed1"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "simpleCC",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "42e4b35ec3696e16665961579e0e244cb669ce0f35e4e80bb2c93138f0a207d2",
+      "extractedHash": "42e4b35ec3696e16665961579e0e244cb669ce0f35e4e80bb2c93138f0a207d2"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "simpleRRF",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "af54aa2ea229200142cdac0b00b705e60086f4963982ab252e568d1d9fe385f7",
+      "extractedHash": "af54aa2ea229200142cdac0b00b705e60086f4963982ab252e568d1d9fe385f7"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "childToParentRRF",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "46fe13aa9b7cada6a6f278bc9fd3a487e72271ff01038e0da42667f9d38db6e0",
+      "extractedHash": "46fe13aa9b7cada6a6f278bc9fd3a487e72271ff01038e0da42667f9d38db6e0"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "normalizeScores",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "8711c448034ca269de4e1b891c0867c18dfbf024f6fd87acd85afff07dfff297",
+      "extractedHash": "8711c448034ca269de4e1b891c0867c18dfbf024f6fd87acd85afff07dfff297"
+    },
+    {
+      "source": "src/ts/process/memory/hypav3.ts",
+      "function": "HypaProcesserEx",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c8f5edaced5323f3fb6536318f1265c611d76daef2c373e26631cbf1658c1df2",
+      "extractedHash": "c8f5edaced5323f3fb6536318f1265c611d76daef2c373e26631cbf1658c1df2"
+    },
+    {
+      "source": "src/ts/process/memory/hypamemoryv2.ts",
+      "function": "HypaProcessorV2",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "840272bc5f62301c967ed55a53f552a1ccd5608fe275abbd0845d8db0e3bfe4c",
+      "extractedHash": "840272bc5f62301c967ed55a53f552a1ccd5608fe275abbd0845d8db0e3bfe4c"
+    },
+    {
+      "source": "src/ts/process/memory/contextualEmbedding.ts",
+      "function": "isContextModel",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b68fc4ee181f7b1f9ed733bd3036228dba96759bd459ccb3878c6cab42065a0b",
+      "extractedHash": "b68fc4ee181f7b1f9ed733bd3036228dba96759bd459ccb3878c6cab42065a0b"
+    },
+    {
+      "source": "src/ts/process/memory/contextualEmbedding.ts",
+      "function": "getContextProvider",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "12379de61c01cff2d7f925e4fcbbde2cc0c28f6d5ef21277400166407e0d578e",
+      "extractedHash": "12379de61c01cff2d7f925e4fcbbde2cc0c28f6d5ef21277400166407e0d578e"
+    },
+    {
+      "source": "src/ts/process/memory/contextualEmbedding.ts",
+      "function": "VoyageContext3Provider",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "669fb80645f8a17328a37f28626d924853f299d2f846947b08ef873bd3a77125",
+      "extractedHash": "669fb80645f8a17328a37f28626d924853f299d2f846947b08ef873bd3a77125"
+    },
+    {
+      "source": "src/ts/process/memory/supaMemory.ts",
+      "function": "supaMemory",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "53b99385898c6551477604e418fcf57f31dffe89e46a19d518df8de0c1436137",
+      "extractedHash": "53b99385898c6551477604e418fcf57f31dffe89e46a19d518df8de0c1436137"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "multiChatReplacer",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b67a5004c62bde7b10ecbff76768bf06a2adbee420d2ba29a25f6b17f10bed96",
+      "extractedHash": "b67a5004c62bde7b10ecbff76768bf06a2adbee420d2ba29a25f6b17f10bed96"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "stringlizeChat",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "426d6a8e2fc1ac09be0a30bc56f974a899182e190e9d04e4ab3d320a9991cc01",
+      "extractedHash": "426d6a8e2fc1ac09be0a30bc56f974a899182e190e9d04e4ab3d320a9991cc01"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "appendWhitespace",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "769f10fa5023f6cb472d97fa60dc6459c63bb7723bc51b143411cf6a2fcbdc4c",
+      "extractedHash": "769f10fa5023f6cb472d97fa60dc6459c63bb7723bc51b143411cf6a2fcbdc4c"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "stringlizeChatOba",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "9f86a2ba4ee480a647872d0631bb7eb3e8b8b7b9c8e670c5610a2d77e7a485e6",
+      "extractedHash": "9f86a2ba4ee480a647872d0631bb7eb3e8b8b7b9c8e670c5610a2d77e7a485e6"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "toTitleCase",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "cb7859d6a2c03528c7d5271edf5b9de3beaaefade370b9ec9999121c28d28d34",
+      "extractedHash": "cb7859d6a2c03528c7d5271edf5b9de3beaaefade370b9ec9999121c28d28d34"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "getStopStrings",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "20e395355b345e8fc7078761a34159883307d9e175f2dc3fcce3a4bda9e2e846",
+      "extractedHash": "20e395355b345e8fc7078761a34159883307d9e175f2dc3fcce3a4bda9e2e846"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "unstringlizeChat",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "b5de2f2243c11eaf49202d89afbd0df5e25b847ed4267734dc21487f8be3cb8b",
+      "extractedHash": "b5de2f2243c11eaf49202d89afbd0df5e25b847ed4267734dc21487f8be3cb8b"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "getUnstringlizerChunks",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "ff566a8fad0b5f11365958afd03a671048f260bfa48a80c30c6f243af708c05d",
+      "extractedHash": "ff566a8fad0b5f11365958afd03a671048f260bfa48a80c30c6f243af708c05d"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "stringlizeAINChat",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "c64ce42012cc25434f26d96ca18ec9d15b13fd6be16ae55bf029a0c113d66780",
+      "extractedHash": "c64ce42012cc25434f26d96ca18ec9d15b13fd6be16ae55bf029a0c113d66780"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "extractAINOutputStrings",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "43c7e499ce84c1002aedc4b9ab6cab0d59d1999e15dec4980c5ca8d202958537",
+      "extractedHash": "43c7e499ce84c1002aedc4b9ab6cab0d59d1999e15dec4980c5ca8d202958537"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "unstringlizeAIN",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "470e4ecd6a638cfe8c3c241287cd27c3aad06868171550359c9b640d293722c3",
+      "extractedHash": "470e4ecd6a638cfe8c3c241287cd27c3aad06868171550359c9b640d293722c3"
+    },
+    {
+      "source": "src/ts/process/stringlize.ts",
+      "function": "formatToAIN",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "e83a4f9373b03904c72c66b066cee8809e703d214789c30a60449e271bbe7f07",
+      "extractedHash": "e83a4f9373b03904c72c66b066cee8809e703d214789c30a60449e271bbe7f07"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "isRecord",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "823a8012c0dfd80092f344760bea3a23a76c3682435c01715f45afabd1a2cef9",
+      "extractedHash": "823a8012c0dfd80092f344760bea3a23a76c3682435c01715f45afabd1a2cef9"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "getDefaultTranslatorPreset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "7f1ced90449f2900092a1f0024459381a5cb97474fcc8c19a3715aa6c36be704",
+      "extractedHash": "7f1ced90449f2900092a1f0024459381a5cb97474fcc8c19a3715aa6c36be704"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "getNormalizedTranslatorPresetName",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "aedb9499aa27da4f532af05e594c3bd5a53252df399a8ee19f260c0f1f2903bb",
+      "extractedHash": "aedb9499aa27da4f532af05e594c3bd5a53252df399a8ee19f260c0f1f2903bb"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "createTranslatorPreset",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "ecbc77f7e054915a319e0bdd319d67b66bcc8eb3edd6d9bdf358ebb07edabae7",
+      "extractedHash": "ecbc77f7e054915a319e0bdd319d67b66bcc8eb3edd6d9bdf358ebb07edabae7"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "normalizeTranslatorPresetState",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "cd751af231ad93a49e63b9368e5863a294d358536cc611b04e2def8c95968430",
+      "extractedHash": "cd751af231ad93a49e63b9368e5863a294d358536cc611b04e2def8c95968430"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "syncCurrentTranslatorPresetToLegacyFields",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "37ea9563ea942ee38d0ad19602416595a4dbf6a43715067aae39119dc9ca8ae9",
+      "extractedHash": "37ea9563ea942ee38d0ad19602416595a4dbf6a43715067aae39119dc9ca8ae9"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "getCurrentTranslatorPresetFromState",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "7115061b9b29bef3d2ac358ad48eb84a482cf2ba254a06d0df179f43e57549cc",
+      "extractedHash": "7115061b9b29bef3d2ac358ad48eb84a482cf2ba254a06d0df179f43e57549cc"
+    },
+    {
+      "source": "src/ts/translator/presets.ts",
+      "function": "isTranslatorPresetValue",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "5ac2f45c91928c15866b532e8b695685ca93c87ac6738e19b4f3b5906e31f9e7",
+      "extractedHash": "5ac2f45c91928c15866b532e8b695685ca93c87ac6738e19b4f3b5906e31f9e7"
+    },
+    {
+      "source": "src/ts/process/group.ts",
+      "function": "groupOrder",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "4bd7b102364cf7e51b9365be653346919e3e712bb1844f032db01f90a7e93bb1",
+      "extractedHash": "4bd7b102364cf7e51b9365be653346919e3e712bb1844f032db01f90a7e93bb1"
+    },
+    {
+      "source": "src/ts/process/group.ts",
+      "function": "getWords",
+      "originalAlgorithmPreserved": true,
+      "originalHash": "ac60e2c637bb12a2973d90f0f8e078266ec72ec5c92523d812cfec228a75f474",
+      "extractedHash": "ac60e2c637bb12a2973d90f0f8e078266ec72ec5c92523d812cfec228a75f474"
+    }
+  ],
+  "scope": "Structural comparison of selected upstream function, class and callable declarations, including generation, provider requests, tokenizers, settings, modules, regex, Lua, triggers, lorebook and data helpers, reversing injected ports to their source-local names and declared expression ports to their original mutations. Ignores export modifiers, parentheses, equivalent object-key/shorthand notation, regex flag order and the explicitly migrated DBState notification branch and declared module-loader ports. The statistics/activity ports deliberately change native persistence and require separate behavioral tests; Lua invocation cleanup/error policies and Google streaming UTF-8/SSE and pipe-error policies are explicit, hash-pinned exceptions reported separately from originalAlgorithmPreserved, with behavioral tests. All selected declarations remain compared; this comparison does not prove their bindings, complete native-host integration, providers or browser compatibility."
+}

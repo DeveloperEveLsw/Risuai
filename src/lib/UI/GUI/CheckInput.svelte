@@ -9,6 +9,7 @@
         reverse?: boolean;
         className?: string;
         grayText?: boolean;
+        disabled?: boolean;
         children?: import('svelte').Snippet;
     }
 
@@ -21,6 +22,7 @@
         reverse = false,
         className = "",
         grayText = false,
+        disabled = false,
         children
     }: Props = $props();
 </script>
@@ -37,6 +39,7 @@
     <input 
         class="hidden" 
         type="checkbox" 
+        {disabled}
         alt={name}
         bind:checked={check}
         onchange={() => {

@@ -4,16 +4,32 @@
   interface Props {
     onClick?: any;
     additionalStyle?: string | Promise<string>;
-    children?: import('svelte').Snippet;
+    disabled?: boolean;
+    ariaLabel?: string;
+    children?: import("svelte").Snippet;
   }
 
-  let { onClick = () => {}, additionalStyle = "", children }: Props = $props();
+  let {
+    onClick = () => {},
+    additionalStyle = "",
+    disabled = false,
+    ariaLabel,
+    children,
+  }: Props = $props();
 </script>
 
 {#await additionalStyle}
-  <button onclick={onClick} class="ico">{@render children?.()}</button>
+  <button onclick={onClick} class="ico" {disabled} aria-label={ariaLabel}
+    >{@render children?.()}</button
+  >
 {:then as}
-  <button onclick={onClick} class="ico" style={as}>{@render children?.()}</button>
+  <button
+    onclick={onClick}
+    class="ico"
+    style={as}
+    {disabled}
+    aria-label={ariaLabel}>{@render children?.()}</button
+  >
 {/await}
 
 <style>
@@ -24,12 +40,15 @@
     width: 3.5rem;
     min-height: 3.5rem;
     --tw-shadow-color: 0, 0, 0;
-    --tw-shadow: 0 10px 15px -3px rgba(var(--tw-shadow-color), 0.1),
+    --tw-shadow:
+      0 10px 15px -3px rgba(var(--tw-shadow-color), 0.1),
       0 4px 6px -2px rgba(var(--tw-shadow-color), 0.05);
-    -webkit-box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
-      var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000),
-      var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    -webkit-box-shadow:
+      var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
+      var(--tw-shadow);
+    box-shadow:
+      var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000),
+      var(--tw-shadow);
     --tw-bg-opacity: 1;
     background-color: rgba(107, 114, 128, var(--tw-bg-opacity));
     display: flex;

@@ -1,0 +1,318 @@
+{
+  "verifiedAt": "2026-10-04T13:24:57.563642+00:00",
+  "scope": "Local public code and authored neutral synthetic data; schema21 server data snapshot and offline restore milestone; all15 active, whole goal unfinished",
+  "baseline": "4fc87192d13c5da8b03e280aa6924b6825bd6c3b",
+  "node": "v22.21.0",
+  "application": {
+    "path": "evidence/local-server-snapshot-app-final-20261004.log",
+    "sha256": "1c67d083b223e84acc5e257d56053cec85475673441f710692103ef64a473dd1",
+    "passed": 538,
+    "existingSkips": 3,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "backend": {
+    "path": "evidence/local-server-snapshot-backend-serial-20261004.log",
+    "sha256": "219f65f4f52b564c531bb7c2e06211272e0e808b61f821ce47bed50f09a04acd",
+    "tests": 402,
+    "passed": 402,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "browser": {
+    "path": "evidence/local-server-snapshot-ui-final-20261004.log",
+    "sha256": "6aa0bab38659cd0133fc98d7cc5ac66ec3c3e7ef7b7e8831109e4139165d4e01",
+    "tests": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "types": {
+    "path": "evidence/local-server-snapshot-type-final-20261004.log",
+    "sha256": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "errors": 0,
+    "warnings": 0,
+    "exitCode": 0
+  },
+  "builds": [
+    {
+      "path": "evidence/local-server-snapshot-native-build-20261004.log",
+      "sha256": "ce9d78879c79a7131fc30d5703f1b4a8cb23b69770e90c0ecab50ff887253051",
+      "kind": "native",
+      "exitCode": 0
+    },
+    {
+      "path": "evidence/local-server-snapshot-entity-build-20261004.log",
+      "sha256": "c110c60187243a5b1baedb35f0303efeaffe9b96b622db11ef9c7a31734c51aa",
+      "kind": "entity",
+      "exitCode": 0
+    },
+    {
+      "path": "evidence/local-server-snapshot-ordinary-build-20261004.log",
+      "sha256": "807d66eb3781d5e40b09b555c471c4266eb754bd1fe265bedf1db6b01c054ccc",
+      "kind": "ordinary",
+      "exitCode": 0
+    }
+  ],
+  "audit": {
+    "path": "evidence/local-server-snapshot-engine-audit-20261004.log",
+    "sha256": "0a5d00271ddd944730f708b583ae1abe354187a0762e80597d4f42c5a923d88f",
+    "declarations": 169,
+    "originalAlgorithmPreserved": 167,
+    "explicitPolicies": 2,
+    "exitCode": 0
+  },
+  "format": [
+    {
+      "path": "evidence/local-server-snapshot-format-final-20261004.log",
+      "sha256": "725b574d0eed36816bc9177c3cb231d76e48bffd4d2899f403f462624461e0cd"
+    },
+    {
+      "path": "evidence/local-server-snapshot-original-format-20261004.log",
+      "sha256": "41474f6bdfca8c562eb8432c4d89f3a175e49461349308501030cbdbb3373e9c"
+    }
+  ],
+  "uiObservation": {
+    "path": "evidence/local-server-snapshot-ui-final-20261004.json",
+    "sha256": "cb705f427f21b88cfbf5b6d8bec0a6082fdc7d85c6956d8dc62ff6c2872d686c"
+  },
+  "uiSummary": {
+    "observation": {
+      "name": "risu-server-backup",
+      "extensions": [
+        "risusnapshot"
+      ],
+      "closed": true,
+      "aborted": false,
+      "alert": {
+        "type": "normal"
+      }
+    },
+    "bytes": 475647,
+    "backupSha256": "edf818450a14b7f42e0b52ed2e664b311cf3d64fdfb115a36908fb63fdca5627",
+    "report": {
+      "restored": true,
+      "schema": 21,
+      "serverId": "e6772f40-4d9b-436e-828a-0497903e8c55",
+      "sourceServerId": "42f5bea2-717c-44b3-9530-dd53c26c3d59",
+      "sourceCursor": 145,
+      "backupSha256": "edf818450a14b7f42e0b52ed2e664b311cf3d64fdfb115a36908fb63fdca5627",
+      "unfinishedJobsInterrupted": 0,
+      "pendingInteractionsClosed": 0,
+      "assetBlobs": 1,
+      "comparedTables": 33,
+      "untouchedDataIdentical": true,
+      "automaticExternalReplay": false
+    },
+    "browserProjectionsPreserved": true,
+    "inputNodesPreserved": true,
+    "restoredResultReview": true,
+    "restoredBatchSelection": true,
+    "corruption": {
+      "closed": false,
+      "aborted": true,
+      "alert": {
+        "type": "error",
+        "msg": "Server snapshot checksum mismatch",
+        "submsg": ""
+      }
+    },
+    "pending": {
+      "error": "Finish or resolve pending changes before exporting a server backup",
+      "writes": 0
+    },
+    "cancelled": "none"
+  },
+  "initialFullBackend": {
+    "path": "evidence/local-server-snapshot-backend-final-20261004.log",
+    "sha256": "62789503e30350652aafa78d9246092e9abfc420d477be6f2444547b9a8de57d",
+    "tests": 401,
+    "passed": 400,
+    "failed": 1,
+    "skipped": 0,
+    "exitCode": 1
+  },
+  "unchangedRestartRerun": {
+    "path": "evidence/local-server-snapshot-restart-rerun-20261004.log",
+    "sha256": "47b697b275ef2ca2fed110e0de6eb63e9df2df7e8681065431c329936f3c88bb",
+    "tests": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "focusedSupplement": {
+    "path": "evidence/local-server-snapshot-backend-supplement-20261004.log",
+    "sha256": "edfe6359ab7f1cb63b76c362b8322a5e438475f1d5d62f1268f7273c4be5fd73",
+    "tests": 9,
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "preservedFailures": [
+    {
+      "path": "evidence/local-server-snapshot-backend-fifth-20261004.log",
+      "sha256": "4ce70b6960c9ef2af120d348d0501e109c07e2f48e26aafd06651b2ce1576aa3"
+    },
+    {
+      "path": "evidence/local-server-snapshot-backend-final-20261004.log",
+      "sha256": "62789503e30350652aafa78d9246092e9abfc420d477be6f2444547b9a8de57d"
+    },
+    {
+      "path": "evidence/local-server-snapshot-backend-initial-20261004.log",
+      "sha256": "37cbc995f49e46f463ccba055aa286371fed0707ed1310d2e47cbfe336cbde24"
+    },
+    {
+      "path": "evidence/local-server-snapshot-backend-second-20261004.log",
+      "sha256": "cc9617c91cf2381cedd6b8192dd7d0d1078074bb32e58528d268b8414168bb6e"
+    },
+    {
+      "path": "evidence/local-server-snapshot-backend-third-20261004.log",
+      "sha256": "aae8807b69ac570cbbd3cb8842b2352f8ff7d41160f0f9f79be7806ee70b771d"
+    },
+    {
+      "path": "evidence/local-server-snapshot-types-initial-20261004.log",
+      "sha256": "101def0dc25c5ba980ccd1de42634537aa303288673a6ea95a1d0276e9c7493d"
+    },
+    {
+      "path": "evidence/local-server-snapshot-ui-initial-20261004.log",
+      "sha256": "4bcdcabf1e6acce58a52c7a78346176009ce0fc1d5af4c6a20b988ac94d68305"
+    }
+  ],
+  "failurePolicy": {
+    "assertionsOrTimeoutsWeakened": false,
+    "parallelRestartTimeoutRootCauseConfirmed": false,
+    "settingsNavigation": "Original Settings unmounts chat; peer input asserted during real Settings download and both mounted input nodes asserted in a separate run of the same real backup action"
+  },
+  "sourceFiles": [
+    {
+      "path": "docs/engine-extraction-audit.json",
+      "sha256": "0a5d00271ddd944730f708b583ae1abe354187a0762e80597d4f42c5a923d88f"
+    },
+    {
+      "path": "docs/original-backup-runtime.md",
+      "sha256": "80f3b1b121504a55bc0355b00cffee6f2813a41eb3246a4e6c077ac584d4d472"
+    },
+    {
+      "path": "docs/server-runtime-plan.md",
+      "sha256": "4b021fdec2eba8f8e9644773f6844b3fd9803770911360c1c32b7a169d52fcc5"
+    },
+    {
+      "path": "docs/server-snapshot-runtime.md",
+      "sha256": "17b8fa8650f8a6fe23be02339b63cff4d3ae16b1106b1de2541a17e87d73a51d"
+    },
+    {
+      "path": "server/browser/serverSnapshotUi.test.cjs",
+      "sha256": "da2b7aac348b6541ae0ecacea3545c5dcfa4d3fc3205b4f4adca4e4c8cf4897e"
+    },
+    {
+      "path": "server/runtime/archive.cjs",
+      "sha256": "621d5d090b4c1e4e0b2adede08870a40dff21206d6830b7048a1012d98572926"
+    },
+    {
+      "path": "server/runtime/production.test.cjs",
+      "sha256": "7bd1f7c757f34e17701dea22b3fbd0ae13509441f7835a4f527187b3aeedfbfe"
+    },
+    {
+      "path": "server/runtime/restoreServerSnapshot.cjs",
+      "sha256": "fcf8c7fff6dbab8885d8b19c1f48d34f34169c5934361a1966214c027e7b621c"
+    },
+    {
+      "path": "server/runtime/serverSnapshot.cjs",
+      "sha256": "a01f49f64ae84f2d4a0dda041ace286bd3692a289ede1e70f737927b78ae66ae"
+    },
+    {
+      "path": "server/runtime/serverSnapshot.test.cjs",
+      "sha256": "a126fa488ac8643b2f150728dd57ec0a969489f52e55565261b57e45159a8a8b"
+    },
+    {
+      "path": "server/runtime/serverSnapshotExports.cjs",
+      "sha256": "c6f83bc2118d22119d09529153949959daf70e098da531dbf9c49187d7bc1091"
+    },
+    {
+      "path": "server/runtime/serverSnapshotExports.test.cjs",
+      "sha256": "2006d71fb37f5831bac136f1430bea206a6fff642ca74d6c7d0996327eef96f3"
+    },
+    {
+      "path": "server/runtime/serverSnapshotWorker.cjs",
+      "sha256": "e0d869119c9be1f84c3e95be8c66ad3cc7d7cdbba95246b11642966e03b56c90"
+    },
+    {
+      "path": "server/runtime/service.cjs",
+      "sha256": "9f6da4bb4e9af10986488b6d65cfb864fba039f2f5e59dcc33b69ca591009507"
+    },
+    {
+      "path": "src/lib/Setting/Pages/UserSettings.svelte",
+      "sha256": "ca60f5753fdbc56c01d86492791d51735b13495af1a83b484595f7353d813ff8"
+    },
+    {
+      "path": "src/ts/drive/serverSnapshotBackup.ts",
+      "sha256": "40e704708bccc81e26b0cb06a0db78e73927beadbbf4eab30c51e9e33c122ef4"
+    },
+    {
+      "path": "src/ts/runtime/browserRuntimeController.svelte.ts",
+      "sha256": "aa9988a70703f1cd01417aa29323972e2ce04838a7da1f05aad8852cb60a90c7"
+    },
+    {
+      "path": "src/ts/runtime/browserRuntimeState.svelte.ts",
+      "sha256": "8c3d8f83c306bb540eb3f2fdb9871a90cebd0c718d3993bdeb70bde70139f666"
+    },
+    {
+      "path": "src/ts/runtime/runtimeSyncClient.ts",
+      "sha256": "aaa7c3b66f9205afeeac5612d33a65b42820d59d6a8927664ec74a3d5090b7b7"
+    },
+    {
+      "path": "src/ts/runtime/serverSnapshotDownload.test.ts",
+      "sha256": "d320f251e583f4b04bd49fc1a094b5dd91ee2fd4a593120ed2c7d9c5b8c3d021"
+    },
+    {
+      "path": "src/ts/runtime/serverSnapshotDownload.ts",
+      "sha256": "50d9381b73d986319f89eadb056adc6dcdfcf5dc72d11b8e31becdc50a70189b"
+    },
+    {
+      "path": "src/ts/runtime/serverSnapshotProtocol.d.mts",
+      "sha256": "6b76a251294d9c3857fcd33ed330944ab1d7caeb3104e006b00bb8502cbfbd43"
+    },
+    {
+      "path": "src/ts/runtime/serverSnapshotProtocol.mjs",
+      "sha256": "fa0d74ae73c3607733882769612a4b82de45eace4416e42fe1645a2e7851d1cc"
+    }
+  ],
+  "all15": {
+    "unchecked": 15,
+    "sha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+    "wholeGoalComplete": false
+  },
+  "uniqueFinalCases": 945,
+  "excludedCounts": "Supplement, reruns and initial failed runs are not added; three existing application skips excluded",
+  "limits": {
+    "schema": 21,
+    "manifestMiB": 64,
+    "databaseGiB": 8,
+    "entriesGiB": 32,
+    "assetMiB": 64,
+    "uniqueAssetBlobs": 200000,
+    "chunkBytes": 65536,
+    "workerHeapMiB": 512,
+    "browserTimeoutHours": 1
+  },
+  "remaining": [
+    "In-place online restore and cross-version migration",
+    "Host auth/config/code and browser outbox recovery",
+    "Crash orphan cleanup and filesystem failure injection",
+    "Global disk/WAL/assets budgets and reservation; reference lifetime and GC",
+    "Unknown extension/complete read dependency and generation compatibility",
+    "Synchronous CBS/HTML preparation, representative latency/long tasks and physical-mobile tests",
+    "Configured full user trial and all15 completion conditions"
+  ],
+  "boundaryCounts": {
+    "productionAccesses": 0,
+    "productionChanges": 0,
+    "privateContentReads": 0,
+    "actualProviderCalls": 0,
+    "remotePushes": 0
+  }
+}

@@ -82,6 +82,7 @@ export async function encodeRisuSaveCompressionStream(data:any) {
 
 export type toSaveType = {
     character: string[];
+    chat: [string, string][];
     botPreset: boolean;
     modules: boolean;
     loadouts: boolean;
@@ -120,65 +121,10 @@ type EncodeBlockOption = {
 const risuSaveCacheForage = localforage.createInstance({
     name: 'risuSaveCache'
 });
-
-export async function clearRisuSaveClientCache() {
-    await risuSaveCacheForage.clear()
-}
 export class RisuSaveEncoder {
 
     private blocks: { [key: string]: Uint8Array } = {};
     private compression: boolean = false;
-
-    /** Reuse an already decoded canonical Node snapshot. Legacy, remote and
-     * split-chat layouts fall back to init(); never partially replace blocks. */
-    initFromSnapshot(
-        data: Uint8Array,
-        characterIds: readonly string[],
-        compression = false,
-    ): boolean {
-        if (!magicRisuSaveHeader.every((byte, index) => data[index] === byte))
-            return false
-        const expected = new Map<string, number>([
-            ['config', RisuSaveType.CONFIG],
-            ['root', RisuSaveType.ROOT],
-            ['preset', RisuSaveType.BOTPRESET],
-            ['modules', RisuSaveType.MODULES],
-            ['loadouts', RisuSaveType.LOADOUTS],
-            ['plugins', RisuSaveType.PLUGINS],
-            ['pluginStorage', RisuSaveType.PLUGIN_STORAGE],
-        ])
-        for (const id of characterIds) {
-            if (!id || expected.has(id)) return false
-            expected.set(id, RisuSaveType.CHARACTER_WITH_CHAT)
-        }
-        const blocks: Record<string, Uint8Array> = Object.create(null)
-        let offset = magicRisuSaveHeader.length
-        while (offset < data.length) {
-            const start = offset
-            if (offset + 7 > data.length || data[offset + 1] > 1) return false
-            const type = data[offset]
-            const nameLength = data[offset + 2]
-            const lengthOffset = offset + 3 + nameLength
-            if (lengthOffset + 4 > data.length) return false
-            const name = new TextDecoder().decode(
-                data.subarray(offset + 3, lengthOffset),
-            )
-            if (expected.get(name) !== type || Object.hasOwn(blocks, name))
-                return false
-            const length = new DataView(
-                data.buffer,
-                data.byteOffset + lengthOffset,
-                4,
-            ).getUint32(0, true)
-            offset = lengthOffset + 4 + length
-            if (offset > data.length) return false
-            blocks[name] = data.slice(start, offset)
-        }
-        if (Object.keys(blocks).length !== expected.size) return false
-        this.blocks = blocks
-        this.compression = compression
-        return true
-    }
 
     async init(data:Database,arg:{
         compression?: boolean,
@@ -251,10 +197,6 @@ export class RisuSaveEncoder {
             type: RisuSaveType.CONFIG,
             name: "config"
         })
-    }
-
-    hasCharacterBlock(id: string): boolean {
-        return Object.prototype.hasOwnProperty.call(this.blocks, id)
     }
 
     async set(data:Database, toSave:toSaveType){
@@ -384,14 +326,14 @@ export class RisuSaveEncoder {
     }
 
     async encodeBlock(arg:EncodeBlockArg, option:EncodeBlockOption = { remote: 'none' }){
-        // Node multi-device saves use one self-contained blob so the server can
-        // commit it with a single revision compare-and-swap. Tauri can still
-        // prefer remote character blocks because it has one local writer.
         if(
             option.remote === 'force' ||
             (
                 option.remote === 'prefer' &&
-                isTauri
+                (
+                    isTauri ||
+                    isNodeServer
+                )
             ) &&
             !disableRemoteSaving()
         ){
@@ -425,17 +367,11 @@ export class RisuSaveEncoder {
         buf.set(nameBuf, 3);
         buf.set(new Uint8Array(lengthBuf), 3 + nameBuf.length);
         buf.set(databuf, 7 + nameBuf.length);
-        // A self-hosted Node client treats the server snapshot as the
-        // authoritative cache. Keeping another copy of every encoded block in
-        // the device IndexedDB defeats the server-resident storage mode and can
-        // leave a second device with stale encoder blocks.
-        if(cacheBlock && !isNodeServer){
-            await risuSaveCacheForage.setItem(`risuSaveBlock_${arg.name}`, {
-                type: arg.type,
-                data: arg.data,
-                name: arg.name,
-            });
-        }
+        await risuSaveCacheForage.setItem(`risuSaveBlock_${arg.name}`, {
+            type: arg.type,
+            data: arg.data,
+            name: arg.name,
+        });
         return buf;
     }
 
@@ -541,6 +477,7 @@ export class RisuSaveDecoder {
                 continue
             }
         }
+        console.log('blocks',this.blocks)
         let directory: string[] = []
         for(let i = 0; i < this.blocks.length; i++){
             const key = i;

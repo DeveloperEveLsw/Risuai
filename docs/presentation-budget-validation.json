@@ -1,0 +1,461 @@
+{
+  "baselineCommit": "bd9b167d212de597ca56902611073eb994b16820",
+  "verifiedAt": "2026-10-04T07:10:16.256619+00:00",
+  "schemaVersion": 20,
+  "schemaChanged": false,
+  "all15ConditionsRemainActive": true,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateDataReads": false,
+    "realModelCalls": 0,
+    "deployments": 0,
+    "remotePushes": 0
+  },
+  "gates": {
+    "check": {
+      "errors": 0,
+      "warnings": 0
+    },
+    "app": {
+      "passed": 479,
+      "skipped": 3,
+      "freshForCandidate": true
+    },
+    "newUnitCases": {
+      "count": 2,
+      "arbitraryTrees": 500,
+      "seed": 107
+    },
+    "browserRegressions": {
+      "passed": 28,
+      "skipped": 0,
+      "files": 27,
+      "originalBuiltUI": 9,
+      "additionalDisplayCases": 19,
+      "serial": true
+    },
+    "backend": {
+      "passed": 354,
+      "freshlyRerun": false,
+      "reusedFromCommit": "bd9b167d212de597ca56902611073eb994b16820",
+      "node": "24.19.0",
+      "priorLog": "evidence/hosted-current-rollout-bd9b167-backend.log",
+      "backendFilesUnchanged": true,
+      "nativeArtifactIdentical": true
+    },
+    "builds": ["native", "entity", "ordinary"],
+    "ordinaryBuild": {
+      "exitCode": 0,
+      "temporaryOutput": "/tmp/risu-presentation-ordinary-7c5a763h",
+      "temporaryOutputRemoved": true,
+      "bothRuntimeFlagsRemoved": true,
+      "indexSha256": "00ac130be58f02e5f04d32ce0d60091455ce7f8699de95714dcbb4617086295c"
+    },
+    "engineAudit": {
+      "total": 169,
+      "originalPreserved": 167,
+      "existingPolicies": 2
+    }
+  },
+  "sourceFingerprints": {
+    "server/browser/chromium.cjs": "4f03356ed5f1fe819e1959adee7372af56a0e2dc90899f9148cd5fb1aa42cf89",
+    "server/browser/displayDependencyUi.test.cjs": "55d4df9abbf5b05d502696ecd19683a84d487d30e3c4b34b3fb6d099c9677b79",
+    "server/browser/displayPerformance.test.cjs": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "server/browser/displayScopeCache.test.cjs": "e1460b992ed67587aec180826961d239e05849ddd46d564942ff90141ba2ac95",
+    "server/browser/displayScopeHarness.svelte.ts": "b4effdfa758c78481399951c63b9685a5e47f24d327039e5fb10ea128f2a8875",
+    "server/browser/noticesUi.test.cjs": "76ae969ac37f42c15261430082d4bc2e7519854eb5a59238b39d77e456ff8f78",
+    "server/entity/store.cjs": "c765b48db75eca7bbcf6bce99e367053ec11994f0cfcdea43a6986eef59e84dc",
+    "src/lib/ChatScreens/Chat.svelte": "06b1af8b63f4ceafd299331643e1f558d05215c7d729d93273e87ae4a7d776f7",
+    "src/lib/ChatScreens/ChatBody.svelte": "2501e1ae5243b0df8f0a15ccd948de7f562d9544eb340176d282f174ebdb577f",
+    "src/ts/observer.svelte.ts": "e9f03dae411b056e0e37bec2da03111f34559eee811df53a9d804184c47b4bf7",
+    "src/ts/parser/cbsRuntime.ts": "0d8f4fe2f9f7c8819d7242c914c7df33af3a208c2833fae03527b3d33439a4d3",
+    "src/ts/parser/parser.svelte.ts": "78f47a5fb4b853d97cc929ecb3694cf11ae86c4db647e89fc57fbffc213f9e5f",
+    "src/ts/process/scriptings.ts": "8003d77c792fe43c4c02f6094e5296b95c26c7ef460830475f3f9ceaf6aafac7",
+    "src/ts/process/scripts.ts": "7efc5a10953b203a96d65f07bb3f3dc572c215ddf6eb3ffb7034b8dcb0be6edc",
+    "src/ts/process/triggers.ts": "0380dbc1a60349dc3003412c90eefd19bf373cc7e7f6c0efbaedd22ffcf4cbf6",
+    "src/ts/runtime/browserDisplayLua.test.ts": "6026faedfa29c7bdab512e4abdd3736d1fdfa9ba113581ca1f32f7ea70424bd4",
+    "src/ts/runtime/browserDisplayLua.ts": "0f38227bc78c4ced453bde55bf5ed30f071d13f39ecfbc321428468119a0cca8",
+    "src/ts/runtime/browserDisplayMetadata.ts": "890cacd57f9cd4e269dbaf7b7404a6297b6e6a0a0e30e3ecec37d3a8a7030942",
+    "src/ts/runtime/browserRuntimeController.svelte.ts": "686e90dcf843eb651b542e27e333f8d2f42bf2a402089bab12b5351eb4a7205b",
+    "src/ts/runtime/browserRuntimeState.svelte.ts": "e1b8020757cf2ad87a50e566b9e11ee24a5f220193c40b836d96a0bdf5ee6238",
+    "src/ts/runtime/canonicalDisplayHistory.ts": "40ace21dbdb8223a0fd2445c31482c72ba5f474b35abcc0ca2b6dbbb45fa3d82",
+    "src/ts/runtime/display.worker.ts": "ce6fa7fcccee6743e025edbf258b0d91c833b665a1f509d725629c2a893d5142",
+    "src/ts/runtime/displayCaptureTransport.ts": "5615117930cbcc55c8670b14db43181bea95184c3e95ec4ce15b1ace7bd6f642",
+    "src/ts/runtime/displayCbsScope.ts": "0f7ade67c1240203e426066a4f72f3c5e654ef9cafccb5ab10b824f8135b2556",
+    "src/ts/runtime/displayEffects.ts": "ad79908aba18888f8d59e1de6ca9ab6a631ecb16248d84818d0831c215a0d3a1",
+    "src/ts/runtime/displayLuaContext.ts": "90f94001d8223750a9fe6656fba6a7ed62ab4ed4248a4e83f59d8e1e2ff46f3e",
+    "src/ts/runtime/displayReadDependencies.ts": "586ed4865c891607447ef17f482653dd34775810da576c196113e02242031c47",
+    "src/ts/runtime/displayRenderCache.ts": "2b8ebe1e1edcec14f5f8ddb8eb6f7637f7dbc4e6e8e9ff1c37cef7744e54d8e4",
+    "src/ts/runtime/displayScheduling.ts": "296a4041075652168cbce5c08ecd16df90323749c6fa4fad3763991bf62b6b17",
+    "src/ts/runtime/displayScopeCache.svelte.ts": "c23b931a99a316950e44aac54783a6cfefc9d6280557f4e5907f58c89d0cb8e7",
+    "src/ts/runtime/displayScopeIdentity.test.ts": "f7275600079e7bc567e720e238e3dd5940c8213f4174256da6a806c7ebc221b4",
+    "src/ts/runtime/displayScopeIdentity.ts": "ce51463992207f2164d9775ded898b35aff81ec571d2eec8e410c6e8fee01736",
+    "src/ts/runtime/displayWireBudget.ts": "d1fe817792b9630fc662e7ce659ac0c30429bb21f10eefefcca04b841b6a4ec6",
+    "src/ts/runtime/displayWorkerExecutor.ts": "4beb16ae7fe4aa443786d82aede03508198ae76b4a73ef76c1bc9b32b6bfe5f3",
+    "src/ts/runtime/risuReadModel.ts": "9399e318777fda8ce190b80fbf8d35d36b0cd13a5d367bdcffd463fb3ef8bc05",
+    "src/ts/runtime/stableDisplayDom.ts": "682b6e958abf6422621769176162d68cbe65aa7cd3c53d197b39e4da4a129251"
+  },
+  "backendSourceFingerprints": {
+    "server/engine/auditExtraction.mjs": "3a6f8724bcfd4b4770645c53c8399ba664672dd701e03617fc9055e31a45bef7",
+    "server/entity/assets.cjs": "1e4fe91baf5fde9d036c9d4c0f78e3bb1958fde36b978168264af6373197ec98",
+    "server/entity/assets.test.cjs": "d64ff4a56f7ddbf154b3a2d7b1e4b614b6db6fbfdb188ae5dccad5bd9d38e9c0",
+    "server/entity/bookkeeping.cjs": "4cf098a426e548482e438211d3da2c0e2f846993cee9eff3a96382fdb7c651f1",
+    "server/entity/bookkeeping.test.cjs": "be0be6bad41e86e33b997587733773b524ae16501592438bf1a361d2faf0a3c1",
+    "server/entity/bookmarks.cjs": "60a65b075adc75021d53e6fa304858538541faa16ece7d15c797daf982763c76",
+    "server/entity/bookmarks.test.cjs": "67a4ac65d5be58d983cfebfb1cc54a8349c49ec8f7f9a2cd2814efe4211f8835",
+    "server/entity/branching.cjs": "0723cda7b0e8141971cce935d9e50c7fcbb55db133784364a36648e9ee9bddd7",
+    "server/entity/branching.test.cjs": "34fad4e545a8add6690e703d8e7b3e79eb58502eff597bd25e17e54b11252786",
+    "server/entity/catalog.cjs": "0b77079da8866dc4697fb0628593951cb19e85468bd5838beba09c202131b3d7",
+    "server/entity/catalog.test.cjs": "67088b9001cb8b34443e43ad1b7df1f163860177dc45325a7584ffe11c2ab5db",
+    "server/entity/characterNavigation.cjs": "a00f6cb9271f087c4b118ac7e3a029481547118ab9ac06e0cbfc0b60eca653d8",
+    "server/entity/characterNavigation.test.cjs": "9e5dd907770ec8fecaed7618063c03bafb2ba582b57036c0f46adde02a7f5bde",
+    "server/entity/chatNavigation.cjs": "866affdb7d09556a6a0f3b5f931af2492d635e7b62f1326cbec61d34109a1773",
+    "server/entity/chatNavigation.test.cjs": "df3527d7d13999fe4640487ddd71e2070b63114028caf594f34a9096a8261847",
+    "server/entity/chatSummary.test.cjs": "bc411dc426222859e5c832c53cf4288bd837add716021a8c89d4fcf48963dbd2",
+    "server/entity/client.cjs": "7ebb9dda8045b78d6984c6ed715bc6af507835aa99b35e2fcb141fe9d9edf51e",
+    "server/entity/displayEffects.cjs": "672562c15099135a3713e253d5c79632b970280b1facb3a8e4a05ce30d663cb4",
+    "server/entity/displayEffects.test.cjs": "ce82997e0dd8f5b56e86c44f14e9d51b5410cc1d3059d4acdcc7d404d1063a8b",
+    "server/entity/displayMessageIntents.test.cjs": "63f8ad05429122c32297ec42ab00af3c7d7e81ea8ec65033d4ddd8f100841248",
+    "server/entity/errors.cjs": "34b915e6df441edc39a7992e8a3cd16d85118ca20e7237a1c51a03bd5ebdb3f5",
+    "server/entity/fields.cjs": "0fa9b24e315cca886579767b1e466979b55bba7a3f90f4130c0e0e645584b950",
+    "server/entity/fields.test.cjs": "26de2b308a9fd8dbe285fce685496102ad480d77a87d2c7bd0ca92a3bbacd603",
+    "server/entity/groupMembers.cjs": "2e69caf53a414adcde8a6d43bf20725bd0756b15d4b3a4572a1af26dd821c79a",
+    "server/entity/groupMembers.test.cjs": "4f407b6dcaa3bf5d8849597ad45a2d358512c825a131ab37897e1ef97ed2be1f",
+    "server/entity/interactions.cjs": "bff745fb808694625a92133f3defe582f0756f55ea9fab2e4d0cc735fe5acf9f",
+    "server/entity/interactions.test.cjs": "14de912c48d0f7ac2f0b3517952d49f9b20db9a875244318941ccbb3db4b13c0",
+    "server/entity/jobProgress.test.cjs": "fcb33c4270d4c20367cadf500aed106afe8a70f340cc816e90d5418d3274cffb",
+    "server/entity/jobResults.cjs": "6669fd660c89f9df13c3d68f4186d40b91508a1204d93e987fb49ac84e320231",
+    "server/entity/jobResults.test.cjs": "d49c932c00568d3fccd2623ee739370a90ca995276c55252170cfeaa115f76e5",
+    "server/entity/jobRetry.test.cjs": "f649839092eb91a5e8801556e3348273b348b8029e3a89cd6386ad0be1df4407",
+    "server/entity/library.cjs": "3f250010e47f2efb40c448b5714021ea16b342720a1044bf956eade7c35fe73a",
+    "server/entity/library.test.cjs": "8d47ad6e97bdd832df5dd73e6ebd0d9fd57344da598193a60bfad75ee3c8cf86",
+    "server/entity/librarySelection.cjs": "cbf7eecdd8e37a7a41a85722d3a6a09119fb2e94329c615dd670f4ea43221287",
+    "server/entity/librarySelection.test.cjs": "e8a00bebe428d6c626d7b3d99a5e58cfcd810b35927c85618406a501e7d51545",
+    "server/entity/lifecycle.cjs": "d4e8511b607da3000dd68313c9a19347a74d3d1eb3d7e62cfd93c4805242bafa",
+    "server/entity/lifecycle.test.cjs": "b95a62ba92e8f9451d38225afc2385486865a775ff197901a84052aaee1626be",
+    "server/entity/messageWindow.cjs": "de28be315e032dca5de63789a15bda0c5d6889133782aca5d1afd0046efb2009",
+    "server/entity/messageWindow.test.cjs": "497904a7641a6b823e67a47f44b2a32f933a6dce8a14eb1e674b5866fc653e5b",
+    "server/entity/messages.cjs": "3018d3066f3bcc5f0d7e92df6b13d507207fe34010bd69854a59c4a9a0570cb2",
+    "server/entity/messages.test.cjs": "2697b7fc2954c3013a276bfe770424ff048d0119ed54b1df7b3912aca7f0dfcd",
+    "server/entity/notices.cjs": "e4cabfd48fea79ecfce0e1b251e3f3980b0b60d19f626879ccd08c9e8e115ab3",
+    "server/entity/notices.test.cjs": "508c415f92521f0c85a95f3f02d8d10266223b90a57bae458fad8e1418ff0120",
+    "server/entity/replyBatches.cjs": "d3478532d73b043341a6a82e15d6d354e112c85b83bdf8d84da9b78725d35ba6",
+    "server/entity/replyBatches.test.cjs": "0dc863848b624da72e994c62b21a58a523f9350e71725259f587f6c9a17e6bf9",
+    "server/entity/replyChoices.cjs": "b91d3908c5b4a825cf5a3eee58c8984919af9f5441066b5a520023c9b55d2fcc",
+    "server/entity/replyChoices.test.cjs": "f8d3c28b50e55294f5fd6bd40c971360480f9be9cb9f296cb95796fdc3971aa3",
+    "server/entity/resourceReads.cjs": "1370a047e59ed3e8acf6ce8a8ce1237b02f70b1e47b74c7e3ca19fc0f85d27c1",
+    "server/entity/resourceReads.test.cjs": "e21e8464d4002e049fed4ce5ade63598d8da0310810342d8fbb6dd1ced8618a4",
+    "server/entity/storagePressure.test.cjs": "d55f6878b702f144aac909550e93f48d34f4630549a1917f710569a1bf996106",
+    "server/entity/store.cjs": "c765b48db75eca7bbcf6bce99e367053ec11994f0cfcdea43a6986eef59e84dc",
+    "server/entity/store.test.cjs": "c01dfcbafe63709bc5693595fd7e5a4ab3d137f79c9cda1315dbab8d6ecdb317",
+    "server/entity/variableConcurrency.test.cjs": "1362fdd297e5c9e21afa8affd650938e7f57a094307dcf437e1110f605e52ef9",
+    "server/entity/variableReads.cjs": "609c97cbc9c496fece674b5e277bb6f2556d784e8ce42fe7f149368c0a1a5bd1",
+    "server/entity/variableReads.test.cjs": "0604b88086768a42761d2cfebfa619d3bd5a769e9559dca6064341bd2edcc3c1",
+    "server/entity/variables.cjs": "a458c35ffd18e7658647e2e232d4ed12de2e141e14f6235be8d51513a2d7ece9",
+    "server/entity/variables.test.cjs": "ae5dff350c2f961996df355495edb8f4cdaddfe07171a1615eff86fe38307097",
+    "server/entity/worker.cjs": "2aba29932d4b0562208ee9128a300ed562c845c59f012360baab3e5755e124e8",
+    "server/entity/writeSet.cjs": "89f6479d0899eff3b2be41e6c99221beafa5d8ec25b6ce107d45a45017de217e",
+    "server/native/extensionProcess.cjs": "16111d94dc3e84c820bfcfbd3475288fe68f2d478cb96f91e5068bcd3ea2faf9",
+    "server/native/extensionWorker.cjs": "4dec41c713d2d3cddb22e8cb339649c8d7418a4c376db6d3a609156d3dc17aee",
+    "server/native/extensionWorker.test.cjs": "a0f39a52aacd021bf194c59ed9f4b76b9dad6a43bb952eb017a998077888890c",
+    "server/native/generationWorker.test.cjs": "871153a2d3c05d3e5e4ff4d07f47e8bae21924e6988555156fafa66bbf17bbb3",
+    "server/native/groupGeneration.test.cjs": "3904df58d66b9b2a24308ab5c051e6a33b3957ec2311f48e8047faa7f588bbf0",
+    "server/native/interactions.cjs": "c90c7d49ff2ccb475898c7eb9e05b75dc68a5d4c13a11e4fed781931b8840906",
+    "server/native/interactions.test.cjs": "7dc4d23ff63242306bb92912038fe10e33b5b771b43e082ca6714961369f0cda",
+    "server/native/jobChannel.cjs": "332ddaf02f0d0725336c7a773be8a359ff4c6730de5bdd6c24994085310f3636",
+    "server/native/notices.cjs": "41f8f8fc8878d26be28e300275f42219ff10158b23cecc2bc6f17a2a9e4d1e6d",
+    "server/native/notices.test.cjs": "2cfba900651d6d22937878a3c3127447b71898cf82a8868867d2aabe3fa1f337",
+    "server/native/pluginAdmission.cjs": "a5d6168e20d3541835daae330d5a37d788131c8e3f8bdb2ad48992b6711deea0",
+    "server/native/pluginAdmission.test.cjs": "f9694190b4a4679019b748a00747531197f55c5dbd532ef7fbcbc73d42d8ef7c",
+    "server/native/processWorker.cjs": "45b0f6734bc119c17ebf419ecd0190d77cfca3ef3e0669677487c218685b270d",
+    "server/native/progress.cjs": "53c1336e8563641d9afb83c2969a8b5b0cbc8fb99ef48291734235cc0c406353",
+    "server/native/readSnapshot.cjs": "89b61fa9fd9806be629c2040105c284bd85ec17da6c4f0e76a4ce38e30ff19ae",
+    "server/native/readSnapshot.test.cjs": "41369bc8d933008571c4ca12925b1571d35056587d5740b8a084228286f854e4",
+    "server/native/scheduler.cjs": "6e96bede686a5d0923325ab68914009f889dbf37d4b4bfb11784af2ff9d66b1b",
+    "server/native/tokenizerLoader.cjs": "7c2ad2da91906366bdd5933fe2a88d8b5f2b8be113b2679d70879aae99f40afd",
+    "server/native/variableReads.test.cjs": "ce9f7d8f15987e635780e5da8f4cc8514fdba8578f9cf418a10a959a98771725",
+    "server/runtime/assets.cjs": "e5c15d6dc780bde34fbb769acbe7179c7de02e64575e73aca0c670935523edb3",
+    "server/runtime/assets.test.cjs": "969a7eadca186364ef994889a0fc6774a8b5e857bef9e8f9f99608806aa510d3",
+    "server/runtime/develop.cjs": "8e5674771c03b2f36a1cedee8c7eb2180e29b55f3e32edb0d912d68ebfc5c2af",
+    "server/runtime/diagnostics.cjs": "2fa1096696d8104c0af6617fdf4117557154519ef100221e4c633b67fee81007",
+    "server/runtime/diagnostics.test.cjs": "f4b50a7f1a6a1b312618d01323df3a8de8e92975353d0dd21d27e1616713deec",
+    "server/runtime/displayEffects.test.cjs": "9dafe18daee0ec87158f0a7043835ce9a349ab4508c980e42640eaf28a0b642c",
+    "server/runtime/interactions.test.cjs": "a6a5936d9365ac6e87a337ce50b53a0c47c5794f6d95bfd28cd17d8c750111ad",
+    "server/runtime/notices.test.cjs": "ba3aff9da51d841ecf6d2cc9ee4637730e159619831d02ae29175ff00670d389",
+    "server/runtime/production.cjs": "b81e6b389f6a1f059bf4e8e212068c14babd422964321c7494725f5978a42847",
+    "server/runtime/production.test.cjs": "58102f33b09bf182fcbaf32139b52f780450e5b453e78ec2818f4af5e300ce14",
+    "server/runtime/restoreBackup.cjs": "e096b656689d55d39b4215e14c7d922cd2a58065003470512d6099312d55b2d0",
+    "server/runtime/restoreBackup.test.cjs": "2ec6ec1c16c85fdaed6e89ea73e976dba27d104206fbaa9d47be27078ff11502",
+    "server/runtime/service.cjs": "8176021d547ad14504afc0bb44fb9fba73cb9a3aa0377e93042574426e262bcd",
+    "server/runtime/service.test.cjs": "09b9e1fad3ffcc14fd4368e54bbf7fdc45415362ecd5eade523faae86a5859da",
+    "server/runtime/start.cjs": "35f7b56af478efdd6e5516ddc72241384ddaee4489d81f28011e220dbf396d91"
+  },
+  "artifacts": {
+    "nativeSha256": "692e674125e28c4d4352b2d45082f6beab42eab8eb6c5fc5bafe91f92709d411",
+    "entityIndexSha256": "43666c582b5c2cfcb71ecd2ce1f25039d17917364370bab89ffa182be32a3c66"
+  },
+  "comparison": {
+    "fixture": {
+      "count": 100,
+      "dependent": 6,
+      "sourceBytes": 1068010,
+      "htmlCells": 9600,
+      "regexCount": 16,
+      "loopIterations": 600000
+    },
+    "helperHash": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176",
+    "beforeBuildIndexHash": "12951d5c3449d8ed626c209ee0992c8ff20ce99c4617537d344783f10d0f139b",
+    "afterBuildIndexHash": "43666c582b5c2cfcb71ecd2ce1f25039d17917364370bab89ffa182be32a3c66",
+    "warmUnprofiledSamples": 48,
+    "physicalMobile": false,
+    "workerThrottleVerified": false,
+    "statistics": "median / nearest-rank p95; n12 p95 is observed maximum",
+    "observations": {
+      "before": {
+        "desktop": {
+          "feedbackMs": {
+            "median": 20.549999997019768,
+            "p95": 23.799999982118607
+          },
+          "settledMs": {
+            "median": 1138.800000011921,
+            "p95": 1204.7999999821186
+          },
+          "maxFrameGapMs": {
+            "median": 100.0,
+            "p95": 100.10000000000036
+          },
+          "longTasks": 9,
+          "longestTaskMs": 69,
+          "computationsPerClick": 106,
+          "independentRows": 94
+        },
+        "mobile-emulation-4x": {
+          "feedbackMs": {
+            "median": 39.55000001192093,
+            "p95": 50.400000005960464
+          },
+          "settledMs": {
+            "median": 2324.3999999910593,
+            "p95": 2468.4000000059605
+          },
+          "maxFrameGapMs": {
+            "median": 250.0,
+            "p95": 316.7999999999993
+          },
+          "longTasks": 14,
+          "longestTaskMs": 302,
+          "computationsPerClick": 106,
+          "independentRows": 94
+        }
+      },
+      "after": {
+        "desktop": {
+          "feedbackMs": {
+            "median": 21.0,
+            "p95": 26
+          },
+          "settledMs": {
+            "median": 1121.2999999970198,
+            "p95": 1188.0999999940395
+          },
+          "maxFrameGapMs": {
+            "median": 100.0,
+            "p95": 100.10000000000036
+          },
+          "longTasks": 1,
+          "longestTaskMs": 54,
+          "computationsPerClick": 106,
+          "independentRows": 94
+        },
+        "mobile-emulation-4x": {
+          "feedbackMs": {
+            "median": 37.25,
+            "p95": 49.29999998211861
+          },
+          "settledMs": {
+            "median": 2282.5499999970198,
+            "p95": 2398.4000000059605
+          },
+          "maxFrameGapMs": {
+            "median": 208.3000000000011,
+            "p95": 250
+          },
+          "longTasks": 12,
+          "longestTaskMs": 227,
+          "computationsPerClick": 106,
+          "independentRows": 94
+        }
+      }
+    }
+  },
+  "profileDiagnostics": {
+    "diagnosticOnly": true,
+    "notUnprofiledWallTime": true,
+    "attributionIncomplete": true,
+    "sourceBefore": "bd9b167",
+    "profiles": [
+      {
+        "stage": "current",
+        "scenario": "desktop",
+        "profile": "evidence/local-display-preparation-current-profile-desktop.json",
+        "sampledInclusiveMs": {
+          "displaya": 35.58,
+          "displayScopeJson": 69.78,
+          "compute": 64.59,
+          "ParseMarkdown": 92.29,
+          "stringBytes": 84.23,
+          "measure": 117.54,
+          "execute": 94.62,
+          "displayPresentationIdentity": 22.49
+        },
+        "topSelfMs": [
+          ["(idle)", "", 761.62],
+          ["(program)", "", 385.46],
+          ["stringBytes", "displayWireBudget.ts", 53.03],
+          ["encode", "", 34.41],
+          ["size", "displayWireBudget.ts", 31.17],
+          ["(garbage collector)", "", 21.73],
+          ["", "displayWorkerExecutor.ts", 16.12],
+          ["executeScript", "scriptRuntime.ts", 11.82],
+          ["visit", "displayCaptureTransport.ts", 11.36],
+          ["receive", "displayWorkerExecutor.ts", 10.8],
+          ["ParseMarkdown", "parser.svelte.ts", 10.74],
+          ["parseThoughtsAndTools", "parser.svelte.ts", 8.64]
+        ]
+      },
+      {
+        "stage": "current",
+        "scenario": "mobile-emulation-4x",
+        "profile": "evidence/local-display-preparation-current-profile-mobile-emulation-4x.json",
+        "sampledInclusiveMs": {
+          "displaya": 185.17,
+          "displayScopeJson": 361.63,
+          "displayPresentationIdentity": 114.96,
+          "stringBytes": 327.44,
+          "measure": 495.81,
+          "ParseMarkdown": 520.91,
+          "compute": 334.76,
+          "execute": 380.4
+        },
+        "topSelfMs": [
+          ["(program)", "", 1739.77],
+          ["(idle)", "", 738.44],
+          ["stringBytes", "displayWireBudget.ts", 176.3],
+          ["encode", "", 174.56],
+          ["size", "displayWireBudget.ts", 158.77],
+          ["(garbage collector)", "", 81.93],
+          ["ParseMarkdown", "parser.svelte.ts", 75.59],
+          ["", "displayWorkerExecutor.ts", 66.65],
+          ["parseThoughtsAndTools", "parser.svelte.ts", 63.07],
+          ["visit", "displayCaptureTransport.ts", 55.25],
+          ["", "displayScopeIdentity.ts", 54.36],
+          ["compute", "browserDisplayLua.ts", 54.11]
+        ]
+      },
+      {
+        "stage": "candidate",
+        "scenario": "desktop",
+        "profile": "evidence/local-display-preparation-candidate-profile-desktop.json",
+        "sampledInclusiveMs": {
+          "displayScopeJson": 72.08,
+          "displayPresentationIdentity": 16.59,
+          "displaya": 26.58,
+          "stringBytes": 74.95,
+          "measure": 110.58,
+          "compute": 75.21,
+          "ParseMarkdown": 106.94,
+          "execute": 93.26
+        },
+        "topSelfMs": [
+          ["(idle)", "", 756.96],
+          ["(program)", "", 402.21],
+          ["stringBytes", "displayWireBudget.ts", 57.34],
+          ["size", "displayWireBudget.ts", 33.19],
+          ["encode", "", 21.98],
+          ["", "displayWorkerExecutor.ts", 21.91],
+          ["(garbage collector)", "", 19.05],
+          ["ParseMarkdown", "parser.svelte.ts", 16.55],
+          ["processScriptFull", "scriptRuntime.ts", 12.22],
+          ["visit", "displayCaptureTransport.ts", 11.45],
+          ["parseThoughtsAndTools", "parser.svelte.ts", 11.04],
+          ["encode", "displayScopeIdentity.ts", 10.03]
+        ]
+      },
+      {
+        "stage": "candidate",
+        "scenario": "mobile-emulation-4x",
+        "profile": "evidence/local-display-preparation-candidate-profile-mobile-emulation-4x.json",
+        "sampledInclusiveMs": {
+          "displaya": 134.96,
+          "displayScopeJson": 339.31,
+          "displayPresentationIdentity": 77.11,
+          "stringBytes": 306.55,
+          "measure": 449.63,
+          "compute": 345.64,
+          "ParseMarkdown": 534.73,
+          "execute": 348.55
+        },
+        "topSelfMs": [
+          ["(program)", "", 1684.9],
+          ["(idle)", "", 750.33],
+          ["stringBytes", "displayWireBudget.ts", 199.12],
+          ["encode", "", 132.24],
+          ["size", "displayWireBudget.ts", 130.88],
+          ["ParseMarkdown", "parser.svelte.ts", 86.62],
+          ["", "displayWorkerExecutor.ts", 65.24],
+          ["parseThoughtsAndTools", "parser.svelte.ts", 64.57],
+          ["", "displayScopeIdentity.ts", 64.26],
+          ["(garbage collector)", "", 63.98],
+          ["visit", "displayCaptureTransport.ts", 47.87],
+          ["encode", "displayScopeIdentity.ts", 42.29]
+        ]
+      }
+    ]
+  },
+  "removalControl": {
+    "separateDevSamples": 4,
+    "actuallyLoaded": true,
+    "onlySharedIdentitySizeCacheDisabled": true,
+    "pooledWithOptimizedSamples": false,
+    "computationsPerClick": 106,
+    "independentRows": 94,
+    "sourceOverrideHashes": {
+      "src/ts/runtime/browserDisplayLua.ts": "5c067c8bb288eea01bf5e3c5836c3c86016404af56507a15be020cc2adb30980"
+    }
+  },
+  "retainedBrowserFailure": {
+    "initialPassed": 27,
+    "initialFailed": 1,
+    "test": "built original notifications",
+    "stage": "login readiness/character list",
+    "message": "Synthetic notice UI timeout: false",
+    "initialLog": "evidence/local-responsiveness-logs/preparation-browser-initial.log",
+    "isolatedLog": "evidence/local-responsiveness-logs/preparation-notices-isolated.log",
+    "isolatedPassed": true,
+    "cause": "unconfirmed",
+    "change": "Failure-only synthetic bootstrap diagnostic, no threshold/behavior relaxation",
+    "finalSerialLog": "evidence/local-responsiveness-logs/preparation-browser.log",
+    "permanentFixProven": false
+  },
+  "unchangedSemantics": [
+    "first CBS reactive reads",
+    "raw source/durable SHA",
+    "fresh identity/admission",
+    "Lua globals and sequence",
+    "worker captures",
+    "16MiB logical scope",
+    "stable original DOM and confirmed values"
+  ],
+  "limits": [
+    "Single diagnostic profile per stage/scenario has incomplete attribution; not causal wall-time evidence",
+    "Warm synthetic100-row fixture; physical mobile/cold/configuration/changed HTML/scaling unproven",
+    "Mobile emulation applies page CPU4x; worker throttle unverified",
+    "About2.28seconds settlement/208ms gaps remain; not stutter resolved",
+    "One initial notification bootstrap timeout; isolated/final passes do not prove a permanent fix",
+    "Whole resource/extension/storage/import/export/practical trial and15 conditions remain incomplete"
+  ]
+}

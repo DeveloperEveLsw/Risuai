@@ -1339,6 +1339,46 @@ interface RisuaiPluginAPI {
      * @returns Chat object or null if not found
      */
     getChatFromIndex(characterIndex: number, chatIndex: number): Promise<any|null>;
+
+    /**
+     * Parses Risu CBS macros using the currently selected character and active chat.
+     * Set processRegex to also run the editprocess script pipeline after CBS parsing.
+     * The editprocess pipeline can invoke plugin script handlers and action scripts,
+     * which may modify the active chat.
+     * @param text - Text containing CBS macros
+     * @param options - Parser context options
+     * @returns Parsed text
+     *
+     * @example
+     * ```typescript
+     * const text = await risuai.parseRisuChat('Hello, {{user}}', {
+     *   role: 'user',
+     *   processRegex: true,
+     * });
+     * ```
+     */
+    parseRisuChat(text: string, options?: {
+        /** Existing message index used by chat-aware CBS macros. Defaults to -1. */
+        messageIndex?: number;
+        /** Message role used by role-aware CBS macros. */
+        role?: string;
+        /**
+         * Run the editprocess script pipeline after CBS parsing.
+         * This can invoke plugin handlers and action scripts that modify the active chat.
+         */
+        processRegex?: boolean;
+        /** Enable chat variable writes from CBS macros. */
+        runVar?: boolean;
+        /** Remove unresolved variable macros. */
+        rmVar?: boolean;
+        /** Use tokenizer-accurate parsing behavior where supported. */
+        tokenizeAccurate?: boolean;
+        /** Additional CBS condition flags. */
+        cbsConditions?: {
+            firstmsg?: boolean;
+            chatRole?: string;
+        };
+    }): Promise<string>;
     
 
     /**
@@ -2025,20 +2065,15 @@ interface RisuaiPluginAPI {
     unwarpSafeArray<T>(safeArray: SafeClassArray<T>): Promise<T[]>;
 
     /**
-     * Searches the LLM translation cache for entries whose opaque key contains the given
-     * partial key. Legacy source-substring matching is preserved through local durable
-     * compatibility metadata, including across reload and versioned cache backup/restore.
-     * @param partialKey - A substring to match against cache keys or locally stored sources
+     * Searches the LLM translation cache for entries whose key contains the given partial key
+     * @param partialKey - A substring to match against cache keys
      * @returns Array of matching cache entries with key and value
      */
     searchTranslationCache(partialKey: string): Promise<{key: string, value: string}[]>;
 
     /**
-     * Gets a single entry from the LLM translation cache. Opaque keys returned
-     * by searchTranslationCache are exact handles. For API 3.0 compatibility,
-     * passing legacy raw source text returns the most recently written local
-     * semantic variant for that source.
-     * @param key - An exact opaque cache key or legacy raw source text
+     * Gets a single entry from the LLM translation cache by exact key
+     * @param key - The exact cache key to look up
      * @returns The cached translation or null if not found
      */
     getTranslationCache(key: string): Promise<string | null>;

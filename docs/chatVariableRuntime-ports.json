@@ -1,0 +1,41 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/parser/chatVar.svelte.ts",
+  "core": "src/ts/parser/chatVariableRuntime.ts",
+  "factory": "createChatVariableRuntime",
+  "functions": [
+    "getChatVar",
+    "setChatVar",
+    "getGLChatVar",
+    "setGLChatVar",
+    "getGlobalChatVar",
+    "setGlobalChatVar",
+    "isLocallyHandledGlobalChatVar",
+    "removeLocallyHandledGlobalChatVar"
+  ],
+  "ports": [
+    {
+      "name": "selectedCharID",
+      "specifier": "../stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "DBState",
+      "specifier": "../stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "parseKeyValue",
+      "specifier": "../util",
+      "original": "parseKeyValue"
+    },
+    {
+      "name": "getCurrentChat",
+      "specifier": "../storage/database.svelte",
+      "original": "getCurrentChat"
+    }
+  ],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/executionContext.ts",
+  "nativeVerifiedScope": "Native chat/global variable binding, default precedence and local/global separation; no UI synchronization yet"
+}

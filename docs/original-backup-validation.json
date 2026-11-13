@@ -1,0 +1,303 @@
+{
+  "verifiedAt": "2026-10-04T12:55:33.900905+00:00",
+  "scope": "Local public code and authored neutral synthetic fixtures; original-data export/backup/CLI restore milestone. Full operational-state fidelity and all15 remain active.",
+  "baseline": "aa0b5e2af558d1425a04f1baf3cd7db6148461fc",
+  "node": "v22.21.0",
+  "application": {
+    "path": "evidence/local-full-export-app-final-20261004.log",
+    "sha256": "17173918c0b32a61b2ddccf69ac0cc0a1f81964fc919f92766a381a17b6ca726",
+    "passed": 535,
+    "existingSkips": 3,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "backend": {
+    "path": "evidence/local-full-export-backend-complete-20261004.log",
+    "sha256": "ffab02797d2035634a8f30448ac7f7b2f5459f5b9b7a3bf2195d015f3d0f1a1f",
+    "passed": 395,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "browser": {
+    "path": "evidence/local-full-export-ui-complete-20261004.log",
+    "sha256": "9f6c4693e72287ebfd686898d68c38168e3691de0aeaf73a15231d90dbc3a214",
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0
+  },
+  "types": {
+    "path": "evidence/local-full-export-type-last-20261004.log",
+    "sha256": "ecfa1b5ef1b3c788fdc8426761dffa3f498d0fced082b3203c558549839230dc",
+    "errors": 0,
+    "warnings": 0,
+    "exitCode": 0
+  },
+  "builds": [
+    {
+      "path": "evidence/local-full-export-native-build-20261004.log",
+      "sha256": "efdba18e55e181d4b8bef036f98cc4904db01fdd99dbdf31098c7d2482921dd7",
+      "kind": "native",
+      "exitCode": 0
+    },
+    {
+      "path": "evidence/local-full-export-entity-build-20261004.log",
+      "sha256": "5121c8d99bb7f9c7a8279a60cf6bf3b9915874b57064c3b29fae043c13734ff3",
+      "kind": "entity",
+      "exitCode": 0
+    },
+    {
+      "path": "evidence/local-full-export-ordinary-build-20261004.log",
+      "sha256": "8edecb0a07e155f6b62e9371223a10c7e74df72afbd4060670fc09d26ddac46c",
+      "kind": "ordinary",
+      "exitCode": 0
+    }
+  ],
+  "audit": {
+    "declarations": 169,
+    "originalAlgorithmPreserved": 167,
+    "verifiedInvocationPolicies": 2
+  },
+  "uniqueFinalPassingCases": 934,
+  "originalUiObservation": {
+    "before": [
+      {
+        "id": "a",
+        "desc": "Synthetic unopened description a",
+        "chats": [
+          {
+            "id": "a1",
+            "count": 100
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "desc": "",
+        "chats": []
+      }
+    ],
+    "after": [
+      {
+        "id": "a",
+        "desc": "Synthetic unopened description a",
+        "chats": [
+          {
+            "id": "a1",
+            "count": 100
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "desc": "",
+        "chats": []
+      }
+    ],
+    "dataset": [
+      {
+        "name": "Synthetic a",
+        "description": "Synthetic unopened description a",
+        "count": 210
+      },
+      {
+        "name": "Synthetic b",
+        "description": "Synthetic unopened description b",
+        "count": 1
+      },
+      {
+        "name": "Synthetic b",
+        "description": "Synthetic unopened description b",
+        "count": 2
+      }
+    ],
+    "backup": [
+      {
+        "id": "a",
+        "unknown": {
+          "neutral": "a"
+        },
+        "chats": [
+          {
+            "id": "a1",
+            "count": 210,
+            "unknown": {
+              "retained": true
+            }
+          }
+        ]
+      },
+      {
+        "id": "b",
+        "unknown": {
+          "neutral": "b"
+        },
+        "chats": [
+          {
+            "id": "b1",
+            "count": 1,
+            "unknown": {
+              "retained": true
+            }
+          },
+          {
+            "id": "b2",
+            "count": 2,
+            "unknown": {
+              "retained": true
+            }
+          }
+        ]
+      }
+    ],
+    "entryNames": [
+      "78652091631e27d25a8fc7da8d5ec8e81d040b3084b0b0cefb1ea37efd7e7d64.png",
+      "faf90dde7fd7a168c57cb3a4724584c233c2b297754169d85a5d7b4165ef82fd.wav",
+      "database.risudat"
+    ],
+    "closed": true
+  },
+  "originalCliAndFailureObservations": {
+    "complete-backup-cli-inventory": {
+      "backup": "/tmp/risu-full-backup-ui-Imq2t0/actual-original-ui.bin",
+      "inventory": "/tmp/risu-full-backup-ui-Imq2t0/inventory.json",
+      "entries": 3,
+      "bytes": 8611,
+      "backupSha256": "fd68f5e16c29c2fae1a36a9b986854388a3412c49f2f90f4a4b349d2077dcec0",
+      "inventorySha256": "ef708413b0096c7275bee4087dd3b5226e2144d054d0fd077c0fabab1273a859",
+      "contentsDecoded": false
+    },
+    "complete-backup-cli-roundtrip": {
+      "restored": true,
+      "validated": true,
+      "backupSha256": "fd68f5e16c29c2fae1a36a9b986854388a3412c49f2f90f4a4b349d2077dcec0",
+      "databaseEntrySha256": "903e8ac98e4a715861925c5ce24972ab337cbc81be4971911591e22167776f0a",
+      "normalizedSourceSha256": "80dbfdee0556daf6d86d1f80e7c3d21b9f60ab2f822620fdf5127a46cf9c8720",
+      "normalizedDatabaseSha256": "80dbfdee0556daf6d86d1f80e7c3d21b9f60ab2f822620fdf5127a46cf9c8720",
+      "counts": {
+        "characters": 2,
+        "chats": 3,
+        "messages": 213,
+        "chat_variables": 0,
+        "chat_global_variables": 0,
+        "resources": 3,
+        "assets": 2,
+        "jobs": 0
+      },
+      "coldPayloads": 0,
+      "coldHydrated": 0,
+      "assetReferencesChecked": 4,
+      "missingAssetReferences": 0,
+      "missingStructuredAssetReferences": 0,
+      "preservedPreexistingInlineAssetReferences": 0,
+      "remapped": {
+        "character": 0,
+        "chat": 0,
+        "message": 0,
+        "resource": 0
+      },
+      "durationSeconds": 0.127,
+      "schema": 21,
+      "serverId": "00d4ab51-ddfe-432b-824c-2a2edb8899cf",
+      "coldStorageDisabledForEntityRuntime": true,
+      "privateContentsLogged": false
+    },
+    "complete-backup-corruption-rejected": {
+      "aborted": true,
+      "alert": {
+        "type": "error",
+        "msg": "Archive asset checksum mismatch: 78652091631e27d25a8fc7da8d5ec8e81d040b3084b0b0cefb1ea37efd7e7d64.png",
+        "submsg": ""
+      },
+      "containsDatabase": false
+    },
+    "original-partial-backup-observation": {
+      "names": [
+        "78652091631e27d25a8fc7da8d5ec8e81d040b3084b0b0cefb1ea37efd7e7d64.png",
+        "database.risudat"
+      ],
+      "counts": [
+        210,
+        1,
+        2
+      ]
+    },
+    "complete-backup-pending-cancel-missing": {
+      "pending": "Finish or resolve pending changes before exporting a server backup",
+      "cancellation": "none",
+      "missing": {
+        "initialized": false,
+        "alert": {
+          "type": "error",
+          "msg": "Backup references assets missing from server storage",
+          "submsg": ""
+        }
+      }
+    }
+  },
+  "completionRequirements": {
+    "sha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+    "unchanged": true,
+    "unchecked": 15
+  },
+  "testedFiles": {
+    "docs/archive-runtime.md": "84df72379ff605afb375f37e24fa444f0af22bb3315daab15b7dca2b509f7aa0",
+    "docs/engine-extraction-audit.json": "fa17f1e1fe455c67fe8f7df3857cb1d9b025cdb7d22c507b7a0623f557693faf",
+    "docs/original-backup-runtime.md": "66117d6f987f0ffdf48528240e7aa4c0e9d0f1fb17c89f44f3ca24042aaee180",
+    "docs/server-runtime-plan.md": "303f769aa8dbcd5b983f18899ea36f9460d1a50ca4cc90f70171b43f2169c6e0",
+    "server/browser/fullBackupUi.test.cjs": "16074b8fd84de4af1f7a23279d4afde4881c55c29f0cd66a1eb9b6b4a1aebde8",
+    "server/entity/archive.cjs": "1dedb7bc67248ebd39a28ee05b09057ac99a5255559c4b1a27c427d7e5db31e4",
+    "server/entity/archive.test.cjs": "cd24b068f20e43b57363f85c7d461c0693d4f2f257c649346f4cbc43e9fce3e3",
+    "server/runtime/archive.cjs": "3685d5e265bc8b6878e6e24a64309d60d1c586dc57f6c32fd079651659d5db92",
+    "server/runtime/archive.test.cjs": "875afa794228fc95289f533a189627ac6c994e6fdb2909c885c29710cbc101d0",
+    "server/runtime/archiveWorker.cjs": "e60643fa132cc2f5b2e72d7cb6a6a4073a9e2cb819e03e01ab01484d805207ad",
+    "server/runtime/inventoryBackup.cjs": "27b61e4c9786c196672c3ad2cd241867b236cf618a14223632090a6c7393fff4",
+    "server/runtime/inventoryBackup.test.cjs": "d33c3222585798bc647c7052458e986e0544625ebb3233fd64d57dd19ac3560a",
+    "server/runtime/restoreBackup.cjs": "2f1d309070c4c702b919164c49693af0b91b4715e3ff63aeb2d4b69d2b14d1a8",
+    "server/runtime/restoreBackup.test.cjs": "784e7384a0d6bbf7e18703e4a7e6506a02699deacb685848829846db1cba1272",
+    "server/runtime/service.cjs": "ac13cacd8b8a43ed5d51a0e6e590c34fe085a2c79ced9967fbf010f07d80ed3a",
+    "src/ts/drive/backuplocal.ts": "cf493f3eaad555dacccbdc5b1a39e1cd559eb9bffd045ffcf9ded8cc659fcd93",
+    "src/ts/drive/runtimeBackup.ts": "86818e4cab0f33d34e5d11ffee122b72e23fb60f358cf11a8bc14c417ea50b89",
+    "src/ts/runtime/browserRuntimeController.svelte.ts": "fed7d629c1a9f7eeac650eb9d1b8fc5186c6aace758291df52d1a0d37bd4f6fe",
+    "src/ts/runtime/browserRuntimeState.svelte.ts": "7367716d857ebf33caa74a934ce6f8da104162ca4d4ed35d33646258b0d63430",
+    "src/ts/runtime/originalArchive.test.ts": "18bdf915fc5d5adcf0f4b254704db54872e3737a11bd1dbcfbb38b5171cf0169",
+    "src/ts/runtime/originalArchive.ts": "d50a949fe604ab384c3b3606a1ac564fdb4123456e33b790a288c80cb1b926be",
+    "src/ts/storage/exportAsDataset.ts": "5f0c1624ce8274842b5544b11370ff940748d6d1d5012ea72eff551014b854b1"
+  },
+  "fingerprintExclusion": "This generated receipt excludes itself to avoid self-referential hashing. Source commit is recorded in the root receipt after commit.",
+  "failuresPreserved": [
+    {
+      "path": "evidence/local-full-export-baseline-20261004.log",
+      "kind": "real original partial DBState omission; pass0/fail1"
+    },
+    {
+      "path": "evidence/local-full-export-backend-initial-20261004.log",
+      "kind": "fixture supplied object where variable scalar required; pass8/fail3"
+    },
+    {
+      "path": "evidence/local-full-export-backend-second-20261004.log",
+      "kind": "fixture nested peer transactions; pass10/fail1"
+    },
+    {
+      "path": "evidence/local-full-export-ui-final-20261004.log",
+      "kind": "pending fixture waited only on published pending list; export correctly refused. Concurrent native rebuild temporarily cleared output and two existing cases failed import; pass1/fail3. Assertions/timeouts retained; rebuilt before final rerun."
+    }
+  ],
+  "broaderPreviousBrowserRun": {
+    "path": "evidence/local-post-capture-gap-all-browser-20261004.json",
+    "passed": 67,
+    "failed": 1,
+    "unchangedFailedCaseRerunPassed": 1,
+    "wholeBroadRunGreen": false,
+    "notRepeatedOrAddedToCurrentTotals": true
+  },
+  "productionAccesses": 0,
+  "productionChanges": 0,
+  "actualModelRequests": 0,
+  "privateContentReads": 0,
+  "remotePushes": 0,
+  "wholeGoalComplete": false,
+  "operationalServerBackupComplete": false,
+  "stutterResolved": false
+}

@@ -1,0 +1,45 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/memory/hypamemoryv2.ts",
+  "core": "src/ts/process/memory/embeddingV2Runtime.ts",
+  "factory": "createEmbeddingV2Runtime",
+  "functions": [],
+  "classes": ["HypaProcessorV2"],
+  "ports": [
+    {
+      "name": "localforage"
+    },
+    {
+      "name": "localModels"
+    },
+    {
+      "name": "isContextModel"
+    },
+    {
+      "name": "getContextProvider"
+    },
+    {
+      "name": "TaskRateLimiter"
+    },
+    {
+      "name": "runEmbedding"
+    },
+    {
+      "name": "globalFetch"
+    },
+    {
+      "name": "getDatabase"
+    },
+    {
+      "name": "appendLastPath"
+    },
+    {
+      "name": "isMobile"
+    },
+    {
+      "name": "navigator"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": true
+}

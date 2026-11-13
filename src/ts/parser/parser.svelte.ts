@@ -1,11 +1,20 @@
 import DOMPurify from 'dompurify';
 import markdownit from 'markdown-it'
 import { appVer, getCurrentCharacter, getDatabase, type Database, type character, type customscript, type groupChat, type triggerscript } from '../storage/database.svelte';
-import { DBState, selIdState } from '../stores.svelte';
+import { CurrentTriggerIdStore, DBState, selIdState } from '../stores.svelte';
 import { aiWatermarkingLawApplies, getFileSrc } from '../globalApi.svelte';
 import { isTauri, isNodeServer } from "src/ts/platform"
 import { getChatVar, setChatVar, getGlobalChatVar } from './chatVar.svelte';
 import { processScriptFull } from '../process/scripts';
+import { entityRuntimeEnabled } from '../runtime/browserRuntimeState.svelte';
+import { displayMetadata } from '../runtime/browserDisplayMetadata';
+import { captureDisplayScope, commitDisplayScope, createDisplayAdmission } from '../process/scriptings';
+import { createDisplayCbsScope } from '../runtime/displayCbsScope';
+import type { DisplayCapture } from '../runtime/displayEffects';
+import { yieldDisplayTurn } from '../runtime/displayScheduling';
+import { forkDisplayScope } from '../runtime/displayScopeCache.svelte';
+import { inheritDisplayReads } from '../runtime/displayReadDependencies';
+import type { DisplayRenderCache, DisplayRenderTicket } from '../runtime/displayRenderCache';
 import { get } from 'svelte/store';
 import css, { type CssAtRuleAST } from '@adobe/css-tools'
 import { selectedCharID } from '../stores.svelte';
@@ -18,9 +27,12 @@ import 'highlight.js/styles/atom-one-dark.min.css'
 import { language } from 'src/lang';
 import katex from 'katex'
 import { getModelInfo } from '../model/modellist';
-import { registerCBS, type matcherArg, type RegisterCallback } from '../cbs';
+import { createCbsRuntime, type CbsConditions } from './cbsRuntime';
+export type { CbsConditions } from './cbsRuntime';
+import { risuEscape, risuUnescape } from './cbsText';
+export { risuEscape, risuUnescape } from './cbsText';
+import { formatThoughtTools } from './thoughtToolFormatting';
 import cssSelectorParser from 'postcss-selector-parser'
-import { applyAssetMimeTypeHint, inferAssetMimeType } from '../media/assetMime';
 
 const markdownItOptions = {
     html: true,
@@ -44,6 +56,37 @@ const mdHighlight = markdownit({
 md.disable(['code'])
 mdHighlight.disable(['code'])
 
+export interface MarkdownPresentation {
+  capture?: DisplayCapture;
+  renderCache?: DisplayRenderCache;
+  current?: () => boolean;
+  finalize?: (
+    html: string,
+    current?: () => boolean,
+  ) => Promise<string | undefined>;
+}
+type MarkdownContext = {
+  settings: Database;
+  parseCss: (data: string) => string;
+  check: () => void;
+};
+let sanitizerSettings: Database | undefined;
+function withSanitizerSettings<T>(
+  settings: Database | undefined,
+  action: () => T,
+): T {
+  const previous = sanitizerSettings;
+  sanitizerSettings = settings;
+  try {
+    return action();
+  } finally {
+    sanitizerSettings = previous;
+  }
+}
+function currentSanitizerSettings() {
+  return sanitizerSettings ?? DBState.db;
+}
+
 DOMPurify.addHook("uponSanitizeElement", (node: HTMLElement, data) => {
     if (data.tagName === "iframe") {
        const src = node.getAttribute("src") || "";
@@ -53,7 +96,7 @@ DOMPurify.addHook("uponSanitizeElement", (node: HTMLElement, data) => {
     }
     if(data.tagName === 'img'){
         // Hide external images when hideAllImages is enabled
-        if(DBState.db?.hideAllImages){
+        if(currentSanitizerSettings()?.hideAllImages){
             const src = node.getAttribute("src") || "";
             // Replace with placeholder if it's an external/loaded image
             if(src && !src.startsWith('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP')){
@@ -78,7 +121,7 @@ DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
     switch(data.attrName){
         case 'style':{
             // Remove background-image URLs when hideAllImages is enabled
-            if(DBState.db?.hideAllImages && data.attrValue){
+            if(currentSanitizerSettings()?.hideAllImages && data.attrValue){
                 // Remove background-image property from inline styles
                 data.attrValue = data.attrValue.replace(/background(-image)?:\s*url\([^)]*\);?/gi, '')
                 // Also remove background property if it contains url()
@@ -113,300 +156,299 @@ DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
 
 DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
     if (['IMG', 'SOURCE', 'VIDEO', 'AUDIO', 'STYLE'].includes(node.nodeName) && data.attrName === 'src') {
-        if (data.attrValue.startsWith('blob:')) {
+        if (data.attrValue.startsWith('blob:') || data.attrValue.startsWith('asset:')) {
             data.forceKeepAttr = true;
         }
     }
 });
 
 
-const replacements = [
-    '{', //0xE9B8
-    '}', //0xE9B9
-    '(', //0xE9BA
-    ')', //0xE9BB
-    '&lt;', //0xE9BC
-    '&gt;', //0xE9BD
-    ':', //0xE9BE
-    ';', //0xE9BF
-]
+function renderMarkdown(
+  md: markdownit,
+  data: string,
+  settings = DBState.db,
+  reusable?: { value: boolean },
+) {
+  let quotes = ["“", "”", "‘", "’"];
+  if (settings?.customQuotes) {
+    quotes = settings.customQuotesData ?? quotes;
+  }
+  data = data.replace(/\$\$(.*?)\$\$/gs, (match: string, content: string) => {
+    try {
+      content = content
+        .replace(/\uE9b8/gu, "{")
+        .replace(/\uE9b9/gu, "}")
+        .replace(/\uE9ba/gu, "(")
+        .replace(/\uE9bb/gu, ")");
+      const rendered = katex.renderToString(content, {
+        displayMode: false,
+        throwOnError: true,
+        output: "mathml",
+      });
+      return rendered;
+    } catch (error) {
+      if (reusable) reusable.value = false;
+      console.error("KaTeX render error:", error);
+      return match;
+    }
+  });
+  let text = risuUnescape(
+    md.render(data.replace(/“|”/g, '"').replace(/‘|’/g, "'")),
+  );
 
-export function risuUnescape(text:string){
-    return text.replace(/[\uE9b8-\uE9bf]/g, (f) => {
-        const index = f.charCodeAt(0) - 0xE9B8
-        return replacements[index]
-    })
+  if (settings?.unformatQuotes) {
+    text = text.replace(/\uE9b0/gu, quotes[0]).replace(/\uE9b1/gu, quotes[1]);
+    text = text.replace(/\uE9b2/gu, quotes[2]).replace(/\uE9b3/gu, quotes[3]);
+  } else if (settings?.blockquoteStyling) {
+    text = text
+      .replace(/\uE9b0(.+?)\uE9b1/gmu, (full, content) => {
+        content = content
+          .replace(/\uE9b2/gu, '<mark risu-mark="quote1">' + quotes[2])
+          .replace(/\uE9b3/gu, quotes[3] + "</mark>");
+        return `<br><br><mark risu-mark="blockquote2">${quotes[0]}${content}${quotes[1]}</mark><br><br>`;
+      })
+      .replace(/\uE9b2(.+?)\uE9b3/gmu, (full, content) => {
+        return `<br><br><mark risu-mark="blockquote1">${quotes[2]}${content}${quotes[3]}</mark><br><br>`;
+      });
+
+    //clean up any unmatched quote marks
+    text = text.replace(/\uE9b0/gu, quotes[0]).replace(/\uE9b1/gu, quotes[1]);
+    text = text.replace(/\uE9b2/gu, quotes[2]).replace(/\uE9b3/gu, quotes[3]);
+  } else {
+    text = text
+      .replace(/\uE9b0/gu, '<mark risu-mark="quote2">' + quotes[0])
+      .replace(/\uE9b1/gu, quotes[1] + "</mark>");
+    text = text
+      .replace(/\uE9b2/gu, '<mark risu-mark="quote1">' + quotes[2])
+      .replace(/\uE9b3/gu, quotes[3] + "</mark>");
+  }
+
+  return text;
 }
 
-export function risuEscape(text:string){
-    return text.replace(/[{}()]/g, (f) => {
-        switch(f){
-            case '{': return '\uE9B8'
-            case '}': return '\uE9B9'
-            case '(': return '\uE9BA'
-            case ')': return '\uE9BB'
-            default: return f
+async function renderHighlightableMarkdown(
+  data: string,
+  settings = DBState.db,
+  reusable?: { value: boolean },
+) {
+  let rendered = renderMarkdown(mdHighlight, data, settings, reusable);
+  const highlightPlaceholders = rendered.match(
+    /<pre-hljs-placeholder lang="(.+?)">(.+?)<\/pre-hljs-placeholder>/gms,
+  );
+  if (!highlightPlaceholders) {
+    return rendered;
+  }
+
+  for (const placeholder of highlightPlaceholders) {
+    try {
+      let lang = placeholder.match(/lang="(.+?)"/)?.[1];
+      const code = placeholder.match(
+        /<pre-hljs-placeholder lang=".+?">(.+?)<\/pre-hljs-placeholder>/ms,
+      )?.[1];
+      if (!lang || !code) {
+        continue;
+      }
+      //import language if not already loaded
+      //we do not refactor this to a function because we want to keep vite to only import the languages that are needed
+      let languageModule: typeof import("highlight.js/lib/languages/*") | null =
+        null;
+      let fileExt = "";
+
+      switch (lang) {
+        case "bash": {
+          fileExt = "sh";
+          lang = "bash";
+          if (!hljs.getLanguage("bash")) {
+            languageModule = await import("highlight.js/lib/languages/bash");
+          }
+          break;
         }
-    })
-}
-
-function renderMarkdown(md:markdownit, data:string){
-    let quotes = ['“', '”', '‘', '’']
-    if(DBState.db?.customQuotes){
-        quotes = DBState.db.customQuotesData ?? quotes
-    }
-    data = data.replace(/\$\$(.*?)\$\$/gs, (
-        match:string,
-        content:string,
-    ) => {
-
-        try {
-            content = content
-                .replace(/\uE9b8/gu, '{')
-                .replace(/\uE9b9/gu, '}')
-                .replace(/\uE9ba/gu, '(')
-                .replace(/\uE9bb/gu, ')')
-            const rendered = katex.renderToString(content, {
-                displayMode: false,
-                throwOnError: true,
-                output: 'mathml'
-            })
-            return rendered
-        } catch (error) {
-            console.error('KaTeX render error:', error)
-            return match
+        case "c":
+        case "cpp": {
+          fileExt = lang;
+          lang = "cpp";
+          if (!hljs.getLanguage("cpp")) {
+            languageModule = await import("highlight.js/lib/languages/cpp");
+          }
+          break;
         }
-    })
-    let text = risuUnescape(md.render(data.replace(/“|”/g, '"').replace(/‘|’/g, "'")))
-
-    if(DBState.db?.unformatQuotes){
-        text = text.replace(/\uE9b0/gu, quotes[0]).replace(/\uE9b1/gu, quotes[1])
-        text = text.replace(/\uE9b2/gu, quotes[2]).replace(/\uE9b3/gu, quotes[3])
-    }
-    else if(DBState.db?.blockquoteStyling){
-        text = text.replace(/\uE9b0(.+?)\uE9b1/gum, (full, content) => {
-            content = content.replace(/\uE9b2/gu, '<mark risu-mark="quote1">' + quotes[2]).replace(/\uE9b3/gu, quotes[3] + '</mark>')
-            return `<br><br><mark risu-mark="blockquote2">${quotes[0]}${content}${quotes[1]}</mark><br><br>`
-        }).replace(/\uE9b2(.+?)\uE9b3/gum, (full, content) => {
-            return `<br><br><mark risu-mark="blockquote1">${quotes[2]}${content}${quotes[3]}</mark><br><br>`
-        })
-
-        //clean up any unmatched quote marks
-        text = text.replace(/\uE9b0/gu,  quotes[0]).replace(/\uE9b1/gu, quotes[1])
-        text = text.replace(/\uE9b2/gu, quotes[2]).replace(/\uE9b3/gu, quotes[3])
-        
-    }
-    else{
-        text = text.replace(/\uE9b0/gu, '<mark risu-mark="quote2">' + quotes[0]).replace(/\uE9b1/gu, quotes[1] + '</mark>')
-        text = text.replace(/\uE9b2/gu, '<mark risu-mark="quote1">' + quotes[2]).replace(/\uE9b3/gu, quotes[3] + '</mark>')
-    }
-
-    return text
-}
-
-async function renderHighlightableMarkdown(data:string) {
-    let rendered = renderMarkdown(mdHighlight, data)
-    const highlightPlaceholders = rendered.match(/<pre-hljs-placeholder lang="(.+?)">(.+?)<\/pre-hljs-placeholder>/gms)
-    if (!highlightPlaceholders){
-        return rendered
-    }
-
-    for (const placeholder of highlightPlaceholders){
-        try {
-            let lang = placeholder.match(/lang="(.+?)"/)?.[1]
-            const code = placeholder.match(/<pre-hljs-placeholder lang=".+?">(.+?)<\/pre-hljs-placeholder>/ms)?.[1]
-            if (!lang || !code){
-                continue
-            }
-            //import language if not already loaded
-            //we do not refactor this to a function because we want to keep vite to only import the languages that are needed
-            let languageModule: typeof import('highlight.js/lib/languages/*')|null = null
-            let fileExt = ''
-
-            switch(lang){
-                case 'bash':{
-                    fileExt = 'sh'
-                    lang = 'bash'
-                    if(!hljs.getLanguage('bash')){
-                        languageModule = await import('highlight.js/lib/languages/bash')
-                    }
-                    break
-                }
-                case 'c':
-                case 'cpp':{
-                    fileExt = lang
-                    lang = 'cpp'
-                    if(!hljs.getLanguage('cpp')){
-                        languageModule = await import('highlight.js/lib/languages/cpp')
-                    }
-                    break
-                }
-                case 'cs':
-                case 'csharp':{
-                    fileExt = 'cs'
-                    lang = 'csharp'
-                    if(!hljs.getLanguage('csharp')){
-                        languageModule = await import('highlight.js/lib/languages/csharp')
-                    }
-                    break
-                }
-                case 'css':{
-                    fileExt = 'css'
-                    lang = 'css'
-                    if(!hljs.getLanguage('css')){
-                        languageModule = await import('highlight.js/lib/languages/css')
-                    }
-                    break
-                }
-                case 'dart':{
-                    fileExt = 'dart'
-                    lang = 'dart'
-                    if(!hljs.getLanguage('dart')){
-                        languageModule = await import('highlight.js/lib/languages/dart')
-                    }
-                    break
-                }
-                case 'html':
-                case 'svg':
-                case 'xml':{
-                    fileExt = lang
-                    lang = 'xml'
-                    if(!hljs.getLanguage('xml')){
-                        languageModule = await import('highlight.js/lib/languages/xml')
-                    }
-                    break
-                }
-                case 'java':{
-                    fileExt = 'java'
-                    lang = 'java'
-                    if(!hljs.getLanguage('java')){
-                        languageModule = await import('highlight.js/lib/languages/java')
-                    }
-                    break
-                }
-                case 'js':
-                case 'jsx':
-                case 'javascript':{
-                    fileExt = 'js'
-                    lang = 'javascript'
-                    if(!hljs.getLanguage('javascript')){
-                        languageModule = await import('highlight.js/lib/languages/javascript')
-                    }
-                    break
-                }
-                case 'json':{
-                    fileExt = 'json'
-                    lang = 'json'
-                    if(!hljs.getLanguage('json')){
-                        languageModule = await import('highlight.js/lib/languages/json')
-                    }
-                    break
-                }
-                case 'lua':{
-                    fileExt = 'lua'
-                    lang = 'lua'
-                    if(!hljs.getLanguage('lua')){
-                        languageModule = await import('highlight.js/lib/languages/lua')
-                    }
-                    break
-                }
-                case 'markdown':
-                case 'md':{
-                    fileExt = 'md'
-                    lang = 'markdown'
-                    if(!hljs.getLanguage('markdown')){
-                        languageModule = await import('highlight.js/lib/languages/markdown')
-                    }
-                    break
-                }
-                case 'py':
-                case 'python':{
-                    fileExt = 'py'
-                    lang = 'python'
-                    if(!hljs.getLanguage('python')){
-                        languageModule = await import('highlight.js/lib/languages/python')
-                    }
-                    break
-                }
-                case 'rust':{
-                    fileExt = 'rs'
-                    lang = 'rust'
-                    if(!hljs.getLanguage('rust')){
-                        languageModule = await import('highlight.js/lib/languages/rust')
-                    }
-                    break
-                }
-                case 'shell':{
-                    fileExt = 'sh'
-                    lang = 'shell'
-                    if(!hljs.getLanguage('shell')){
-                        languageModule = await import('highlight.js/lib/languages/shell')
-                    }
-                    break
-                }
-                case 'ts':
-                case 'tsx':
-                case 'typescript':{
-                    fileExt = 'ts'
-                    lang = 'typescript'
-                    if(!hljs.getLanguage('typescript')){
-                        languageModule = await import('highlight.js/lib/languages/typescript')
-                    }
-                    break
-                }
-                case 'txt':
-                case 'vtt':{
-                    fileExt = lang
-                    lang = 'plaintext'
-                    if(!hljs.getLanguage('plaintext')){
-                        languageModule = await import('highlight.js/lib/languages/plaintext')
-                    }
-                    break
-                }
-                case 'yaml':{
-                    fileExt = 'yml'
-                    lang = 'yaml'
-                    if(!hljs.getLanguage('yaml')){
-                        languageModule = await import('highlight.js/lib/languages/yaml')
-                    }
-                    break
-                }
-                case 'risuerror':{
-                    lang = 'error'
-                    fileExt = 'error'
-                    break
-                }
-                default:{
-                    lang = 'none'
-                    fileExt = 'none'
-                }
-            }
-            if(languageModule){
-                hljs.registerLanguage(lang, languageModule.default)
-            }
-            if(lang === 'none'){
-                rendered = rendered.replace(placeholder, `<pre><code>${md.utils.escapeHtml(code)}</code></pre>`)
-            }
-            else if(lang === 'error'){
-                rendered = rendered.replace(placeholder, `<div class="risu-error"><h1>${language.error}</h1>${md.utils.escapeHtml(code)}</div>`)
-            }
-            else{
-                const highlighted = hljs.highlight(code, {
-                    language: lang,
-                    ignoreIllegals: true
-                }).value
-                rendered = rendered.replace(placeholder, `<pre class="hljs" x-hl-lang="${fileExt}"><code>${highlighted}</code></pre>`)   
-            }
-        } catch (error) {
-            
+        case "cs":
+        case "csharp": {
+          fileExt = "cs";
+          lang = "csharp";
+          if (!hljs.getLanguage("csharp")) {
+            languageModule = await import("highlight.js/lib/languages/csharp");
+          }
+          break;
         }
+        case "css": {
+          fileExt = "css";
+          lang = "css";
+          if (!hljs.getLanguage("css")) {
+            languageModule = await import("highlight.js/lib/languages/css");
+          }
+          break;
+        }
+        case "dart": {
+          fileExt = "dart";
+          lang = "dart";
+          if (!hljs.getLanguage("dart")) {
+            languageModule = await import("highlight.js/lib/languages/dart");
+          }
+          break;
+        }
+        case "html":
+        case "svg":
+        case "xml": {
+          fileExt = lang;
+          lang = "xml";
+          if (!hljs.getLanguage("xml")) {
+            languageModule = await import("highlight.js/lib/languages/xml");
+          }
+          break;
+        }
+        case "java": {
+          fileExt = "java";
+          lang = "java";
+          if (!hljs.getLanguage("java")) {
+            languageModule = await import("highlight.js/lib/languages/java");
+          }
+          break;
+        }
+        case "js":
+        case "jsx":
+        case "javascript": {
+          fileExt = "js";
+          lang = "javascript";
+          if (!hljs.getLanguage("javascript")) {
+            languageModule =
+              await import("highlight.js/lib/languages/javascript");
+          }
+          break;
+        }
+        case "json": {
+          fileExt = "json";
+          lang = "json";
+          if (!hljs.getLanguage("json")) {
+            languageModule = await import("highlight.js/lib/languages/json");
+          }
+          break;
+        }
+        case "lua": {
+          fileExt = "lua";
+          lang = "lua";
+          if (!hljs.getLanguage("lua")) {
+            languageModule = await import("highlight.js/lib/languages/lua");
+          }
+          break;
+        }
+        case "markdown":
+        case "md": {
+          fileExt = "md";
+          lang = "markdown";
+          if (!hljs.getLanguage("markdown")) {
+            languageModule =
+              await import("highlight.js/lib/languages/markdown");
+          }
+          break;
+        }
+        case "py":
+        case "python": {
+          fileExt = "py";
+          lang = "python";
+          if (!hljs.getLanguage("python")) {
+            languageModule = await import("highlight.js/lib/languages/python");
+          }
+          break;
+        }
+        case "rust": {
+          fileExt = "rs";
+          lang = "rust";
+          if (!hljs.getLanguage("rust")) {
+            languageModule = await import("highlight.js/lib/languages/rust");
+          }
+          break;
+        }
+        case "shell": {
+          fileExt = "sh";
+          lang = "shell";
+          if (!hljs.getLanguage("shell")) {
+            languageModule = await import("highlight.js/lib/languages/shell");
+          }
+          break;
+        }
+        case "ts":
+        case "tsx":
+        case "typescript": {
+          fileExt = "ts";
+          lang = "typescript";
+          if (!hljs.getLanguage("typescript")) {
+            languageModule =
+              await import("highlight.js/lib/languages/typescript");
+          }
+          break;
+        }
+        case "txt":
+        case "vtt": {
+          fileExt = lang;
+          lang = "plaintext";
+          if (!hljs.getLanguage("plaintext")) {
+            languageModule =
+              await import("highlight.js/lib/languages/plaintext");
+          }
+          break;
+        }
+        case "yaml": {
+          fileExt = "yml";
+          lang = "yaml";
+          if (!hljs.getLanguage("yaml")) {
+            languageModule = await import("highlight.js/lib/languages/yaml");
+          }
+          break;
+        }
+        case "risuerror": {
+          lang = "error";
+          fileExt = "error";
+          break;
+        }
+        default: {
+          lang = "none";
+          fileExt = "none";
+        }
+      }
+      if (languageModule) {
+        hljs.registerLanguage(lang, languageModule.default);
+      }
+      if (lang === "none") {
+        rendered = rendered.replace(
+          placeholder,
+          `<pre><code>${md.utils.escapeHtml(code)}</code></pre>`,
+        );
+      } else if (lang === "error") {
+        rendered = rendered.replace(
+          placeholder,
+          `<div class="risu-error"><h1>${language.error}</h1>${md.utils.escapeHtml(code)}</div>`,
+        );
+      } else {
+        const highlighted = hljs.highlight(code, {
+          language: lang,
+          ignoreIllegals: true,
+        }).value;
+        rendered = rendered.replace(
+          placeholder,
+          `<pre class="hljs" x-hl-lang="${fileExt}"><code>${highlighted}</code></pre>`,
+        );
+      }
+    } catch (error) {
+      if (reusable) reusable.value = false;
     }
+  }
 
-    return rendered
-
+  return rendered;
 }
 
-export const assetRegex = /{{(raw|path|img|image|video|audio|bgm|bg|emotion|asset|video-img|source)::(.+?)}}/gms
+export { assetRegex } from "./assetSyntax";
+import { assetRegex } from "./assetSyntax";
 
 function getAssetSrc(assetArr: string[][], assetPaths: AssetPaths) {
     for (const asset of assetArr) {
@@ -448,16 +490,6 @@ type AssetPaths = {[key:string]:{
 
 let assetsCache: AssetPaths | null = null
 let emoAssetsCache: AssetPaths | null = null
-const emptyAssetList: string[][] = []
-
-type AssetCacheOwner = {
-    characterId: string
-    characterAssets: string[][]
-    emotionAssets: string[][]
-    modules: ReturnType<typeof getModules>
-}
-
-let assetsCacheOwner: AssetCacheOwner | null = null
 
 export function resetAssetsCache(charAssets: string[][], emoAssets: string[][], moduleAssets: string[][]) {
     const assetPaths: AssetPaths = {}
@@ -469,40 +501,6 @@ export function resetAssetsCache(charAssets: string[][], emoAssets: string[][], 
 
     assetsCache = assetPaths
     emoAssetsCache = charEmoPaths
-    // Callers which do not provide the current render context intentionally
-    // invalidate ownership. The next parse rebinds the cache to its character
-    // and active module set instead of trusting potentially stale global data.
-    assetsCacheOwner = null
-}
-
-function resetAssetsCacheForCharacter(
-    char: simpleCharacterArgument | character,
-    modules: ReturnType<typeof getModules>,
-) {
-    const characterAssets = char.additionalAssets ?? emptyAssetList
-    const emotionAssets = char.emotionImages ?? emptyAssetList
-    resetAssetsCache(characterAssets, emotionAssets, getModuleAssets())
-    assetsCacheOwner = {
-        characterId: char.chaId,
-        characterAssets,
-        emotionAssets,
-        modules,
-    }
-}
-
-function isAssetsCacheCurrent(
-    char: simpleCharacterArgument | character,
-    modules: ReturnType<typeof getModules>,
-) {
-    return Boolean(
-        assetsCache
-        && emoAssetsCache
-        && assetsCacheOwner
-        && assetsCacheOwner.characterId === char.chaId
-        && assetsCacheOwner.characterAssets === (char.additionalAssets ?? emptyAssetList)
-        && assetsCacheOwner.emotionAssets === (char.emotionImages ?? emptyAssetList)
-        && assetsCacheOwner.modules === modules
-    )
 }
 
 $effect.root(() => {
@@ -513,7 +511,11 @@ $effect.root(() => {
             return
         }
 
-        resetAssetsCacheForCharacter(char, getModules())
+        const charAssets = char.additionalAssets ?? []
+        const emoAssets = char.emotionImages ?? []
+        const moduleAssets = getModuleAssets()
+
+        resetAssetsCache(charAssets, emoAssets, moduleAssets)
     })
 })
 
@@ -521,15 +523,38 @@ const imageCBS = ['img', 'image', 'emotion', 'asset', 'bg', 'raw', 'path']
 const videoExtensions = ['mp4', 'webm', 'avi', 'm4p', 'm4v']
 
 async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|character, mode:'normal'|'back', arg:{ch:number}){
-    const assetWidthString = (DBState.db.assetWidth && DBState.db.assetWidth !== -1 || DBState.db.assetWidth === 0) ? `max-width:${DBState.db.assetWidth}rem;` : ''
+    const capture = entityRuntimeEnabled
+      ? displayMetadata.get(char)?.capture
+      : undefined;
+    const settings = capture?.database ?? DBState.db;
+    const assetWidthString =
+      (settings.assetWidth && settings.assetWidth !== -1) ||
+      settings.assetWidth === 0
+        ? `max-width:${settings.assetWidth}rem;`
+        : "";
 
-    const modules = getModules()
-    if (!isAssetsCacheCurrent(char, modules)) {
-        resetAssetsCacheForCharacter(char, modules)
+    let assetPaths: AssetPaths;
+    let emoPaths: AssetPaths;
+    if (capture && capture.character.type === "character") {
+      assetPaths = {};
+      emoPaths = {};
+      getAssetSrc(capture.character.additionalAssets ?? [], assetPaths);
+      getAssetSrc(
+        capture.cbsModules?.flatMap((module) => module.assets ?? []) ?? [],
+        assetPaths,
+      );
+      getEmoSrc(capture.character.emotionImages ?? [], emoPaths);
+    } else {
+      if (char.type === "character" && (!assetsCache || !emoAssetsCache)) {
+        resetAssetsCache(
+          char.additionalAssets ?? [],
+          char.emotionImages,
+          getModuleAssets(),
+        );
+      }
+      assetPaths = assetsCache ?? {};
+      emoPaths = emoAssetsCache ?? {};
     }
-
-    const assetPaths = assetsCache ?? {}
-    const emoPaths = emoAssetsCache ?? {}
 
     let needsSourceAccess = false
     let cx: number|null = null
@@ -539,7 +564,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
 
         // Skip image-related assets when hideAllImages is enabled
         // raw and path are also included as they're used in CSS background-image
-        if(DBState.db.hideAllImages && imageCBS.includes(type)){
+        if(settings.hideAllImages && imageCBS.includes(type)){
             return ''  // Hide the image asset
         }
 
@@ -567,12 +592,12 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
         let match = assetPaths?.[name]
 
         if(!match){
-            if(DBState.db.legacyMediaFindings){
+            if(settings.legacyMediaFindings){
                 return ''
             }
 
             if(assetPaths){
-                match = getClosestMatch(char, name, assetPaths)
+                match = getClosestMatch(capture?.character.type === 'character' ? capture.character : char, name, assetPaths, settings.assetMaxDifference)
             }
 
             if(!match){
@@ -591,17 +616,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
             pSrc = match.srcPaths[selIndex]
         }
 
-        // Legacy .risum imports stored every payload under a .png key. The
-        // tuple's extension remains authoritative, including for raw CSS/font
-        // URLs which cannot be recovered reliably through byte sniffing.
-        const p = applyAssetMimeTypeHint(
-            await getFileSrcCached(pSrc),
-            match.ext ?? '',
-        )
-        const sourceMimeType = (fallback: string) => inferAssetMimeType(
-            match.ext ?? '',
-            inferAssetMimeType(pSrc, fallback),
-        )
+        const p = await getFileSrcCached(pSrc)
         switch(type){
             case 'raw':
             case 'path':
@@ -611,11 +626,11 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
             case 'image':
                 return `<div class="risu-inlay-image"><img src="${p}" alt="${p}" style="${assetWidthString}"/></div>\n`
             case 'video':
-                return `<video controls autoplay loop><source src="${p}" type="${sourceMimeType('video/mp4')}"></video>\n`
+                return `<video controls autoplay loop><source src="${p}" type="video/mp4"></video>\n`
             case 'video-img':
-                return `<video autoplay muted loop><source src="${p}" type="${sourceMimeType('video/mp4')}"></video>\n`
+                return `<video autoplay muted loop><source src="${p}" type="video/mp4"></video>\n`
             case 'audio':
-                return `<audio controls autoplay loop><source src="${p}" type="${sourceMimeType('audio/mpeg')}"></audio>\n`
+                return `<audio controls autoplay loop><source src="${p}" type="audio/mpeg"></audio>\n`
             case 'bg':
                 if(mode === 'back'){
                     return `<div style="width:100%;height:100%;background: linear-gradient(rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.8)),url(${p}); background-size: cover;"></div>`
@@ -623,7 +638,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
                 break
             case 'asset':{
                 if(match.ext && videoExtensions.includes(match.ext)){
-                    return `<video autoplay muted loop><source src="${p}" type="${sourceMimeType('video/mp4')}"></video>\n`
+                    return `<video autoplay muted loop><source src="${p}" type="video/mp4"></video>\n`
                 }
                 return `<img src="${p}" alt="${p}" style="${assetWidthString} "/>\n`
             }
@@ -634,21 +649,30 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
     })
 
     if(needsSourceAccess){
-        const chara = getCurrentCharacter()
-        if(chara.image){}
-        data = data.replace(/\uE9b4CHAR\uE9b4/g,
-            chara.image ? (await getFileSrc(chara.image)) : ''
-        )
+        const chara = capture?.character ?? getCurrentCharacter();
+        const userIcon = capture
+          ? createDisplayCbsScope(
+              capture,
+              getBrowserCbsHost(),
+            ).util.getUserIcon()
+          : getUserIcon();
+        if (chara.image) {
+        }
+        data = data.replace(
+          /\uE9b4CHAR\uE9b4/g,
+          chara.image ? await getFileSrc(chara.image) : "",
+        );
 
-        data = data.replace(/\uE9b4USER\uE9b4/g,
-            getUserIcon() ? (await getFileSrc(getUserIcon())) : ''
-        )
+        data = data.replace(
+          /\uE9b4USER\uE9b4/g,
+          userIcon ? await getFileSrc(userIcon) : "",
+        );
     }
     
     return data
 }
 
-function getClosestMatch(char: simpleCharacterArgument|character, name:string, assetPaths:AssetPaths){   
+function getClosestMatch(char: simpleCharacterArgument|character, name:string, assetPaths:AssetPaths, maxDifference=DBState.db.assetMaxDifference){
     if(!char.additionalAssets) return null
 
     let closest = ''
@@ -668,7 +692,7 @@ function getClosestMatch(char: simpleCharacterArgument|character, name:string, a
         }
     }
     
-    if(closestDist > DBState.db.assetMaxDifference){
+    if(closestDist > maxDifference){
         return null
     }
 
@@ -715,7 +739,7 @@ function trimmer(str:string){
 
 const blobUrlCache = new Map<string, string>()
 
-async function parseInlayAssets(data:string){
+async function parseInlayAssets(data:string, settings=DBState.db){
     const inlayMatch = data.match(/{{(inlay|inlayed|inlayeddata)::(.+?)}}/g)
     if(inlayMatch){
         for(const inlay of inlayMatch){
@@ -733,17 +757,17 @@ async function parseInlayAssets(data:string){
             switch(asset?.type){
                 case 'image':
                     // Hide inlay images when hideAllImages is enabled
-                    if(DBState.db.hideAllImages){
+                    if(settings.hideAllImages){
                         data = data.replace(inlay, '')
                         break
                     }
                     data = data.replace(inlay, `${prefix}<img src="${url}"/>${postfix}`)
                     break
                 case 'video':
-                    data = data.replace(inlay, `${prefix}<video controls><source src="${url}" type="${inferAssetMimeType(asset.ext, 'video/mp4')}"></video>${postfix}`)
+                    data = data.replace(inlay, `${prefix}<video controls><source src="${url}" type="video/mp4"></video>${postfix}`)
                     break
                 case 'audio':
-                    data = data.replace(inlay, `${prefix}<audio controls><source src="${url}" type="${inferAssetMimeType(asset.ext, 'audio/mpeg')}"></audio>${postfix}`)
+                    data = data.replace(inlay, `${prefix}<audio controls><source src="${url}" type="audio/mpeg"></audio>${postfix}`)
                     break
             }
             
@@ -757,7 +781,6 @@ export interface simpleCharacterArgument{
     additionalAssets?: [string, string, string][]
     customscript: customscript[]
     chaId: string,
-    translatorNote?: string
     virtualscript?: string
     emotionImages?: [string, string][]
     triggerscript?: triggerscript[]
@@ -786,216 +809,272 @@ function parseThoughtsAndTools(data:string){
     })
 }
 
-type ParseMarkdownPolicy = {
-    runDisplayExtensions: boolean
-    resolveStyleTemplates: boolean
+// Only the immutable formatting stage is reusable. Script execution, asset
+// resolution, captures, CSS CBS and effect admission keep their own lifetimes.
+function displayRenderKey(settings: Database) {
+  if (settings.plugins?.length) return undefined;
+  const quotes = settings.customQuotes
+    ? (settings.customQuotesData ?? ["“", "”", "‘", "’"])
+    : ["“", "”", "‘", "’"];
+  if (
+    !Array.isArray(quotes) ||
+    quotes.length !== 4 ||
+    quotes.some((value) => typeof value !== "string")
+  )
+    return undefined;
+  return JSON.stringify([
+    quotes,
+    Boolean(settings.unformatQuotes),
+    Boolean(settings.blockquoteStyling),
+    language.error,
+  ]);
 }
 
-const canonicalMarkdownPolicy: ParseMarkdownPolicy = {
-    runDisplayExtensions: true,
-    resolveStyleTemplates: true,
-}
-
-const readOnlyPresentationMarkdownPolicy: ParseMarkdownPolicy = {
-    runDisplayExtensions: false,
-    resolveStyleTemplates: false,
-}
-
-export interface PreparedMarkdownDisplay {
-    data: string
-    resolveStyleTemplates: boolean
-}
-
-async function prepareMarkdownWithPolicy(
-    data:string,
-    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
-    chatID=-1,
-    cbsConditions:CbsConditions = {},
-    policy:ParseMarkdownPolicy,
-    additionalAssetMode: 'normal' | 'back' = 'normal',
-): Promise<PreparedMarkdownDisplay> {
-    let firstParsed = ''
-    let char = (typeof(charArg) === 'string') ? (findCharacterbyId(charArg)) : (charArg)
-
-    if(char && char.type !== 'group'){
-        data = await parseAdditionalAssets(data, char, additionalAssetMode, {
-            ch: chatID
-        })
-        firstParsed = data
-    }
-
-    if(policy.runDisplayExtensions && char){
-        data = (await processScriptFull(char, data, 'editdisplay', chatID, cbsConditions)).data
-    }
-
-    if(firstParsed !== data && char && char.type !== 'group'){
-        data = await parseAdditionalAssets(data, char, additionalAssetMode, {
-            ch: chatID
-        })
-    }
-
-    data = await parseInlayAssets(data ?? '')
-
-    data = parseThoughtsAndTools(data)
-
-    data = encodeStyle(data)
-    return {
-        data,
-        resolveStyleTemplates: policy.resolveStyleTemplates,
-    }
-}
-
-export async function finalizePreparedMarkdown(
-    prepared: PreparedMarkdownDisplay,
-    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
-) {
-    let data = prepared.data
-    if(mode === 'normal' || mode === 'notrim'){
-        data = await renderHighlightableMarkdown(data)
-
-        if(mode === 'notrim'){
-            return data
-        }
-    }
-    return trimMarkdown(data, {
-        resolveStyleTemplates: prepared.resolveStyleTemplates,
-    })
-}
-
-async function parseMarkdownWithPolicy(
-    data:string,
-    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
-    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
-    chatID=-1,
-    cbsConditions:CbsConditions = {},
-    policy:ParseMarkdownPolicy,
-) {
-    const prepared = await prepareMarkdownWithPolicy(
-        data,
-        charArg,
-        chatID,
-        cbsConditions,
-        policy,
-        mode === 'back' ? 'back' : 'normal',
-    )
-    return finalizePreparedMarkdown(prepared, mode)
-}
-
-/** Runs the canonical asset/editdisplay pipeline once so cache probing and
- * final rendering can safely derive different representations from it. */
-export async function prepareMarkdownDisplay(
-    data:string,
-    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
-    chatID=-1,
-    cbsConditions:CbsConditions = {},
-) {
-    return prepareMarkdownWithPolicy(
-        data,
-        charArg,
-        chatID,
-        cbsConditions,
-        canonicalMarkdownPolicy,
-    )
-}
-
-/** Render a canonical chat message with the complete upstream display
- * extension pipeline, including Lua, plugins, triggers and regex scripts. */
 export async function ParseMarkdown(
-    data:string,
-    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
-    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
-    chatID=-1,
-    cbsConditions:CbsConditions = {}
+  data: string,
+  charArg: character | simpleCharacterArgument | groupChat | string = null,
+  mode: "normal" | "back" | "pretranslate" | "notrim" = "normal",
+  chatID = -1,
+  cbsConditions: CbsConditions = {},
+  presentation?: MarkdownPresentation,
 ) {
-    return parseMarkdownWithPolicy(
-        data,
-        charArg,
-        mode,
-        chatID,
-        cbsConditions,
-        canonicalMarkdownPolicy,
+  let firstParsed = "";
+  const additionalAssetMode = mode === "back" ? "back" : "normal";
+  const processingChar =
+    typeof charArg === "string" ? findCharacterbyId(charArg) : charArg;
+  // Original group rows supply no simple character, but still have a captured
+  // canonical owner. Finalize their HTML under that owner/settings without
+  // introducing character scripts the original null argument would skip.
+  let char =
+    processingChar ??
+    (entityRuntimeEnabled ? presentation?.capture?.character : undefined);
+  if (entityRuntimeEnabled && char) {
+    const supplied = presentation?.capture;
+    if (
+      supplied &&
+      (supplied.character.chaId !== char.chaId ||
+        (!cbsConditions.firstmsg &&
+          cbsConditions.messageId &&
+          supplied.message?.id !== cbsConditions.messageId))
     )
-}
+      throw new Error(
+        "Display presentation source does not belong to its captured owner",
+      );
+    const capture = supplied
+      ? forkDisplayScope(supplied, supplied, supplied.cbsEnvironment)
+      : captureDisplayScope(
+          chatID,
+          Boolean(cbsConditions.firstmsg),
+          char.chaId,
+          cbsConditions.messageId,
+          cbsConditions.bookmarkSession,
+        );
+    if (supplied && capture) {
+      capture.presentationVariables = supplied.presentationVariables;
+      inheritDisplayReads(supplied, capture);
+    }
+    char = { ...char };
+    displayMetadata.set(char, {
+      firstMessage: Boolean(cbsConditions.firstmsg),
+      rawContent: data,
+      captured: true,
+      capture,
+      current: presentation?.current,
+      admit: capture && createDisplayAdmission(capture),
+    });
+  }
+  const capture =
+    entityRuntimeEnabled && char
+      ? displayMetadata.get(char)?.capture
+      : undefined;
+  let cssScope: ReturnType<typeof createDisplayCbsScope> | undefined;
+  const context: MarkdownContext | undefined = capture
+    ? {
+        settings: capture.database,
+        parseCss: (text) => {
+          cssScope ??= createDisplayCbsScope(capture, getBrowserCbsHost());
+          // Original CSS decoding parses with default CBS arguments (-1),
+          // while every state/definition/body still belongs to this owner.
+          return cssScope.parse(text, { db: cssScope.database });
+        },
+        check: () => cssScope?.check(),
+      }
+    : undefined;
+  let preparedHtml: string | undefined;
+  let preparedSanitized = false;
+  const renderCache = context && presentation?.renderCache;
+  let renderTicket: DisplayRenderTicket | undefined;
+  const sanitize = (html: string) => {
+    const key = String(Boolean(context?.settings.hideAllImages));
+    const cached =
+      renderTicket && renderCache?.sanitized(renderTicket, html, key);
+    if (cached !== undefined) return cached;
+    const rendered = trimMarkdown(html, context);
+    if (renderTicket)
+      renderCache?.rememberSanitized(renderTicket, html, key, rendered);
+    return rendered;
+  };
+  if (presentation && entityRuntimeEnabled) {
+    presentation.finalize = async (html, current = () => true) => {
+      // Retain the previous DOM while the confirmed scope is fenced.
+      if (
+        !context ||
+        !char ||
+        !current() ||
+        (presentation.current && !presentation.current())
+      )
+        return undefined;
+      const rendered =
+        preparedSanitized && html === preparedHtml ? html : sanitize(html);
+      context.check();
+      if (!current()) return undefined;
+      await commitDisplayScope(char);
+      return rendered;
+    };
+  }
 
-/** Render an uncommitted runtime presentation without invoking any extension
- * code or CBS evaluation. Asset resolution and core markdown remain enabled;
- * the canonical message receives the full display pipeline after adoption. */
-export async function ParseMarkdownReadOnlyPresentation(
-    data:string,
-    charArg:(character|simpleCharacterArgument | groupChat | string) = null,
-    mode:'normal'|'back'|'pretranslate'|'notrim' = 'normal',
-    chatID=-1,
-) {
-    return parseMarkdownWithPolicy(
+  // An owning UI cannot publish a result without this canonical context: its
+  // finalizer above already rejects it. Retain the previous DOM and wait for
+  // the owner's fresh projection instead of preparing discarded assets/HTML.
+  // Unowned/background/translation calls keep their original fallback.
+  if (entityRuntimeEnabled && presentation?.current && !context) return "";
+
+  // The private owner/settings/read context is pinned above. Break the burst
+  // of immediately fulfilled asset/pre-Lua promises without recapturing state.
+  if (context) await yieldDisplayTurn();
+  // The owner can retire while this captured task yields or resolves assets.
+  // Avoid starting original script work for a presentation already discarded.
+  if (context && presentation?.current && !presentation.current()) return "";
+
+  if (char && char.type !== "group") {
+    data = await parseAdditionalAssets(data, char, additionalAssetMode, {
+      ch: chatID,
+    });
+    firstParsed = data;
+  }
+
+  if (context && presentation?.current && !presentation.current()) return "";
+  if (processingChar && char) {
+    data = (
+      await processScriptFull(char, data, "editdisplay", chatID, cbsConditions)
+    ).data;
+  }
+
+  if (firstParsed !== data && char && char.type !== "group") {
+    data = await parseAdditionalAssets(data, char, additionalAssetMode, {
+      ch: chatID,
+    });
+  }
+
+  data = await parseInlayAssets(data ?? "", context?.settings);
+
+  // Ordinary/plugin formatting retains the original function. The private
+  // entity presentation uses an equivalent literal-token pass after scripts.
+  data =
+    context && !context.settings.plugins?.length && typeof data === "string"
+      ? formatThoughtTools(data, () => language)
+      : parseThoughtsAndTools(data);
+
+  data = encodeStyle(data);
+  if (mode === "normal" || mode === "notrim") {
+    const source = data;
+    const key = renderCache && displayRenderKey(context.settings);
+    renderTicket =
+      key === undefined ? undefined : renderCache.lookup(source, key);
+    if (renderTicket) data = renderTicket.rendered;
+    else {
+      const reusable = { value: true };
+      data = await renderHighlightableMarkdown(
         data,
-        charArg,
-        mode,
-        chatID,
-        {},
-        readOnlyPresentationMarkdownPolicy,
-    )
+        context?.settings,
+        reusable,
+      );
+      if (
+        reusable.value &&
+        key !== undefined &&
+        key === displayRenderKey(context.settings)
+      )
+        renderTicket = renderCache.remember(source, key, data);
+    }
+
+    if (mode === "notrim") {
+      preparedHtml = data;
+      if (entityRuntimeEnabled && char && !presentation) {
+        // Keep the public raw-return API, but validate its final CSS
+        // before accepting effects. Actual UI callers finalize once.
+        if (context) {
+          trimMarkdown(data, context);
+          context.check();
+        }
+        await commitDisplayScope(char);
+      }
+      return data;
+    }
+  }
+  const rendered = sanitize(data);
+  context?.check();
+  preparedHtml = rendered;
+  preparedSanitized = true;
+  if (entityRuntimeEnabled && char && !presentation)
+    await commitDisplayScope(char);
+  return rendered;
 }
 
-export function trimMarkdown(data:string, options:{
-    resolveStyleTemplates?: boolean
-    allowPresentationSideEffects?: boolean
-} = {}){
-    const allowPresentationSideEffects = options.allowPresentationSideEffects ?? true
-    const sanitizeOptions = {
-        ADD_TAGS: [
-            ...(allowPresentationSideEffects ? ['iframe'] : []),
-            'style', 'risu-style', 'x-em', 'annotation', 'semantics', 'mrow', 'mi',
-            'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt',
-        ],
-        ADD_ATTR: [
-            ...(allowPresentationSideEffects
-                ? ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'risu-ctrl', 'risu-btn', 'risu-trigger']
-                : []),
-            'risu-mark', 'risu-id', 'x-hl-lang', 'x-hl-text',
-        ],
-        ...(allowPresentationSideEffects ? {} : {
-            FORBID_TAGS: ['iframe'],
-            FORBID_ATTR: ['risu-ctrl', 'risu-btn', 'risu-trigger', 'autoplay'],
-        }),
-    }
-    let sant = DOMPurify.sanitize(data, sanitizeOptions)
-
-    const decoded = decodeStyle(sant, options.resolveStyleTemplates ?? true)
-
-    if(decoded !== sant){
-        sant = DOMPurify.sanitize(decoded, {
-            ...sanitizeOptions,
-            FORCE_BODY: true,
-        })
-    }
-    else{
-        sant = decoded
-    }
-
-    return sant
+const trimPurifyConfig = {
+    ADD_TAGS: ["iframe", "style", "risu-style", "x-em", 'annotation', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt'],
+    ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling", "risu-ctrl" ,"risu-btn", 'risu-trigger', 'risu-mark', 'risu-id', 'x-hl-lang', 'x-hl-text'],
 }
 
-/** Final sanitization for runtime presentation HTML. Unlike the canonical
- * helper this never evaluates CBS embedded in streamed style blocks. */
-export function trimMarkdownReadOnlyPresentation(data:string){
-    // The global DOM observer treats risu-ctrl as an imperative command (for
-    // example, starting BGM). A failed/cancelled partial must not execute that
-    // command, expose runtime buttons, load an iframe, or autoplay media before
-    // it becomes canonical. The final adopted message uses trimMarkdown and
-    // therefore retains the complete upstream behavior.
-    const inertData = data
-        // Neutralize the tag name before DOMPurify parses the fragment so a
-        // browser cannot begin an iframe navigation merely while sanitizing.
-        .replace(/<\s*(\/?)\s*iframe\b/gi, '<$1x-runtime-iframe')
-        // Neutralize imperative attributes before DOM insertion. DOMPurify is
-        // still applied below; this early pass prevents observers/autoplay even
-        // in DOM implementations that preserve custom attributes by default.
-        .replace(/\s(?:risu-ctrl|risu-btn|risu-trigger)(?=\s*=)/gi, ' data-runtime-disabled')
-        .replace(/\sautoplay(?=\s|=|\/?>)/gi, ' data-runtime-disabled')
-    return trimMarkdown(inertData, {
-        resolveStyleTemplates: false,
-        allowPresentationSideEffects: false,
-    })
+export function trimMarkdown(data: string, context?: MarkdownContext) {
+  if (!data) {
+    return "";
+  }
+
+  // Without a <risu-style> there is nothing to decode, so the plain string
+  // result is already final. Note the tag itself is not trusted input:
+  // risu-style is in ADD_TAGS, so cards, model output and user scripts can
+  // author one directly. Only its position in the parsed tree is relied on.
+  if (!data.includes("<risu-style")) {
+    return withSanitizerSettings(context?.settings, () =>
+      DOMPurify.sanitize(data, trimPurifyConfig),
+    );
+  }
+
+  // Decoded CSS must never be handed back to the HTML sanitizer as <style>
+  // text: DOMPurify drops style nodes whose CSS contains '<' (SAFE_FOR_XML),
+  // which silently deletes svg data-uris and markup-like content strings.
+  // Take the DOM out of the sanitize we already run and swap the elements in
+  // place instead, so the CSS never re-enters the HTML parser at all.
+  // RETURN_DOM hands back the sanitized <body>, typed as Node. It is null only
+  // for empty input, which the guard above already excludes.
+  const root = withSanitizerSettings(context?.settings, () =>
+    DOMPurify.sanitize(data, {
+      ...trimPurifyConfig,
+      RETURN_DOM: true,
+    }),
+  ) as HTMLElement | null;
+  if (!root) {
+    return "";
+  }
+
+  // Only real <risu-style> elements are decoded. A <risu-style> that survived
+  // inside an attribute value is not an element, so it is left as inert text
+  // and a <style> tag can never be restored into an attribute context.
+  for (const el of Array.from(root.querySelectorAll("risu-style"))) {
+    const decoded = decodeStyleContent(el.textContent ?? "", context);
+    if (decoded.css === undefined) {
+      el.replaceWith(root.ownerDocument.createTextNode(decoded.fallback ?? ""));
+      continue;
+    }
+    const style = root.ownerDocument.createElement("style");
+    // <style> is RAWTEXT, so '</style' is the only sequence that can end the
+    // block early and leak the rest of the CSS as markup once this string is
+    // parsed again ('\/' is still '/' inside CSS).
+    style.textContent = decoded.css.replaceAll(/<\/(?=style)/gi, "<\\/");
+    el.replaceWith(style);
+  }
+
+  return root.innerHTML;
 }
 
 const metaCodes = [
@@ -1103,7 +1182,6 @@ function encodeStyle(txt:string){
         return "<risu-style>" + Buffer.from(c1).toString('hex') + "</risu-style>"
     })
 }
-const styleDecodeRegex = /\<risu-style\>(.+?)\<\/risu-style\>/gms
 
 function decodeStyleRule(rule:CssAtRuleAST){
     if(rule.type === 'rule'){
@@ -1140,875 +1218,105 @@ function decodeStyleRule(rule:CssAtRuleAST){
     return rule
 }
 
-function decodeStyle(text:string, resolveStyleTemplates = true){
-    return text.replaceAll(styleDecodeRegex, (full, txt:string) => {
-        try {
-            let text = Buffer.from(txt, 'hex').toString('utf-8')
-            if(resolveStyleTemplates){
-                text = risuChatParser(text)
-            }
-            const ast = css.parse(text)
-            const rules = ast?.stylesheet?.rules
-            if(rules){
-                for(let i=0;i<rules.length;i++){
-                    rules[i] = decodeStyleRule(rules[i])
-                }
-                ast.stylesheet.rules = rules
-            }
-            return `<style>${css.stringify(ast, {
-                indent: '',
-                compress: true,
-            })}</style>`
-
-        } catch (error) {
-            if(DBState.db.returnCSSError){
-                return `CSS ERROR: ${error}`
-            }
-            return ""
-        }
-    })
+/**
+ * Decodes one <risu-style> body into scoped CSS. Returns the CSS on its own so
+ * the caller can put it into a real <style> element instead of a markup string.
+ * On a CSS parse error the style is dropped and `fallback` holds the text that
+ * takes its place.
+ */
+function decodeStyleContent(
+  hexText: string,
+  context?: MarkdownContext,
+): { css?: string; fallback?: string } {
+  try {
+    let text = Buffer.from(hexText, "hex").toString("utf-8");
+    text = context ? context.parseCss(text) : risuChatParser(text);
+    const ast = css.parse(text);
+    const rules = ast?.stylesheet?.rules;
+    if (rules) {
+      for (let i = 0; i < rules.length; i++) {
+        rules[i] = decodeStyleRule(rules[i]);
+      }
+      ast.stylesheet.rules = rules;
+    }
+    return {
+      css: css.stringify(ast, {
+        indent: "",
+        compress: true,
+      }),
+    };
+  } catch (error) {
+    if ((context?.settings ?? DBState.db).returnCSSError) {
+      return { fallback: `CSS ERROR: ${error}` };
+    }
+    return { fallback: "" };
+  }
 }
 
 export async function hasher(data:Uint8Array){
     return Buffer.from(await crypto.subtle.digest("SHA-256", data as any)).toString('hex');
 }
 
-export type CbsConditions = {
-    firstmsg?:boolean
-    chatRole?:string
+let browserCbsRuntime: ReturnType<typeof createCbsRuntime>;
+
+function getBrowserCbsRuntime() {
+  return (browserCbsRuntime ??= createCbsRuntime(getBrowserCbsHost()));
+}
+export function getBrowserCbsHost(): import("./cbsRuntime").CbsRuntimeHost {
+  return {
+    getDatabase,
+    getUserName,
+    getPersonaPrompt,
+    safeStructuredClone: (value) => safeStructuredClone(value),
+    getChatVar,
+    setChatVar,
+    getGlobalChatVar,
+    calcString,
+    getModules,
+    getModuleLorebooks,
+    pickHashRand,
+    getSelectedCharID: () => get(selectedCharID),
+    getCurrentTriggerId: () => get(CurrentTriggerIdStore),
+    getModelInfo,
+    callInternalFunction: () => "",
+    isTauri,
+    isNodeServer,
+    isMobile: false,
+    appVer,
+    findCharacterbyId,
+  };
 }
 
-let matcherInitialized = false
-
-
-const matcherMap = new Map<string, RegisterCallback>()
-
-function initMatcher(){
-    if(matcherInitialized) return
-    registerCBS({
-        registerFunction: function (arg: {
-            name: string;
-            callback: RegisterCallback | 'doc_only';
-            alias: string[];
-            description: string;
-            deprecated?: { message: string; since?: string; replacement?: string; };
-            internalOnly?: boolean;
-        }): void | Promise<void> {
-            const callback = arg.callback
-            if(callback === 'doc_only') {
-                return
-            }
-            const names = [arg.name, ...arg.alias]
-            for (const name of names) {
-                matcherMap.set(name, callback)
-            }
-        },
-        getDatabase: getDatabase,
-        getUserName: getUserName,
-        getPersonaPrompt: getPersonaPrompt,
-        risuChatParser: risuChatParser,
-        makeArray: makeArray,
-        safeStructuredClone: safeStructuredClone,
-        parseArray: parseArray,
-        parseDict: parseDict,
-        getChatVar: getChatVar,
-        setChatVar: setChatVar,
-        getGlobalChatVar: getGlobalChatVar,
-        calcString: calcString,
-        dateTimeFormat: dateTimeFormat,
-        getModules: getModules,
-        getModuleLorebooks: getModuleLorebooks,
-        pickHashRand: pickHashRand,
-        getSelectedCharID: () => {
-            return get(selectedCharID)
-        },
-        getModelInfo: getModelInfo,
-        callInternalFunction: function (args: string[]): string {
-            return ''
-        },
-        isTauri: isTauri,
-        isNodeServer: isNodeServer,
-        isMobile: false,
-        appVer: appVer,
-    })
-    matcherInitialized = true
-}
-
-function matcher (p1:string,matcherArg:matcherArg,vars:{[key:string]:string}|null = null ):{
-    text:string,
-    var:{[key:string]:string}
-}|string|null {
-
-    initMatcher()
-
-    try {
-        if(p1.startsWith('? ')){
-            const substring = p1.substring(2)
-            return calcString(substring).toString()
-        }
-        const colonIndex = p1.indexOf(':')
-        let splited: string[]
-        if(colonIndex !== -1 && p1[colonIndex + 1] === ':'){
-            splited = p1.split('::')
-        }
-        else{
-            splited = p1.split(':')
-        }
-        const name = splited[0].toLocaleLowerCase().replace(/[\s_-]/g, '')
-        const args = splited.slice(1)
-        const callback = matcherMap.get(name)
-        if(callback){
-            return callback(p1, matcherArg, args,vars)
-        }
-    } catch (error) {}
-
-    return null
-}
-
-const dateTimeFormat = (main:string, time = 0) => {
-    const date = time === 0 ? (new Date()) : (new Date(time))
-    if(!main){
-        return ''
-    }
-    if(main.startsWith(':')){
-        main = main.substring(1)
-    }
-    if(main.length > 300){
-        return ''
-    }
-    return main
-        .replace(/YYYY/g, date.getFullYear().toString())
-        .replace(/YY/g, date.getFullYear().toString().substring(2))
-        .replace(/MMMM/g, Intl.DateTimeFormat('en', { month: 'long' }).format(date))
-        .replace(/MMM/g, Intl.DateTimeFormat('en', { month: 'short' }).format(date))
-        .replace(/MM/g, (date.getMonth() + 1).toString().padStart(2, '0'))
-        .replace(/DDDD/g, Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24)).toString())
-        .replace(/DD/g, date.getDate().toString().padStart(2, '0'))
-        .replace(/dddd/g, Intl.DateTimeFormat('en', { weekday: 'long' }).format(date))
-        .replace(/ddd/g, Intl.DateTimeFormat('en', { weekday: 'short' }).format(date))
-        .replace(/HH/g, date.getHours().toString().padStart(2, '0'))
-        .replace(/hh/g, (date.getHours() % 12 || 12).toString().padStart(2, '0'))
-        .replace(/mm/g, date.getMinutes().toString().padStart(2, '0'))
-        .replace(/ss/g, date.getSeconds().toString().padStart(2, '0'))
-        .replace(/X/g, Math.floor(date.getTime() / 1000).toString())
-        .replace(/x/g, date.getTime().toString())
-        .replace(/A/g, date.getHours() >= 12 ? 'PM' : 'AM')
-
-}
-
-const legacyBlockMatcher = (p1:string,matcherArg:matcherArg) => {
-    const bn = p1.indexOf('\n')
-
-    if(bn === -1){
-        return null
-    }
-
-    const logic = p1.substring(0, bn)
-    const content = p1.substring(bn + 1)
-    const statement = logic.split(" ", 2)
-
-    switch(statement[0]){
-        case 'if':{
-            if(["","0","-1"].includes(statement[1])){
-                return ''
-            }
-        
-            return content.trim()
-        }
-    }
-
-    return null
-}
-
-type blockMatch = 'ignore'|'parse'|'nothing'|'ifpure'|'pure'|'each'|'function'|'pure-display'|'normalize'|'escape'|'newif'|'newif-falsy'
-
-function parseArray(p1:string): unknown[]{
-    try {
-        const arr = JSON.parse(p1)
-        if(Array.isArray(arr)){
-            return arr
-        }
-        return p1.split('§')
-    } catch (error) {
-        return p1.split('§')
-    }
-}
-
-function parseDict(p1 :string): {[key:string]: unknown}{
-    try {
-        return JSON.parse(p1)
-    } catch (error) {
-        return {}
-    }
-}
-
-function makeArray(p1: unknown[]): string{
-    return JSON.stringify(p1.map((f) => {
-        if(typeof(f) === 'string'){
-            return f.replace(/::/g, '\\u003A\\u003A')
-        }
-        return f
-    }))
-}
-
-function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,type2?:string,funcArg?:string[],mode?:string}{
-    if(p1.startsWith('#if') || p1.startsWith('#if_pure ')){
-        const statement = p1.split(' ', 2)
-        const state = statement[1]
-        if(state === 'true' || state === '1'){
-            return {
-                type:   p1.startsWith('#if_pure') ? 'ifpure' :
-                        'parse'
-            }
-        }
-        return {type:'ignore'}
-    }
-
-    if(p1.startsWith('#when')){
-        if(p1.startsWith('#when ')){
-            const statement = p1.split(' ', 2)
-            const state = statement[1]
-            return {type: (state === 'true' || state === '1') ? 'newif' : 'newif-falsy'}
-        }
-        else if(p1.startsWith('#when::')){
-            const statement = p1.split('::').slice(1)
-            if(statement.length === 1){
-                const state = statement[0]
-                return {type: (state === 'true' || state === '1') ? 'newif' : 'newif-falsy'}
-            }
-            let mode: 'normal' | 'keep' | 'legacy' = 'normal'
-
-            const isTruthy = (s:string) => {
-                return s === 'true' || s === '1'
-            }
-            while(statement.length > 1){
-                const condition = statement.pop()
-                const operator = statement.pop()
-                switch(operator){
-                    case 'not':{
-                        if(isTruthy(condition)){
-                            statement.push('0')
-                        }
-                        else{
-                            statement.push('1')
-                        }
-                        break
-                    }
-                    case 'keep':{
-                        mode = 'keep'
-                        statement.push(condition)
-                        break
-                    }
-                    case 'legacy':{
-                        mode = 'legacy'
-                        statement.push(condition)
-                        break
-                    }
-                    case 'and':{
-                        const condition2 = statement.pop()
-                        if(isTruthy(condition) && isTruthy(condition2)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'or':{
-                        const condition2 = statement.pop()
-                        if(isTruthy(condition) || isTruthy(condition2)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'is':{
-                        const condition2 = statement.pop()
-                        if(condition === condition2){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'isnot':{
-                        const condition2 = statement.pop()
-                        if(condition !== condition2){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'var':{
-                        const variable = getChatVar(condition)
-                        if(isTruthy(variable)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'toggle':{
-                        const variable = getGlobalChatVar('toggle_' + condition)
-                        if(isTruthy(variable)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'vis':{ //vis = variable is
-                        const variable = getChatVar(statement.pop())
-                        if(variable === condition){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'visnot':{ //visnot = variable is not
-                        const variable = getChatVar(statement.pop())
-                        if(variable !== condition){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'tis':{ //tis = toggle is
-                        const variable = getGlobalChatVar('toggle_' + statement.pop())
-                        if(variable === condition){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case 'tisnot':{ //tisnot = toggle is not
-                        const variable = getGlobalChatVar('toggle_' + statement.pop())
-                        if(variable !== condition){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case '>':{
-                        const condition2 = statement.pop()
-                        if(parseFloat(condition2) > parseFloat(condition)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case '<':{
-                        const condition2 = statement.pop()
-                        if(parseFloat(condition2) < parseFloat(condition)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case '>=':{
-                        const condition2 = statement.pop()
-                        if(parseFloat(condition2) >= parseFloat(condition)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    case '<=':{
-                        const condition2 = statement.pop()
-                        if(parseFloat(condition2) <= parseFloat(condition)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                    default:{
-                        if(isTruthy(condition)){
-                            statement.push('1')
-                        }
-                        else{
-                            statement.push('0')
-                        }
-                        break
-                    }
-                }
-            }
-
-            const finalCondition = statement[0]
-            if(isTruthy(finalCondition)){
-                switch(mode){
-                    case 'keep':{
-                        return {type: 'newif', type2: 'keep'}
-                    }
-                    case 'legacy':{
-                        return {type: 'parse'}
-                    }
-                    default:{
-                        return {type: 'newif'}
-                    }
-                }
-            }
-            else{
-                switch(mode){
-                    case 'keep':{
-                        return {type: 'newif-falsy', type2: 'keep'}
-                    }
-                    case 'legacy':{
-                        return {type: 'ignore'}
-                    }
-                    default:{
-                        return {type: 'newif-falsy'}
-                    }
-                }
-            }
-        }
-        else{
-            return {type: 'newif-falsy'}
-        }
-    }
-    if(p1 === '#pure'){
-        return {type:'pure'}
-    }
-    if(p1 === '#pure_display' || p1 === '#puredisplay'){
-        return {type:'pure-display'}
-    }
-    if(p1 === '#code'){
-        return {type:'normalize'}
-    }
-    if(p1.startsWith('#escape')){
-        const t2 = p1.substring(7).trim()
-        const mode = t2 === '::keep' ? 'keep' : undefined
-        return {type:'escape', mode}
-    }
-    if(p1.startsWith('#each')){
-        let t2 = p1.substring(5).trim()
-        let mode: string | undefined
-        if(t2.startsWith('::keep ')){
-            mode = 'keep'
-            t2 = t2.substring(7).trim()
-        }
-        if(t2.startsWith('as ')){
-            t2 = t2.substring(3).trim()
-        }
-        return {type:'each', type2:t2, mode}
-    }
-    if(p1.startsWith('#func')){
-        const statement = p1.split(' ')
-        if(statement.length > 1){
-            return {type:'function',funcArg:statement.slice(1)}
-        }
-
-    }
-
-    return {type:'nothing'}
-}
-
-function trimLines(p1:string){
-    return p1.split('\n').map((v) => {
-        return v.trimStart()
-    }).join('\n').trim()
-}
-
-function blockEndMatcher(p1:string,type:{type:blockMatch,type2?:string,mode?:string},matcherArg:matcherArg):string{
-    const p1Trimmed = p1.trim() 
-    switch(type.type){
-        case 'pure':
-        case 'pure-display':
-        case 'function':{
-            return p1Trimmed
-        }
-        case 'parse':{
-            return trimLines(p1Trimmed)
-        }
-        case 'each':{
-            if(type.mode === 'keep'){
-                return p1
-            }
-            return trimLines(p1Trimmed)
-        }
-        case 'ifpure':{
-            return p1
-        }
-        case 'newif':
-        case 'newif-falsy':{
-            const lines =  p1.split("\n")
-
-            if(lines.length === 1){
-                const elseIndex = p1.indexOf('{{:else}}')
-                if(elseIndex !== -1){
-                    if(type.type === 'newif'){
-                        return p1.substring(0, elseIndex)
-                    }
-                    if(type.type === 'newif-falsy'){
-                        return p1.substring(elseIndex + 9)
-                    }
-                }
-                else{
-                    if(type.type === 'newif'){
-                        return p1
-                    }
-                    if(type.type === 'newif-falsy'){
-                        return ''
-                    }
-                }
-            }
-            
-            const elseLine = lines.findIndex((v) => {
-                return v.trim() === '{{:else}}'
-            })
-
-            if(elseLine !== -1 && type.type === 'newif'){
-                lines.splice(elseLine) //else line and everything after it is removed
-            }
-            if(elseLine !== -1 && type.type === 'newif-falsy'){
-                lines.splice(0, elseLine + 1) //everything before else line is removed
-            }
-            if(elseLine === -1 && type.type === 'newif-falsy'){
-                return ''
-            }
-
-            if(type.type2 !== 'keep'){
-                while(lines.length > 0 && lines[0].trim() === ''){
-                    lines.shift()
-                }
-                while(lines.length > 0 && lines[lines.length - 1].trim() === ''){
-                    lines.pop()
-                }
-            }
-            return lines.join('\n')
-        }
-
-        case 'normalize':{
-            return p1Trimmed.trim().replaceAll('\n','').replaceAll('\t','')
-            .replaceAll(/\\u([0-9A-Fa-f]{4})/g, (match, p1) => {
-                return String.fromCharCode(parseInt(p1, 16))
-            })
-            .replaceAll(/\\(.)/g, (match, p1) => {
-                switch(p1){
-                    case 'n':
-                        return '\n'
-                    case 'r':
-                        return '\r'
-                    case 't':
-                        return '\t'
-                    case 'b':
-                        return '\b'
-                    case 'f':
-                        return '\f'
-                    case 'v':
-                        return '\v'
-                    case 'a':
-                        return '\a'
-                    case 'x':
-                        return '\x00'
-                    default:
-                        return p1
-                }
-            })
-        }
-        case 'escape':{
-            return risuEscape(type.mode === 'keep' ? p1 : p1Trimmed)
-        }
-        default:{
-            return ''
-        }
-    }
-}
-
-export function risuChatParser(da:string, arg:{
-    chatID?:number
-    db?:Database
-    chara?:string|character|groupChat
-    rmVar?:boolean,
-    var?:{[key:string]:string}
-    tokenizeAccurate?:boolean
-    consistantChar?:boolean
-    visualize?:boolean,
-    role?:string
-    runVar?:boolean
-    functions?:Map<string,{data:string,arg:string[]}>
-    callStack?:number
-    cbsConditions?:CbsConditions
-} = {}):string{
-    const chatID = arg.chatID ?? -1
-    const db = arg.db ?? DBState.db
-    const aChara = arg.chara
-    let chara:character|string = null
-
-    if(aChara){
-        if(typeof(aChara) !== 'string' && aChara.type === 'group'){
-            if(aChara.chats[aChara.chatPage].message.length > 0){
-                const gc = findCharacterbyId(aChara.chats[aChara.chatPage].message.at(-1).saying ?? '')
-                if(gc.name !== 'Unknown Character'){
-                    chara = gc
-                }
-            }
-            else{
-                chara = 'bot'
-            }
-        }
-        else{
-            chara = aChara
-        }
-    }
-    if(arg.tokenizeAccurate){
-        const db = arg.db ?? DBState.db
-        const selchar = chara ?? db.characters[get(selectedCharID)]
-        if(!selchar){
-            chara = 'bot'
-        }
-    }
-
-    let pointer = 0;
-    let nested:string[] = [""]
-    let stackType = new Uint8Array(512)
-    let pureModeNest:Map<number,boolean> = new Map()
-    let pureModeNestType:Map<number,string> = new Map()
-    let blockNestType:Map<number,{
-        type:blockMatch,
-        type2?:string
-        funcArg?:string[]
-        mode?:string
-    }> = new Map()
-    let commentMode = false
-    let commentLatest:string[] = [""]
-    let commentV = new Uint8Array(512)
-    let thinkingMode = false
-    let tempVar:{[key:string]:string} = {}
-    let functions:Map<string,{
-        data:string,
-        arg:string[]
-    }> = arg.functions ?? (new Map())
-
-    arg.callStack = (arg.callStack ?? 0) + 1
-
-    if(arg.callStack > 20){
-        return 'ERROR: Call stack limit reached'
-    }
-
-    const matcherObj = {
-        chatID: chatID,
-        chara: chara,
-        rmVar: arg.rmVar ?? false,
-        db: db,
-        var: arg.var ?? null,
-        tokenizeAccurate: arg.tokenizeAccurate ?? false,
-        displaying: arg.visualize ?? false,
-        role: arg.role,
-        runVar: arg.runVar ?? false,
-        consistantChar: arg.consistantChar ?? false,
-        cbsConditions: arg.cbsConditions ?? {},
-        callStack: arg.callStack,
-        getNested: () => {
-            return nested
-        },
-        setNestedRoot: (val:string) => {
-            nested[0] = val
-        }
-    }
-
-    da = da.replace(/\<(user|char|bot)\>/gi, '{{$1}}')
-
-    const isPureMode = () => {
-        return pureModeNest.size > 0
-    }
-
-    while(pointer < da.length){
-        switch(da[pointer]){
-            case '{':{
-                if(da[pointer + 1] !== '{' && da[pointer + 1] !== '#'){
-                    nested[0] += da[pointer]
-                    break
-                }
-                pointer++
-                nested.unshift('')
-                stackType[nested.length] = 1
-                break
-            }
-            case '#':{
-                //legacy if statement, deprecated
-                if(da[pointer + 1] !== '}' || nested.length === 1 || stackType[nested.length] !== 1){
-                    nested[0] += da[pointer]
-                    break
-                }
-                pointer++
-                const dat = nested.shift()
-                const mc = legacyBlockMatcher(dat, matcherObj)
-                nested[0] += mc ?? `{#${dat}#}`
-                break
-            }
-            case '}':{
-                if(da[pointer + 1] !== '}' || nested.length === 1 || stackType[nested.length] !== 1){
-                    nested[0] += da[pointer]
-                    break
-                }
-                pointer++
-                const dat = nested.shift()
-                if(dat.startsWith('#') || dat.startsWith(':')){
-                    if(isPureMode()){
-                        nested[0] += `{{${dat}}}`
-                        if (dat !== ':else') {
-                            nested.unshift('')
-                            stackType[nested.length] = 6
-                        }
-                        break
-                    }
-                    const matchResult = blockStartMatcher(dat, matcherObj)
-                    if(matchResult.type === 'nothing'){
-                        nested[0] += `{{${dat}}}`
-                        break
-                    }
-                    else{
-                        nested.unshift('')
-                        stackType[nested.length] = 5
-                        blockNestType.set(nested.length, matchResult)
-                        if( matchResult.type === 'ignore' || matchResult.type === 'pure' ||
-                            matchResult.type === 'each' || matchResult.type === 'function' ||
-                            matchResult.type === 'pure-display' || matchResult.type === 'escape'
-                        ){
-                            pureModeNest.set(nested.length, true)
-                            pureModeNestType.set(nested.length, "block")
-                        }
-                        break
-                    }
-                }
-                if(dat.startsWith('/') && !dat.startsWith('//')){
-                    if(stackType[nested.length] === 5){
-                        const blockType = blockNestType.get(nested.length)
-                        if( blockType.type === 'ignore' || blockType.type === 'pure' ||
-                            blockType.type === 'each' || blockType.type === 'function' ||
-                            blockType.type === 'pure-display' || blockType.type === 'escape'
-                        ){
-                            pureModeNest.delete(nested.length)
-                            pureModeNestType.delete(nested.length)
-                        }
-                        blockNestType.delete(nested.length)
-                        const dat2 = nested.shift()
-                        const matchResult = blockEndMatcher(dat2, blockType, matcherObj)
-                        if(blockType.type === 'each'){
-                            const asIndex = blockType.type2.lastIndexOf(' as ')
-                            let sub = blockType.type2.substring(asIndex + 4).trim()
-                            let array = parseArray(blockType.type2.substring(0, asIndex))
-                            if(asIndex === -1){
-                                //compability mode
-                                const subind = blockType.type2.lastIndexOf(' ')
-                                if(subind === -1){
-                                    break
-                                }
-                                sub = blockType.type2.substring(subind + 1)
-                                array = parseArray(blockType.type2.substring(0, subind))
-                            }
-                            let added = ''
-                            for(let i = 0; i < array.length; i++) {
-                                added += matchResult.replaceAll(`{{slot::${sub}}}`, typeof(array[i]) === 'string' ? array[i] as string : JSON.stringify(array[i]))
-                            }
-                            da = da.substring(0, pointer + 1) + (blockType.mode === 'keep' ? added : added.trim()) + da.substring(pointer + 1)
-                            break
-                        }
-                        if(blockType.type === 'function'){
-                            functions.set(blockType.funcArg[0], {
-                                data: matchResult,
-                                arg: blockType.funcArg.slice(1)
-                            })
-                            break
-                        }
-                        if(blockType.type === 'pure-display'){
-                            nested[0] += matchResult.replaceAll('{{', '\\{\\{').replaceAll('}}', '\\}\\}')
-                            break
-                        }
-                        if(matchResult === ''){
-                            break
-                        }
-                        nested[0] += matchResult
-                        break
-                    }
-                    if(stackType[nested.length] === 6){
-                        const sft = nested.shift()
-                        nested[0] += sft + `{{${dat}}}`
-                        break
-                    }
-                }
-                if(dat.startsWith('call::')){
-                    if(arg.callStack && arg.callStack > 20){
-                        nested[0] += `ERROR: Call stack limit reached`
-                        break
-                    }
-                    const argData = dat.split('::').slice(1)
-                    const funcName = argData[0]
-                    const func = functions.get(funcName)
-                    if(func){
-                        let data = func.data
-                        for(let i = 0;i < argData.length;i++){
-                            data = data.replaceAll(`{{arg::${i}}}`, argData[i])
-                        }
-                        arg.functions = functions
-                        nested[0] += risuChatParser(data, arg)
-                        break
-                    }
-                }
-                const mc = isPureMode() ? null :matcher(dat, matcherObj, tempVar)
-                if(!mc && mc !== ''){
-                    nested[0] += `{{${dat}}}`
-                }
-                else if(typeof(mc) === 'string'){
-                    nested[0] += mc
-                }
-                else{
-                    nested[0] += mc.text
-                    tempVar = mc.var
-                    if(tempVar['__force_return__']){
-                        return tempVar['__return__'] ?? 'null'
-                    }
-                }
-                break
-            }
-            default:{
-                nested[0] += da[pointer]
-                break
-            }
-        }
-        pointer++
-    }
-    if(commentMode){
-        nested = commentLatest
-        stackType = commentV
-        if(thinkingMode){
-            nested[0] += `<div>Thinking...</div>`
-        }
-        commentMode = false
-    }
-    if(nested.length === 1){
-        return nested[0]
-    }
-    let result = ''
-    while(nested.length > 1){
-        let dat = (stackType[nested.length] === 1) ? '{{' : "<"
-        dat += nested.shift()
-        result = dat + result
-    }
-    return nested[0] + result
+export function risuChatParser(
+  data: string,
+  arg: Parameters<ReturnType<typeof createCbsRuntime>["parse"]>[1] = {},
+  presentation?: MarkdownPresentation,
+): string {
+  if (
+    entityRuntimeEnabled &&
+    (arg.visualize ||
+      arg.cbsConditions?.messageId ||
+      arg.cbsConditions?.firstmsg)
+  ) {
+    const capture = captureDisplayScope(
+      arg.chatID ?? -1,
+      Boolean(arg.cbsConditions?.firstmsg),
+      undefined,
+      arg.cbsConditions?.messageId,
+      arg.cbsConditions?.bookmarkSession,
+    );
+    if (!capture) return data;
+    const scope = createDisplayCbsScope(capture, getBrowserCbsHost());
+    const result = scope.parse(data, {
+      ...arg,
+      db: scope.database,
+      chatID: capture.history?.ordinal ?? arg.chatID ?? -1,
+    });
+    scope.check();
+    if (presentation) presentation.capture = capture;
+    return result;
+  }
+  return getBrowserCbsRuntime().parse(data, arg);
 }
 
 export function applyMarkdownToNode(node: Node) {

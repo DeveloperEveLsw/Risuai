@@ -1,7 +1,7 @@
 import { get, writable } from "svelte/store";
 import { language } from "../../lang";
 import { getCurrentCharacter, getDatabase, setDatabase, setDatabaseLite } from "../storage/database.svelte";
-import { alertConfirm, alertError, alertPluginConfirm, runtimeAlertGlobals } from "../alert";
+import { alertConfirm, alertError, alertPluginConfirm } from "../alert";
 import { selectSingleFile, sleep } from "../util";
 import type { OpenAIChat } from "../process/index.svelte";
 import { fetchNative, globalFetch, readImage, saveAsset, toGetter } from "../globalApi.svelte";
@@ -11,10 +11,15 @@ import { checkCodeSafety } from "./pluginSafety";
 import { SafeDocument, SafeIdbFactory, SafeLocalStorage } from "./pluginSafeClass";
 import { loadV3Plugins } from "./apiV3/v3.svelte";
 import { pluginCodeTranspiler } from "./apiV3/transpiler";
+import {
+    browserRuntime,
+    entityRuntimeEnabled,
+} from "../runtime/browserRuntimeState.svelte";
 
 export const customProviderStore = writable([] as string[])
 
 interface ProviderPlugin {
+    id?: string
     name: string
     displayName?: string
     script: string
@@ -62,26 +67,6 @@ const compareVersions = (v1: string, v2: string): 0|1|-1 => {
 }
 
 const updateCache = new Map<string, { version: string, updateURL: string } | undefined>();
-const V2_PLUGIN_LOAD_TIMEOUT_MS = 60_000
-
-async function waitForV2PluginInitialization(pluginName: string, initialization: unknown) {
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-    try {
-        await Promise.race([
-            Promise.resolve(initialization),
-            new Promise<never>((_resolve, reject) => {
-                timeoutId = setTimeout(() => reject(new Error(
-                    `Plugin "${pluginName}" did not initialize within ${V2_PLUGIN_LOAD_TIMEOUT_MS} ms`,
-                )), V2_PLUGIN_LOAD_TIMEOUT_MS)
-            }),
-        ])
-    }
-    finally {
-        if (timeoutId !== null) {
-            clearTimeout(timeoutId)
-        }
-    }
-}
 
 export const checkPluginUpdate = async (plugin: RisuPlugin) => {
     try {
@@ -363,25 +348,12 @@ export async function importPlugin(code:string|null = null, argu:{
         let apiInternalVersion: 2|'2.1'|'3.0' = '2.1'
 
         if(apiVersion === '2.1'){
-            const safety = await checkCodeSafety(jsFile)
-            if(!safety.isSafe){
-                pluginAlertModalStore.errors = safety.errors
-                pluginAlertModalStore.open = true
-                
-                //I can use event but lazy
-                while(pluginAlertModalStore.open){
-                    await sleep(100)
-                }
-
-                if(pluginAlertModalStore.errors.length > 0){
-                    return
-                }
-            }
-            apiInternalVersion = '2.1'
+            showError('Your plugin specifies API version 2.1, which is outdated and no longer supported. Please update your plugin to use at least API version 3.0.')
+            return
         }
         else if(apiVersion === '2.0'){
             //Only block installing
-            showError('Your code does not include //@api or specifies API version 2.0, which is outdated. Please update your plugin to use at least API version 2.1.')
+            showError('Your code does not include //@api or specifies API version 2.0, which is outdated. Please update your plugin to use at least API version 3.0.')
             return
         }
         else if(apiVersion === '3.0'){
@@ -411,6 +383,24 @@ export async function importPlugin(code:string|null = null, argu:{
         db.plugins ??= []
 
         const oldPluginIndex = db.plugins.findIndex((p: RisuPlugin) => p.name === pluginData.name);
+        const oldPlugin = db.plugins[oldPluginIndex];
+        // Capture before confirmation: a peer edit during the dialog must conflict,
+        // rather than be replaced using that peer's newer revision.
+        const expected =
+            entityRuntimeEnabled && oldPlugin?.id
+                ? { ...browserRuntime().libraryHeader("plugin", oldPlugin.id) }
+                : { revision: 0, epoch: 0 };
+        const serverPayload = entityRuntimeEnabled
+            ? JSON.parse(
+                  JSON.stringify({
+                      ...oldPlugin,
+                      ...pluginData,
+                      id: oldPlugin?.id ?? crypto.randomUUID(),
+                      enabled: oldPlugin?.enabled ?? true,
+                      realArg: { ...pluginData.realArg, ...oldPlugin?.realArg },
+                  }),
+              )
+            : undefined;
 
         if(originalPluginName && originalPluginName !== pluginData.name){
             showError(`When updating plugin "${originalPluginName}", the plugin name cannot be changed to "${pluginData.name}". Please keep the original name to update.`)
@@ -425,7 +415,13 @@ export async function importPlugin(code:string|null = null, argu:{
             }
         }
 
-        if(oldPluginIndex !== -1){
+        if(entityRuntimeEnabled){
+            if (oldPluginIndex === -1 && isUpdate && !argu.isHotReload) return;
+            // Publication follows the acknowledged server projection. A failed
+            // import cannot leave an installed-looking, unsaved browser entry.
+            await browserRuntime().saveLibraryResource("plugin", serverPayload, expected);
+        }
+        else if(oldPluginIndex !== -1){
             db.plugins[oldPluginIndex] = pluginData;
         }
         else if(!isUpdate || argu.isHotReload){
@@ -437,9 +433,9 @@ export async function importPlugin(code:string|null = null, argu:{
         }
 
         console.log(`Imported plugin: ${pluginData.name} (API v${apiVersion})`)
-        setDatabaseLite(db)
+        if (!entityRuntimeEnabled) setDatabaseLite(db)
 
-        loadPlugins()
+        await loadPlugins()
         
     } catch (error) {
         console.error(error)
@@ -448,28 +444,25 @@ export async function importPlugin(code:string|null = null, argu:{
 }
 
 let pluginTranslator = false
-let pluginLoadTransactionInProgress = false
 
 export async function loadPlugins() {
-    if(pluginLoadTransactionInProgress){
-        throw new Error('PluginReloadInProgressError: A plugin load transaction is already in progress.')
+    if (entityRuntimeEnabled) {
+        // Entity generation owns installed plugin engines and durable storage.
+        // Import/toggle must not boot a second browser graph writer.
+        await loadV2Plugin([]);
+        await loadV3Plugins([]);
+        return;
     }
-    pluginLoadTransactionInProgress = true
     console.log('Loading plugins...')
-    try {
-        let db = getDatabase()
+    let db = getDatabase()
 
 
-        const enabledPlugins = safeStructuredClone(db.plugins).filter((p: RisuPlugin) => p.enabled)
-        const pluginV2 = enabledPlugins.filter((a: RisuPlugin) => a.version === 2 || a.version === '2.1')
-        const pluginV3 = enabledPlugins.filter((a: RisuPlugin) => a.version === '3.0')
+    const enabledPlugins = safeStructuredClone(db.plugins).filter((p: RisuPlugin) => p.enabled)
+    const pluginV2 = enabledPlugins.filter((a: RisuPlugin) => a.version === 2 || a.version === '2.1')
+    const pluginV3 = enabledPlugins.filter((a: RisuPlugin) => a.version === '3.0')
 
-        await loadV2Plugin(pluginV2)
-        await loadV3Plugins(pluginV3)
-    }
-    finally {
-        pluginLoadTransactionInProgress = false
-    }
+    await loadV2Plugin(pluginV2)
+    await loadV3Plugins(pluginV3)
 }
 
 export type PluginV2ProviderArgument = {
@@ -509,282 +502,6 @@ export const pluginV2 = {
     loaded: false
 }
 
-const pluginV2SetKeys = [
-    'editdisplay',
-    'editoutput',
-    'editprocess',
-    'editinput',
-    'replacerbeforeRequest',
-    'replacerafterRequest',
-    'chatOutput',
-    'unload',
-] as const
-
-const snapshotV2PluginRegistrations = () => ({
-    providers: new Map(pluginV2.providers),
-    providerOptions: new Map(pluginV2.providerOptions),
-    sets: Object.fromEntries(
-        pluginV2SetKeys.map(key => [key, new Set(pluginV2[key] as Set<unknown>)]),
-    ) as { [K in typeof pluginV2SetKeys[number]]: Set<any> },
-    customProviders: [...get(customProviderStore)],
-})
-
-type V2PluginRegistrationSnapshot = ReturnType<typeof snapshotV2PluginRegistrations>
-
-type V2PluginActivationScope = {
-    name: string
-    phase: 'active' | 'unloading' | 'inactive'
-}
-
-const activeV2PluginScopes = new Set<V2PluginActivationScope>()
-
-const v2RegistrationCapabilityKeys = new Set<PropertyKey>([
-    'addProvider',
-    'addRisuScriptHandler',
-    'addRisuReplacer',
-    'addRisuChatListener',
-    'onUnload',
-    'loadPlugins',
-])
-
-const createRevocableV2Capability = (activation: V2PluginActivationScope) => {
-    const proxies = new WeakMap<object, any>()
-    const proxyTargets = new WeakMap<object, object>()
-
-    const assertActive = () => {
-        if(activation.phase === 'inactive'){
-            throw new Error(`PluginInactiveError: Plugin "${activation.name}" is no longer active.`)
-        }
-    }
-
-    const assertRegistrationActive = () => {
-        if(activation.phase !== 'active'){
-            throw new Error(`PluginInactiveError: Plugin "${activation.name}" cannot register while ${activation.phase}.`)
-        }
-    }
-
-    const assertCanCommit = () => {
-        if(activation.phase !== 'active'){
-            throw new Error(`PluginInactiveError: Plugin "${activation.name}" cannot commit while ${activation.phase}.`)
-        }
-    }
-
-    const wrapResult = (result: any): any => {
-        if(result instanceof Promise){
-            return result.then(value => {
-                assertActive()
-                return wrap(value)
-            })
-        }
-        return wrap(result)
-    }
-
-    const wrap = (value: any): any => {
-        if((typeof value !== 'object' || value === null) && typeof value !== 'function'){
-            return value
-        }
-        if(proxyTargets.has(value)){
-            return value
-        }
-        const cached = proxies.get(value)
-        if(cached){
-            return cached
-        }
-
-        const handler: ProxyHandler<any> = {
-            get(target, property) {
-                assertActive()
-                return wrap(Reflect.get(target, property, target))
-            },
-            set(target, property, nextValue) {
-                assertActive()
-                return Reflect.set(target, property, nextValue, target)
-            },
-            deleteProperty(target, property) {
-                assertActive()
-                return Reflect.deleteProperty(target, property)
-            },
-            defineProperty(target, property, attributes) {
-                assertActive()
-                return Reflect.defineProperty(target, property, attributes)
-            },
-            setPrototypeOf(target, prototype) {
-                assertActive()
-                return Reflect.setPrototypeOf(target, prototype)
-            },
-            getPrototypeOf(target) {
-                assertActive()
-                if(!Reflect.isExtensible(target)){
-                    throw new Error('PluginCapabilityReflectionError: Cannot expose a non-extensible capability prototype.')
-                }
-                return wrap(Reflect.getPrototypeOf(target))
-            },
-            getOwnPropertyDescriptor(target, property) {
-                assertActive()
-                const descriptor = Reflect.getOwnPropertyDescriptor(target, property)
-                if(!descriptor){
-                    return undefined
-                }
-                if(!descriptor.configurable && ('value' in descriptor || descriptor.get || descriptor.set)){
-                    throw new Error('PluginCapabilityReflectionError: Cannot expose a fixed capability descriptor.')
-                }
-                if('value' in descriptor){
-                    return {
-                        configurable: descriptor.configurable,
-                        enumerable: descriptor.enumerable,
-                        writable: descriptor.writable,
-                        value: wrap(descriptor.value),
-                    }
-                }
-                return {
-                    configurable: descriptor.configurable,
-                    enumerable: descriptor.enumerable,
-                    get: descriptor.get ? wrap(descriptor.get) : undefined,
-                    set: descriptor.set ? wrap(descriptor.set) : undefined,
-                }
-            },
-            ownKeys(target) {
-                assertActive()
-                return Reflect.ownKeys(target)
-            },
-            has(target, property) {
-                assertActive()
-                return Reflect.has(target, property)
-            },
-            isExtensible(target) {
-                assertActive()
-                return Reflect.isExtensible(target)
-            },
-            preventExtensions() {
-                assertActive()
-                return false
-            },
-            apply(target, thisArgument, args) {
-                assertActive()
-                const rawThis = (
-                    thisArgument && (typeof thisArgument === 'object' || typeof thisArgument === 'function')
-                        ? proxyTargets.get(thisArgument) ?? thisArgument
-                        : thisArgument
-                )
-                return wrapResult(Reflect.apply(target, rawThis, args))
-            },
-            construct(target, args, newTarget) {
-                assertActive()
-                const rawNewTarget = proxyTargets.get(newTarget) ?? newTarget
-                return wrapResult(Reflect.construct(target, args, rawNewTarget as Function))
-            },
-        }
-        const proxy = new Proxy(value, handler)
-        proxies.set(value, proxy)
-        proxyTargets.set(proxy, value)
-        return proxy
-    }
-
-    return { assertActive, assertRegistrationActive, assertCanCommit, wrap }
-}
-
-const createScopedV2PluginApis = (
-    baseApis: ReturnType<typeof getV2PluginAPIs>,
-    activation: V2PluginActivationScope,
-) => {
-    const scopedApis = { ...baseApis } as ReturnType<typeof getV2PluginAPIs>
-    const { assertActive, assertRegistrationActive, assertCanCommit, wrap } = createRevocableV2Capability(activation)
-    for(const key of Reflect.ownKeys(baseApis)){
-        if(key === 'getSafeGlobalThis' || key === 'SafeFunction' || key === 'safeGlobalThis'){
-            continue
-        }
-        const wrappedCapability = wrap((baseApis as any)[key])
-        ;(scopedApis as any)[key] = v2RegistrationCapabilityKeys.has(key)
-            ? (...args: any[]) => {
-                assertRegistrationActive()
-                return wrappedCapability(...args)
-            }
-            : wrappedCapability
-    }
-    // setDatabase may pause for a user confirmation before committing. The
-    // generic Promise wrapper can only notice revocation after the base call
-    // has returned, which is too late to prevent a stale plugin from changing
-    // the canonical database. Fence the synchronous commit itself.
-    scopedApis.setDatabase = (newDb: any) => {
-        // Keep this entry gate synchronous so fire-and-forget calls from an
-        // inactive plugin throw at the call site instead of creating an
-        // unhandled rejected Promise.
-        assertCanCommit()
-        return applyV2Database(newDb, assertCanCommit)
-    }
-    scopedApis.safeGlobalThis = wrap({})
-    const baseGetSafeGlobalThis = baseApis.getSafeGlobalThis
-    scopedApis.getSafeGlobalThis = () => {
-        assertActive()
-        const previousApis = globalThis.__pluginApis__
-        globalThis.__pluginApis__ = scopedApis
-        try {
-            return wrap(baseGetSafeGlobalThis())
-        }
-        finally {
-            globalThis.__pluginApis__ = previousApis
-        }
-    }
-    scopedApis.SafeFunction = new Proxy(Function, {
-        construct() {
-            assertActive()
-            return function() {
-                return scopedApis.getSafeGlobalThis()
-            }
-        },
-        apply() {
-            assertActive()
-            return function() {
-                return scopedApis.getSafeGlobalThis()
-            }
-        },
-    })
-    return scopedApis
-}
-
-async function runV2UnloadCallbacks(callbacks: Array<() => void | Promise<void>>) {
-    const promises: Promise<unknown>[] = []
-    for(const callback of callbacks){
-        try {
-            promises.push(Promise.resolve(callback()))
-        }
-        catch(error){
-            console.error('Error unloading V2.1 plugin:', error)
-        }
-    }
-    if(promises.length > 0){
-        await Promise.race([
-            Promise.allSettled(promises),
-            sleep(1000),
-        ])
-    }
-}
-
-async function rollbackV2PluginRegistrations(snapshot: V2PluginRegistrationSnapshot) {
-    // Run only callbacks installed by the failing plugin. A failure in one
-    // cleanup must not prevent restoration of the remaining registries.
-    const addedUnloadCallbacks = [...pluginV2.unload].filter(
-        callback => !snapshot.sets.unload.has(callback),
-    )
-    await runV2UnloadCallbacks(addedUnloadCallbacks)
-
-    pluginV2.providers.clear()
-    for(const [name, provider] of snapshot.providers){
-        pluginV2.providers.set(name, provider)
-    }
-    pluginV2.providerOptions.clear()
-    for(const [name, options] of snapshot.providerOptions){
-        pluginV2.providerOptions.set(name, options)
-    }
-    for(const key of pluginV2SetKeys){
-        pluginV2[key].clear()
-        for(const value of snapshot.sets[key]){
-            pluginV2[key].add(value as never)
-        }
-    }
-    customProviderStore.set(snapshot.customProviders)
-}
-
 export const allowedDbKeys = [
     'characters',
     'modules',
@@ -811,37 +528,6 @@ export const allowedDbKeys = [
     'selectedPersona',
     'characterOrder'
 ]
-
-async function applyV2Database(
-    newDb: any,
-    assertCanCommit: () => void = () => {},
-) {
-    const updates: Array<{ key: string, value: any, allowed: boolean }> = []
-    for (const key of Object.keys(newDb)) {
-        let value = newDb[key]
-        if (key === 'plugins') {
-            console.warn('[WARN] Plugin attempted to access plugin directly. this would be blocked in future versions. Instead, use the provided APIs to manage plugins. Attempting to handle plugin installation via plugin for new plugins in the provided database object.')
-            value = await handlePluginInstallViaPlugin(value)
-        }
-        updates.push({ key, value, allowed: allowedDbKeys.includes(key) })
-    }
-
-    // There are deliberately no awaits after this fence. A still-active scope
-    // enters one synchronous commit section that unload cannot interleave with
-    // on the browser main thread.
-    assertCanCommit()
-    const db = getDatabase()
-    db.pluginCustomStorage ??= {}
-    for (const update of updates) {
-        if (update.allowed) {
-            ;(db as any)[update.key] = update.value
-        }
-        else {
-            db.pluginCustomStorage[update.key] = update.value
-        }
-    }
-    setDatabase(db)
-}
 
 export const getV2PluginAPIs = () => {
     return {
@@ -979,9 +665,9 @@ export const getV2PluginAPIs = () => {
                 //@ts-expect-error spreading any[] into clearTimeout - first arg should be number | undefined
                 return globalThis.clearTimeout(...args);
             }
-            safeGlobal.alert = runtimeAlertGlobals.alert;
-            safeGlobal.confirm = runtimeAlertGlobals.confirm;
-            safeGlobal.prompt = runtimeAlertGlobals.prompt;
+            safeGlobal.alert = globalThis.alert;
+            safeGlobal.confirm = globalThis.confirm;
+            safeGlobal.prompt = globalThis.prompt;
             safeGlobal.innerWidth = window.innerWidth;
             safeGlobal.innerHeight = window.innerHeight;
             safeGlobal.getComputedStyle = window.getComputedStyle
@@ -1110,8 +796,26 @@ export const getV2PluginAPIs = () => {
                     db.pluginCustomStorage[key] = newDb[key];
                 }
             }
+            DBState.db = db;
         },
-        setDatabase: async (newDb: any) => await applyV2Database(newDb),
+        setDatabase: async (newDb: any) => {
+            const db = getDatabase();
+            db.pluginCustomStorage ??= {}
+            for (const key of Object.keys(newDb)) {
+                if (key === 'plugins') {
+                    console.warn('[WARN] Plugin attempted to access plugin directly. this would be blocked in future versions. Instead, use the provided APIs to manage plugins. Attempting to handle plugin installation via plugin for new plugins in the provided database object.')
+                    newDb[key] = await handlePluginInstallViaPlugin(newDb.plugins)
+                }
+                
+                if (allowedDbKeys.includes(key)) {
+                    (db as any)[key] = newDb[key];
+                }
+                else{
+                    db.pluginCustomStorage[key] = newDb[key];
+                }
+            }
+            setDatabase(db);
+        },
         SafeFunction: new Proxy(Function, {
             construct(target, args) {
                 return function() {
@@ -1148,39 +852,22 @@ export const getV2PluginAPIs = () => {
 
 export async function loadV2Plugin(plugins: RisuPlugin[]) {
 
-    const previousActivations = [...activeV2PluginScopes]
-    for(const activation of previousActivations){
-        activation.phase = pluginV2.loaded ? 'unloading' : 'inactive'
-    }
-
     if (pluginV2.loaded) {
-        const unloadCallbacks = [...pluginV2.unload]
-        pluginV2.unload.clear()
-        await runV2UnloadCallbacks(unloadCallbacks)
-        // A broken onUnload callback may try to register another onUnload.
-        // The old scope is inactive and must never leak into the next reload.
-        pluginV2.unload.clear()
+        for (const unload of pluginV2.unload) {
+            await unload()
+        }
 
         pluginV2.providers.clear()
-        pluginV2.providerOptions.clear()
         pluginV2.editdisplay.clear()
         pluginV2.editoutput.clear()
         pluginV2.editprocess.clear()
         pluginV2.editinput.clear()
-        pluginV2.replacerbeforeRequest.clear()
-        pluginV2.replacerafterRequest.clear()
         pluginV2.chatOutput.clear()
     }
 
-    for(const activation of previousActivations){
-        activation.phase = 'inactive'
-    }
-    activeV2PluginScopes.clear()
-
     pluginV2.loaded = true
 
-    const basePluginApis = getV2PluginAPIs()
-    globalThis.__pluginApis__ = basePluginApis
+    globalThis.__pluginApis__ = getV2PluginAPIs()
 
     for (const plugin of plugins) {
         let data = ''
@@ -1198,7 +885,7 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
 
             const policy = policyFactory.createPolicy('plugin-policy', {
                 createScript: (_input) => {
-                    return `return (async () => {
+                    return `(async () => {
                         const risuFetch = globalThis.__pluginApis__.risuFetch
                         const nativeFetch = globalThis.__pluginApis__.nativeFetch
                         const getArg = globalThis.__pluginApis__.getArg
@@ -1237,35 +924,18 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
         }
 
         if(version === '2.1'){
-            const registrationSnapshot = snapshotV2PluginRegistrations()
-            const activation: V2PluginActivationScope = {
-                name: plugin.name,
-                phase: 'active',
-            }
-            activeV2PluginScopes.add(activation)
-            const scopedPluginApis = createScopedV2PluginApis(basePluginApis, activation)
+            const safety = (await checkCodeSafety(plugin.script))
+            data = safety.modifiedCode
+            console.log('Safety check result:', safety)
+            console.log('Loading V2.1 Plugin', plugin.name, data)
 
             try {
-                const safety = (await checkCodeSafety(plugin.script))
-                data = safety.modifiedCode
-                console.log('Safety check result:', safety)
-                console.log('Loading V2.1 Plugin', plugin.name, data)
-                let initialization: unknown
-                globalThis.__pluginApis__ = scopedPluginApis
-                try {
-                    initialization = new Function(createRealScript(data))()
-                }
-                finally {
-                    globalThis.__pluginApis__ = basePluginApis
-                }
-                await waitForV2PluginInitialization(plugin.name, initialization)
-                console.log('Loaded V2.1 Plugin', plugin.name)
+                new Function(createRealScript(data))()
             } catch (error) {
                 console.error(error)
-                activation.phase = 'inactive'
-                activeV2PluginScopes.delete(activation)
-                await rollbackV2PluginRegistrations(registrationSnapshot)
             }
+
+            console.log('Loaded V2.1 Plugin', plugin.name)
         }
         else{
             data = plugin.script

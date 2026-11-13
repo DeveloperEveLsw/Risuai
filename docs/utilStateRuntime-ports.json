@@ -1,0 +1,49 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/util.ts",
+  "core": "src/ts/utilStateRuntime.ts",
+  "factory": "createUtilStateRuntime",
+  "functions": [
+    "checkPersonaBinded",
+    "getUserName",
+    "getUserIcon",
+    "getPersonaPrompt",
+    "getUserIconProtrait",
+    "findCharacterbyId",
+    "findCharacterIndexbyId",
+    "getCharacterIndexObject",
+    "getAuthorNoteDefaultText"
+  ],
+  "ports": [
+    {
+      "name": "DBState",
+      "specifier": "./stores.svelte",
+      "original": "DBState"
+    },
+    {
+      "name": "selectedCharID",
+      "specifier": "./stores.svelte",
+      "original": "selectedCharID"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "./storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "createBlankChar",
+      "specifier": "./characters",
+      "original": "createBlankChar"
+    }
+  ],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/executionContext.ts",
+  "nativeVerifiedScope": "Native per-job utility binding, bound persona/default note and character-index/lazy-definition tests; cross-chat history remains explicit",
+  "expressionPorts": [
+    {
+      "name": "readResourceValue",
+      "parameters": ["value"],
+      "expression": "value"
+    }
+  ]
+}

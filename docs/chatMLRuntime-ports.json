@@ -1,0 +1,18 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/parser/chatML.ts",
+  "core": "src/ts/parser/chatMLRuntime.ts",
+  "factory": "createChatMLRuntime",
+  "functions": ["parseChatML"],
+  "ports": [
+    {
+      "name": "risuChatParser",
+      "specifier": "./parser.svelte",
+      "original": "risuChatParser"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false,
+  "nativeBinding": "src/ts/runtime/extensionRuntime.ts",
+  "nativeVerifiedScope": "Actual ChatML parsing with the context CBS parser"
+}

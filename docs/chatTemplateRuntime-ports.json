@@ -1,0 +1,32 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/templates/chatTemplate.ts",
+  "core": "src/ts/process/templates/chatTemplateRuntime.ts",
+  "factory": "createChatTemplateRuntime",
+  "functions": ["applyChatTemplate"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "getDatabase",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "src/ts/storage/database.svelte",
+      "original": "getCurrentCharacter"
+    },
+    {
+      "name": "Template",
+      "specifier": "@huggingface/jinja",
+      "original": "Template"
+    },
+    {
+      "name": "getUserName",
+      "specifier": "src/ts/util",
+      "original": "getUserName"
+    }
+  ],
+  "globals": ["safeStructuredClone"],
+  "nativeHostIntegrated": false
+}

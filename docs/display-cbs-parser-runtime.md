@@ -1,0 +1,11 @@
+# Initialized original CBS for plain display text
+
+The browser's pinned display scope wraps the original CBS parser. Text without any opening brace or exact case-insensitive legacy `<user>`, `<char>` or `<bot>` alias only appends unchanged code units in the upstream scan. For that text the wrapper runs the original empty-input path, retains its nonempty error result, then returns the original text. This preserves context/database getters, group character lookup, argument mutation and the original call-stack limit. It does not cache callbacks or change the upstream parser declaration.
+
+Any opening brace, including malformed and legacy syntax, or a legacy alias uses the complete original parser. Nonstring runtime inputs also take that path. HTML, Unicode, isolated closing braces and legacy-looking but nonmatching tags preserve their exact text. The original display capture, read ledger, variable/source admission, Lua execution, rendering and owner lifetimes remain in place.
+
+Differential tests use the actual upstream runtime, comparing results, host calls, argument mutation and persistent variables. They include group/tokenization initialization, call-stack edges, lookup failure, legacy aliases, nested blocks/loops/functions, persistent setters, malformed braces, large authored HTML and a deterministic mixed UTF-16 corpus. Removing initialization or the legacy-tag guard must fail these tests.
+
+The root report records an actual page CPU profile and sequential before/after warm observations using the unchanged original performance fixture. The before scope comes from exact parent Git bytes through the fixture's observed override; the after scope uses current source without overrides. All56 stateful Lua calls and44 unaffected rows must remain. A first comparison run overlapped source edits and is retained separately, excluded from the comparison. Profiles include sampling overhead and overlapping ancestors; they are diagnosis, not latency evidence.
+
+This reduces scanning of plain text, not arbitrary CBS-heavy work, capture/fork/identity costs, DOM work or initial resources. Long tasks remain, and page CPU4x is neither verified worker throttling nor physical mobile. The schema stays14. All15 configured-trial requirements remain active; production/private content, deployment and remote push are outside this work.

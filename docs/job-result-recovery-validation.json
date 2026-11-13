@@ -1,0 +1,108 @@
+{
+  "sourceBase": "a6908a918cc92c85eabee4903b6f6e1a3d5a1a46",
+  "verifiedAt": "2026-10-04T02:00:24.737516+00:00",
+  "scope": "local public code/authored synthetic data only",
+  "wholeGoalComplete": false,
+  "all15Preserved": true,
+  "schemaVersion": 16,
+  "application": {
+    "passed": 433,
+    "existingSkipped": 3
+  },
+  "backend": {
+    "passed": 255,
+    "skipped": 0
+  },
+  "browser": {
+    "passed": 2,
+    "skipped": 0,
+    "cases": [
+      "built group streaming/reroll/process kill/service restart",
+      "two authenticated browsers raw inspection/concurrent recovery/modal navigation/peer conflict/partial output/reload"
+    ]
+  },
+  "types": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "builds": {
+    "native": "passed",
+    "entityWeb": "passed",
+    "ordinaryWeb": "passed"
+  },
+  "audit": {
+    "declarations": 168,
+    "originalBodies": 166,
+    "priorPolicies": 2
+  },
+  "nativeRecovery": {
+    "providerCallsBeforeRecovery": 2,
+    "providerCallsAfterRecovery": 2,
+    "savedMessages": 3,
+    "savedMessageStatistics": 3,
+    "scriptEffects": "original output regex/triggers/Lua retained exactly once"
+  },
+  "logs": [
+    {
+      "path": "evidence/local-job-result-recovery-logs/app.log",
+      "sha256": "bfeea10c0b17e5dbc16787e5a4476c4067dc2248b45dc43399b55a3926795ead"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/backend.log",
+      "sha256": "1b8c05b2c766e8c76bc150844acf0ba269eaf37da93af7bb91793a3671c9f04b"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/check.log",
+      "sha256": "9a5cff9808323067e45f86803d35d10cd3c0671652baa34f2a554e7eff360fb8"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/native-build.log",
+      "sha256": "5e9356b3a2eb1686e5fcae8ce027416b1180f8a6967c6fa1abebc5e61b152337"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/web.log",
+      "sha256": "1214e9af12f116c301cb5943703cfb947c44c172b136422e1b6542353c3cf1a0"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/ordinary-web.log",
+      "sha256": "d37a525c0d03ec5f2798ef0fbd8f854d607bb5211bac66e31950b2ea00c97cd3"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/audit.log",
+      "sha256": "58cfcafd2fc3cfc60e3a6b0d437808bd1345578e81d2c0f21c3954d54161532e"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/browser.log",
+      "sha256": "4f70640b1868c95360ffd3464667e7aaa341614e7b3efd6034370f914b3b6d98"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/browser-legacy-label.log",
+      "sha256": "7440445ea6a1a2968eb4003070bf4434aea7be55f67df76741ff0d902d740a62"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/native.log",
+      "sha256": "0df2c66ca758e62e1c14c45019a489d304e062093777b79f4a553a4a72130694"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/tests.log",
+      "sha256": "5f2787a391c5874b1c831d451add452c30f342f8a09a1b3d5cc403d9173001e4"
+    },
+    {
+      "path": "evidence/local-job-result-recovery-logs/initial.log",
+      "sha256": "8ef90d58b029db84f83c30681e0dc4b57b144f720998a72b6086eddb65177df7"
+    }
+  ],
+  "productionAccess": false,
+  "deployment": false,
+  "remotePush": false,
+  "actualProviderRequests": 0,
+  "pending": [
+    "explicit retry",
+    "reply variants",
+    "general extensions",
+    "complete read dependencies",
+    "physical mobile",
+    "representative latency/long tasks",
+    "all15 configured trial"
+  ]
+}

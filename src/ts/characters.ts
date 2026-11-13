@@ -1,254 +1,364 @@
 import { get, writable } from "svelte/store";
-import { saveImage, type character, type Chat, defaultSdDataFunc, type loreBook, getDatabase, getCharacterByIndex, setCharacterByIndex } from "./storage/database.svelte";
-import { alertAddCharacter, alertConfirm, alertError, alertNormal, alertSelect, alertStore, alertWait } from "./alert";
+import {
+  entityRuntimeEnabled,
+  browserRuntime,
+  reportRuntimeError,
+} from "./runtime/browserRuntimeState.svelte";
+
+import {
+  saveImage,
+  type character,
+  type groupChat,
+  type Chat,
+  defaultSdDataFunc,
+  type loreBook,
+  getDatabase,
+  getCharacterByIndex,
+  setCharacterByIndex,
+} from "./storage/database.svelte";
+
+import {
+  alertAddCharacter,
+  alertConfirm,
+  alertError,
+  alertNormal,
+  alertSelect,
+  alertStore,
+  alertWait,
+} from "./alert";
+
 import { language } from "../lang";
-import { checkNullish, findCharacterbyId, findCharacterIndexbyId, getUserName, selectMultipleFile, selectSingleFile } from "./util";
-import { v4 as uuidv4, v4 } from 'uuid';
+
+import {
+  checkNullish,
+  findCharacterbyId,
+  findCharacterIndexbyId,
+  getUserName,
+  selectMultipleFile,
+  selectSingleFile,
+} from "./util";
+
+import { v4 as uuidv4, v4 } from "uuid";
+
 import { getImageType } from "./media";
-import { DBState, MobileGUIStack, OpenRealmStore, selectedCharID, setSelectedCharacterForPresentation } from "./stores.svelte";
-import { AppendableBuffer, changeChatTo, checkCharOrder, downloadFile, getFileSrc, requiresFullEncoderReload } from "./globalApi.svelte";
+
+import {
+  DBState,
+  MobileGUIStack,
+  OpenRealmStore,
+  selectedCharID,
+} from "./stores.svelte";
+
+import {
+  AppendableBuffer,
+  changeChatTo,
+  checkCharOrder,
+  downloadFile,
+  getFileSrc,
+  requiresFullEncoderReload,
+} from "./globalApi.svelte";
+
 import { updateInlayScreen } from "./process/inlayScreen";
+
 import { parseMarkdownSafe } from "./parser/parser.svelte";
+
 import { translateHTML } from "./translator/translator";
-import { doingChat, localGenerationExecutionActive } from "./process/index.svelte";
+
+import { doingChat } from "./process/index.svelte";
+
 import { importCharacter } from "./characterCards";
+
 import { PngChunk } from "./pngChunk";
+
 import { getColdStorageItem } from "./process/coldstorage.svelte";
-import { isNodeServer, isServerResidentExecutor } from "./platform";
-import { runtimeGenerationActive } from "./runtime/generationActivity.svelte";
 
-export function createNewCharacter() {
-    DBState.db.characters.push(createBlankChar())
-    checkCharOrder()
-    return DBState.db.characters.length - 1
+export async function createServerCharacter(value: character | groupChat) {
+  const { chats, chatPage: _page, reloadKeys: _reload, ...definition } = value;
+  const { message: _messages, scriptstate: _variables, ...metadata } = chats[0];
+  await browserRuntime().createCharacter(
+    JSON.parse(JSON.stringify(definition)),
+    JSON.parse(JSON.stringify(metadata)),
+  );
+  return DBState.db.characters.findIndex((c) => c.chaId === value.chaId);
 }
 
-export function createNewGroup(){
-    DBState.db.characters.push({
-        type: 'group',
-        name: "",
-        firstMessage: "",
-        chats: [{
-            message: [],
-            note: '',
-            name: 'Chat 1',
-            localLore: []
-        }],
-        chatFolders: [],
-        chatPage: 0,
-        viewScreen: 'none',
-        globalLore: [],
-        characters: [],
-        autoMode: false,
-        useCharacterLore: true,
-        emotionImages: [],
-        customscript: [],
-        chaId: uuidv4(),
-        firstMsgIndex: -1,
-        characterTalks: [],
-        characterActive: [],
-        realmId: ''
-    })
-    checkCharOrder()
-    return DBState.db.characters.length - 1
+export async function createNewCharacter() {
+  const value = createBlankChar();
+  if (entityRuntimeEnabled) return createServerCharacter(value);
+  DBState.db.characters.push(value);
+  checkCharOrder();
+  return DBState.db.characters.length - 1;
 }
 
-export async function getCharImage(loc:string, type:'plain'|'css'|'contain'|'lgcss') {
-    const db = DBState.db
-    
-    // Return placeholder when hideAllImages is enabled
-    if(db.hideAllImages){
-        if(type === 'plain'){
-            return '/none.webp'
+export async function createNewGroup() {
+  const value: groupChat = {
+    type: "group",
+    name: "",
+    firstMessage: "",
+    chats: [
+      {
+        message: [],
+        note: "",
+        name: "Chat 1",
+        localLore: [],
+      },
+    ],
+    chatFolders: [],
+    chatPage: 0,
+    viewScreen: "none",
+    globalLore: [],
+    characters: [],
+    autoMode: false,
+    useCharacterLore: true,
+    emotionImages: [],
+    customscript: [],
+    chaId: uuidv4(),
+    firstMsgIndex: -1,
+    characterTalks: [],
+    characterActive: [],
+    realmId: "",
+  };
+  if (entityRuntimeEnabled) return createServerCharacter(value);
+  DBState.db.characters.push(value);
+  checkCharOrder();
+  return DBState.db.characters.length - 1;
+}
+
+export async function getCharImage(
+  loc: string,
+  type: "plain" | "css" | "contain" | "lgcss",
+) {
+  const db = DBState.db;
+
+  // Return placeholder when hideAllImages is enabled
+  if (db.hideAllImages) {
+    if (type === "plain") {
+      return "/none.webp";
+    }
+    return ""; // For CSS types, return empty to show default ? icon
+  }
+
+  if (!loc || loc === "") {
+    if (type === "css") {
+      return "";
+    }
+    return null;
+  }
+  const filesrc = await getFileSrc(loc);
+  if (type === "plain") {
+    return filesrc;
+  } else if (type === "css") {
+    return `background: url("${filesrc}");background-size: cover;`;
+  } else if (type === "lgcss") {
+    return `background: url("${filesrc}");background-size: cover;height: 10.66rem;`;
+  } else {
+    return `background: url("${filesrc}");background-size: contain;background-repeat: no-repeat;background-position: center;`;
+  }
+}
+
+export async function selectCharImg(charIndex: number) {
+  const selected = await selectSingleFile([
+    "png",
+    "webp",
+    "gif",
+    "jpg",
+    "jpeg",
+  ]);
+  if (!selected) {
+    return;
+  }
+  const img = selected.data;
+  let db = DBState.db;
+
+  const type = getImageType(img);
+
+  try {
+    if (type === "PNG" && db.characters[charIndex].type === "character") {
+      const gen = PngChunk.readGenerator(img);
+      const allowedChunk = [
+        "parameters",
+        "Comment",
+        "Title",
+        "Description",
+        "Author",
+        "Software",
+        "Source",
+        "Disclaimer",
+        "Warning",
+        "Copyright",
+      ];
+      for await (const chunk of gen) {
+        if (chunk instanceof AppendableBuffer) {
+          continue;
         }
-        return ''  // For CSS types, return empty to show default ? icon
-    }
-    
-    if(!loc || loc === ''){
-        if(type ==='css'){
-            return ''
+        if (!chunk) {
+          continue;
         }
-        return null
-    }
-    const filesrc = await getFileSrc(loc)
-    if(type === 'plain'){
-        return filesrc
-    }
-    else if(type ==='css'){
-        return `background: url("${filesrc}");background-size: cover;`
-    }
-    else if(type === 'lgcss'){
-        return `background: url("${filesrc}");background-size: cover;height: 10.66rem;`
-
-    }
-
-    else{
-        return `background: url("${filesrc}");background-size: contain;background-repeat: no-repeat;background-position: center;`
-    }
-}
-
-export async function selectCharImg(charIndex:number) {
-    const selected = await selectSingleFile(['png', 'webp', 'gif', 'jpg', 'jpeg'])
-    if(!selected){
-        return
-    }
-    const img = selected.data
-    let db = DBState.db
-
-    const type = getImageType(img)
-
-    try {
-        if(type === 'PNG' && db.characters[charIndex].type === 'character'){
-            const gen = PngChunk.readGenerator(img)
-            const allowedChunk = [
-                'parameters', 'Comment', 'Title', 'Description', 'Author', 'Software', 'Source', 'Disclaimer', 'Warning', 'Copyright',
-            ]
-            for await (const chunk of gen){
-                if(chunk instanceof AppendableBuffer){
-                    continue
-                }
-                if(!chunk){
-                    continue
-                }
-                if(chunk.value.length > 20_000){
-                    continue
-                }
-                if(allowedChunk.includes(chunk.key)){
-                    console.log(chunk.key, chunk.value)
-                    db.characters[charIndex].extentions ??= {}
-                    db.characters[charIndex].extentions.pngExif ??= {}
-                    db.characters[charIndex].extentions.pngExif[chunk.key] = chunk.value
-                }
-            }
-            console.log(db.characters[charIndex].extentions)
-        }   
-    } catch (error) {
-        console.error(error)
-    }
-
-
-
-    const imgp = await saveImage(img)
-    dumpCharImage(charIndex)
-    DBState.db.characters[charIndex].image = imgp
-}
-
-export function dumpCharImage(charIndex:number) {
-    const char = DBState.db.characters[charIndex] as character
-    if(!char.image || char.image === ''){
-        return
-    }
-    char.ccAssets ??= []
-    char.ccAssets.push({
-        type: 'icon',
-        name: 'iconx',
-        uri: char.image,
-        ext: 'png'
-    })
-    char.image = ''
-    DBState.db.characters[charIndex] = char
-}
-
-export function changeCharImage(charIndex:number,changeIndex:number) {
-    const char = DBState.db.characters[charIndex] as character
-    const image = char.ccAssets[changeIndex].uri
-    char.ccAssets.splice(changeIndex, 1)
-    dumpCharImage(charIndex)
-    char.image = image
-    DBState.db.characters[charIndex] = char
-}
-
-
-export const addingEmotion = writable(false)
-
-export async function addCharEmotion(charId:number) {
-    addingEmotion.set(true)
-    const selected = await selectMultipleFile(['png', 'webp', 'gif'])
-    if(!selected){
-        addingEmotion.set(false)
-        return
-    }
-    let db = DBState.db
-    for(const f of selected){
-        const img = f.data
-        const imgp = await saveImage(img)
-        const name = f.name.replace('.png','').replace('.webp','')
-        let dbChar = db.characters[charId]
-        if(dbChar.type !== 'group'){
-            dbChar.emotionImages.push([name,imgp])
-            DBState.db.characters[charId] = dbChar
+        if (chunk.value.length > 20_000) {
+          continue;
         }
+        if (allowedChunk.includes(chunk.key)) {
+          console.log(chunk.key, chunk.value);
+          db.characters[charIndex].extentions ??= {};
+          db.characters[charIndex].extentions.pngExif ??= {};
+          db.characters[charIndex].extentions.pngExif[chunk.key] = chunk.value;
+        }
+      }
+      console.log(db.characters[charIndex].extentions);
     }
-    addingEmotion.set(false)
+  } catch (error) {
+    console.error(error);
+  }
+
+  const imgp = await saveImage(img);
+  dumpCharImage(charIndex);
+  DBState.db.characters[charIndex].image = imgp;
 }
 
-export function rmCharEmotion(charId:number, emotionId:number) {
-    let dbChar = DBState.db.characters[charId]
-    if(dbChar.type !== 'group'){
-        dbChar.emotionImages.splice(emotionId, 1)
-        DBState.db.characters[charId] = dbChar
-    }
+export function dumpCharImage(charIndex: number) {
+  const char = DBState.db.characters[charIndex] as character;
+  if (!char.image || char.image === "") {
+    return;
+  }
+  char.ccAssets ??= [];
+  char.ccAssets.push({
+    type: "icon",
+    name: "iconx",
+    uri: char.image,
+    ext: "png",
+  });
+  char.image = "";
+  DBState.db.characters[charIndex] = char;
 }
 
+export function changeCharImage(charIndex: number, changeIndex: number) {
+  const char = DBState.db.characters[charIndex] as character;
+  const image = char.ccAssets[changeIndex].uri;
+  char.ccAssets.splice(changeIndex, 1);
+  dumpCharImage(charIndex);
+  char.image = image;
+  DBState.db.characters[charIndex] = char;
+}
 
-export async function exportChat(page:number){
-    try {
+export const addingEmotion = writable(false);
 
-        const mode = await alertSelect(['Export as JSON', "Export as TXT", "Export as HTML File", "Export as HTML Embed"])
-        const doTranslate = (mode === '2' || mode === '3') ? (await alertSelect([language.translateContent, language.doNotTranslate])) === '0' : false
-        const anonymous = (mode === '2' || mode === '3') ? ((await alertSelect([language.includePersonaName, language.hidePersonaName])) === '1') : false
-        const selectedID = get(selectedCharID)
-        const db = DBState.db
-        const chat = db.characters[selectedID].chats[page]
-        const char = db.characters[selectedID]
-        const date = new Date().toJSON();
-        const htmlChatParse = async (v:string) => {
-            v = parseMarkdownSafe(v)
+export async function addCharEmotion(charId: number) {
+  addingEmotion.set(true);
+  const selected = await selectMultipleFile(["png", "webp", "gif"]);
+  if (!selected) {
+    addingEmotion.set(false);
+    return;
+  }
+  let db = DBState.db;
+  for (const f of selected) {
+    const img = f.data;
+    const imgp = await saveImage(img);
+    const name = f.name.replace(".png", "").replace(".webp", "");
+    let dbChar = db.characters[charId];
+    if (dbChar.type !== "group") {
+      dbChar.emotionImages.push([name, imgp]);
+      DBState.db.characters[charId] = dbChar;
+    }
+  }
+  addingEmotion.set(false);
+}
 
-            if(doTranslate){
-                v = await translateHTML(v, false, '', -1)
-            }
+export function rmCharEmotion(charId: number, emotionId: number) {
+  let dbChar = DBState.db.characters[charId];
+  if (dbChar.type !== "group") {
+    dbChar.emotionImages.splice(emotionId, 1);
+    DBState.db.characters[charId] = dbChar;
+  }
+}
 
-            if(anonymous){
-                //case insensitive match, replace all
-                const excapedName = char.name.replace(/[-\/\\^$*+\?\.()|[\]{}]/g, '\\$&')
+export async function exportChat(page: number) {
+  try {
+    const mode = await alertSelect([
+      "Export as JSON",
+      "Export as TXT",
+      "Export as HTML File",
+      "Export as HTML Embed",
+    ]);
+    const doTranslate =
+      mode === "2" || mode === "3"
+        ? (await alertSelect([
+            language.translateContent,
+            language.doNotTranslate,
+          ])) === "0"
+        : false;
+    const anonymous =
+      mode === "2" || mode === "3"
+        ? (await alertSelect([
+            language.includePersonaName,
+            language.hidePersonaName,
+          ])) === "1"
+        : false;
+    const selectedID = get(selectedCharID);
+    const db = DBState.db;
+    const chat = db.characters[selectedID].chats[page];
+    const char = db.characters[selectedID];
+    const date = new Date().toJSON();
+    const htmlChatParse = async (v: string) => {
+      v = parseMarkdownSafe(v);
 
-                v = v.replace(new RegExp(`${excapedName}`, 'gi'), '×××')
-            }
+      if (doTranslate) {
+        v = await translateHTML(v, false, "", -1);
+      }
 
-            return v
-        }
+      if (anonymous) {
+        //case insensitive match, replace all
+        const excapedName = char.name.replace(
+          /[-\/\\^$*+\?\.()|[\]{}]/g,
+          "\\$&",
+        );
 
-        if(mode === '0'){
-            let folders = []
-            if(chat.folderId) {
-                folders = db.characters[selectedID].chatFolders?.filter(f => f.id === chat.folderId)
-            }
-            const stringl = Buffer.from(JSON.stringify({
-                type: 'risuChat',
-                ver: 2,
-                data: chat,
-                folders: folders
-            }), 'utf-8')
-    
-            await downloadFile(`${char.name}_${date}_chat`.replace(/[<>:"/\\|?*\.\,]/g, "") + '.json', stringl)
-    
-        }
-        else if(mode === '2'){
+        v = v.replace(new RegExp(`${excapedName}`, "gi"), "×××");
+      }
 
-            let chatContentHTML = ''
+      return v;
+    };
 
-            let i = 0
-            for(const v of chat.message){
-                alertWait(`Translating... ${i++}/${chat.message.length}`)
-                const name = v.saying ? findCharacterbyId(v.saying).name : v.role === 'char' ? char.name : anonymous ? '×××' : getUserName()
-                chatContentHTML += `<div class="chat">
+    if (mode === "0") {
+      let folders = [];
+      if (chat.folderId) {
+        folders = db.characters[selectedID].chatFolders?.filter(
+          (f) => f.id === chat.folderId,
+        );
+      }
+      const stringl = Buffer.from(
+        JSON.stringify({
+          type: "risuChat",
+          ver: 2,
+          data: chat,
+          folders: folders,
+        }),
+        "utf-8",
+      );
+
+      await downloadFile(
+        `${char.name}_${date}_chat`.replace(/[<>:"/\\|?*\.\,]/g, "") + ".json",
+        stringl,
+      );
+    } else if (mode === "2") {
+      let chatContentHTML = "";
+
+      let i = 0;
+      for (const v of chat.message) {
+        alertWait(`Translating... ${i++}/${chat.message.length}`);
+        const name = v.saying
+          ? findCharacterbyId(v.saying).name
+          : v.role === "char"
+            ? char.name
+            : anonymous
+              ? "×××"
+              : getUserName();
+        chatContentHTML += `<div class="chat">
                     <h2>${name}</h2>
                     <div>${await htmlChatParse(v.data)}</div>
-                </div>`
-            }
+                </div>`;
+      }
 
-            const doc = `
+      const doc = `
                 <!DOCTYPE html>
                 <html>
                     <head>
@@ -291,35 +401,46 @@ export async function exportChat(page:number){
                             <div class="chat">
                                 <h2>${char.name}</h2>
                                 <div>${await htmlChatParse(
-                                    chat.fmIndex === -1 ? char.firstMessage : char.alternateGreetings?.[chat.fmIndex ?? 0]
+                                  chat.fmIndex === -1
+                                    ? char.firstMessage
+                                    : char.alternateGreetings?.[
+                                        chat.fmIndex ?? 0
+                                      ],
                                 )}</div>
                             </div>
                             ${chatContentHTML}
                         </div>
-                        <div class="idat">${
-                            JSON.stringify(chat).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                        }</div>
+                        <div class="idat">${JSON.stringify(chat)
+                          .replace(/</g, "&lt;")
+                          .replace(/>/g, "&gt;")}</div>
                     </body>
-            `
+            `;
 
+      await downloadFile(
+        `${char.name}_${date}_chat`.replace(/[<>:"/\\|?*\.\,]/g, "") + ".html",
+        Buffer.from(doc, "utf-8"),
+      );
+    } else if (mode === "3") {
+      //create a html table
+      let chatContentHTML = "";
 
-            await downloadFile(`${char.name}_${date}_chat`.replace(/[<>:"/\\|?*\.\,]/g, "") + '.html', Buffer.from(doc, 'utf-8'))
-        }
-        else if(mode === '3'){
-            //create a html table
-            let chatContentHTML = ''
-
-            let i = 0
-            for(const v of chat.message){
-                alertWait(`Translating... ${i++}/${chat.message.length}`)
-                const name = v.saying ? findCharacterbyId(v.saying).name : v.role === 'char' ? char.name : anonymous ? '×××' : getUserName()
-                chatContentHTML += `<tr>
+      let i = 0;
+      for (const v of chat.message) {
+        alertWait(`Translating... ${i++}/${chat.message.length}`);
+        const name = v.saying
+          ? findCharacterbyId(v.saying).name
+          : v.role === "char"
+            ? char.name
+            : anonymous
+              ? "×××"
+              : getUserName();
+        chatContentHTML += `<tr>
                     <td>${name}</td>
                     <td>${await htmlChatParse(v.data)}</td>
-                </tr>`
-            }
+                </tr>`;
+      }
 
-            const template = `
+      const template = `
                 <table>
                     <tr>
                         <th>Character</th>
@@ -332,655 +453,609 @@ export async function exportChat(page:number){
                     ${chatContentHTML}
                 </table>
                 <p>Chat from Risuai</p>
-            `
+            `;
 
-            //copy to clipboard
+      //copy to clipboard
 
-            const item = new ClipboardItem({
-                'text/html': new Blob([template], { type: 'text/html' }),
-                'text/plain': new Blob([template], { type: 'text/plain' })
-            })
-            await navigator.clipboard.write([item])
+      const item = new ClipboardItem({
+        "text/html": new Blob([template], { type: "text/html" }),
+        "text/plain": new Blob([template], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([item]);
 
-            alertNormal(language.clipboardSuccess)
-            return
+      alertNormal(language.clipboardSuccess);
+      return;
+    } else {
+      let stringl = chat.message
+        .map((v) => {
+          if (v.saying) {
+            return `--${findCharacterbyId(v.saying).name}\n${v.data}`;
+          } else {
+            return `--${v.role === "char" ? char.name : getUserName()}\n${v.data}`;
+          }
+        })
+        .join("\n\n");
 
-        }
-        else{
-            
-            let stringl = chat.message.map((v) => {
-                if(v.saying){
-                    return `--${findCharacterbyId(v.saying).name}\n${v.data}`
-                }
-                else{
-                    return `--${v.role === 'char' ? char.name : getUserName()}\n${v.data}`
-                }
-            }).join('\n\n')
+      if (char.type !== "group") {
+        stringl = `--${char.name}\n${char.firstMessage}\n\n` + stringl;
+      }
 
-            if(char.type !== 'group'){
-                stringl = `--${char.name}\n${char.firstMessage}\n\n` + stringl
-            }
-
-            await downloadFile(`${char.name}_${date}_chat`.replace(/[<>:"/\\|?*\.\,]/g, "") + '.txt', Buffer.from(stringl, 'utf-8'))
-
-        }
-        alertNormal(language.successExport)
-    } catch (error) {
-        alertError(error)
+      await downloadFile(
+        `${char.name}_${date}_chat`.replace(/[<>:"/\\|?*\.\,]/g, "") + ".txt",
+        Buffer.from(stringl, "utf-8"),
+      );
     }
+    alertNormal(language.successExport);
+  } catch (error) {
+    alertError(error);
+  }
 }
 
-export async function importChat(){
-    const dat =await selectSingleFile(['json','jsonl','txt','html'])
-    if(!dat){
-        return
+export async function importChat() {
+  const dat = await selectSingleFile(["json", "jsonl", "txt", "html"]);
+  if (!dat) {
+    return;
+  }
+  try {
+    const selectedID = get(selectedCharID);
+
+    if (dat.name.endsWith("jsonl")) {
+      const lines = Buffer.from(dat.data).toString("utf-8").split("\n");
+      let newChat: Chat = {
+        message: [],
+        note: "",
+        name: "Imported Chat",
+        localLore: [],
+        fmIndex: -1,
+        id: v4(),
+      };
+
+      let isFirst = true;
+      for (const line of lines) {
+        const presedLine = JSON.parse(line);
+        if ((presedLine.name && presedLine.is_user, presedLine.mes)) {
+          if (!isFirst) {
+            newChat.message.push({
+              role: presedLine.is_user ? "user" : "char",
+              data: formatTavernChat(
+                presedLine.mes,
+                DBState.db.characters[selectedID].name,
+              ),
+            });
+          }
+        }
+
+        isFirst = false;
+      }
+
+      if (newChat.message.length === 0) {
+        alertError(language.errors.noData);
+        return;
+      }
+
+      if (
+        DBState.db.characters[selectedID].chatFolders.filter(
+          (folder) => folder.id === newChat.folderId,
+        ).length === 0
+      ) {
+        newChat.folderId = null;
+      }
+
+      DBState.db.characters[selectedID].chats.unshift(newChat);
+      changeChatTo(0);
+      alertNormal(language.successImport);
+    } else if (dat.name.endsWith("json")) {
+      const json = JSON.parse(Buffer.from(dat.data).toString("utf-8"));
+      if (
+        (json.type === "risuAllChats" || json.type === "risuChat") &&
+        json.ver === 2
+      ) {
+        const folders = json.folders || [];
+        const chats = Array.isArray(json.data) ? json.data : [json.data];
+        const selectedID = get(selectedCharID);
+        let db = getDatabase();
+        let folderIdMap = {};
+        folders.forEach((folder) => {
+          if (
+            db.characters[selectedID].chatFolders?.some(
+              (f) => f.id === folder.id,
+            )
+          ) {
+            const newId = uuidv4();
+            folderIdMap[folder.id] = newId;
+            folder.id = newId;
+          } else {
+            folderIdMap[folder.id] = folder.id;
+          }
+        });
+        if (db.characters[selectedID].chatFolders === undefined) {
+          db.characters[selectedID].chatFolders = [];
+        }
+        db.characters[selectedID].chatFolders.push(...folders);
+        chats.forEach((chat) => {
+          if (chat.folderId && folderIdMap[chat.folderId]) {
+            chat.folderId = folderIdMap[chat.folderId];
+          }
+          chat.id = v4();
+        });
+        DBState.db.characters[selectedID].chats.unshift(...chats);
+        alertNormal(language.successImport);
+        return;
+      }
+      if (json.type === "risuAllChats" && json.ver === 1) {
+        const chats = json.data;
+        if (Array.isArray(chats) && chats.length > 0) {
+          DBState.db.characters[selectedID].chats.unshift(
+            ...chats.map((v) => {
+              if (!v.id) {
+                v.id = uuidv4();
+              }
+              if (!v.localLore) {
+                v.localLore = [];
+              }
+              v.fmIndex ??= -1;
+              return v;
+            }),
+          );
+          alertNormal(language.successImport);
+          return;
+        } else {
+          alertError(language.errors.noData);
+          return;
+        }
+      }
+      if (json.type === "risuChat" && json.ver === 1) {
+        const das: Chat = json.data;
+        if (
+          !(
+            checkNullish(das.message) ||
+            checkNullish(das.note) ||
+            checkNullish(das.name) ||
+            checkNullish(das.localLore)
+          )
+        ) {
+          das.fmIndex ??= -1;
+          das.id = v4();
+          DBState.db.characters[selectedID].chats.unshift(das);
+          alertNormal(language.successImport);
+          return;
+        } else {
+          alertError(language.errors.noData);
+          return;
+        }
+      } else {
+        alertError(language.errors.noData);
+        return;
+      }
+    } else if (dat.name.endsWith("html")) {
+      const doc = new DOMParser().parseFromString(
+        Buffer.from(dat.data).toString("utf-8"),
+        "text/html",
+      );
+      const chat = doc.querySelector(".idat").textContent;
+      const json = JSON.parse(chat);
+      if (json.message && json.note && json.name && json.localLore) {
+        DBState.db.characters[selectedID].chats.unshift(json);
+        alertNormal(language.successImport);
+      } else {
+        alertError(language.errors.noData);
+      }
     }
-    try {
-        const selectedID = get(selectedCharID)
-
-        if(dat.name.endsWith('jsonl')){
-            const lines = Buffer.from(dat.data).toString('utf-8').split('\n')
-            let newChat:Chat = {
-                message: [],
-                note: "",
-                name: "Imported Chat",
-                localLore: [],
-                fmIndex: -1,
-                id: v4()
-            }
-
-            let isFirst = true
-            for(const line of lines){
-                
-                const presedLine = JSON.parse(line)
-                if(presedLine.name && presedLine.is_user, presedLine.mes){
-                    if(!isFirst){
-                        newChat.message.push({
-                            role: presedLine.is_user ? "user" : 'char',
-                            data: formatTavernChat(presedLine.mes, DBState.db.characters[selectedID].name)
-                        })
-                    }
-                }
-
-                isFirst = false
-            }
-
-            if(newChat.message.length === 0){
-                alertError(language.errors.noData)
-                return
-            }
-
-            if(DBState.db.characters[selectedID].chatFolders
-                .filter(folder => folder.id === newChat.folderId).length === 0) {
-                newChat.folderId = null
-            }
-
-            DBState.db.characters[selectedID].chats.unshift(newChat)
-            changeChatTo(0)
-            alertNormal(language.successImport)
-        }
-        else if(dat.name.endsWith('json')){
-            const json = JSON.parse(Buffer.from(dat.data).toString('utf-8'))
-            if((json.type === 'risuAllChats' || json.type === 'risuChat') && json.ver === 2){
-                const folders = json.folders || []
-                const chats = Array.isArray(json.data) ? json.data : [json.data]
-                const selectedID = get(selectedCharID)
-                let db = getDatabase()
-                let folderIdMap = {}
-                folders.forEach(folder => {
-                    if(db.characters[selectedID].chatFolders?.some(f => f.id === folder.id)){
-                        const newId = uuidv4()
-                        folderIdMap[folder.id] = newId
-                        folder.id = newId
-                    } else {
-                        folderIdMap[folder.id] = folder.id
-                    }
-                })
-                if(db.characters[selectedID].chatFolders === undefined){
-                    db.characters[selectedID].chatFolders = []
-                }
-                db.characters[selectedID].chatFolders.push(...folders)
-                chats.forEach(chat => {
-                    if(chat.folderId && folderIdMap[chat.folderId]){
-                        chat.folderId = folderIdMap[chat.folderId]
-                    }
-                    chat.id = v4()
-                })
-                DBState.db.characters[selectedID].chats.unshift(...chats)
-                alertNormal(language.successImport)
-                return
-            }
-            if(json.type === 'risuAllChats' && json.ver === 1){
-                const chats = json.data
-                if(Array.isArray(chats) && chats.length > 0){
-                    DBState.db.characters[selectedID].chats.unshift(...(chats.map((v) => {
-                        if(!v.id){
-                            v.id = uuidv4()
-                        }
-                        if(!v.localLore){
-                            v.localLore = []
-                        }
-                        v.fmIndex ??= -1
-                        return v
-                    })))
-                    alertNormal(language.successImport)
-                    return
-                } else {
-                    alertError(language.errors.noData)
-                    return
-                }
-            }
-            if(json.type === 'risuChat' && json.ver === 1){
-                const das:Chat = json.data
-                if(!(checkNullish(das.message) || checkNullish(das.note) || checkNullish(das.name) || checkNullish(das.localLore))){
-                    das.fmIndex ??= -1
-                    das.id = v4()
-                    DBState.db.characters[selectedID].chats.unshift(das)
-                    alertNormal(language.successImport)
-                    return
-                }
-                else{
-                    alertError(language.errors.noData)
-                    return   
-                }
-            }
-            else{
-                alertError(language.errors.noData)
-                return
-            }
-        }
-        else if(dat.name.endsWith('html')){
-            const doc = new DOMParser().parseFromString(Buffer.from(dat.data).toString('utf-8'), 'text/html')
-            const chat = doc.querySelector('.idat').textContent
-            const json = JSON.parse(chat)
-            if(json.message && json.note && json.name && json.localLore){
-                DBState.db.characters[selectedID].chats.unshift(json)
-                alertNormal(language.successImport)
-            }
-            else{
-                alertError(language.errors.noData)
-            }
-        }
-    } catch (error) {
-        alertError(error)
-    }
+  } catch (error) {
+    alertError(error);
+  }
 }
 
 export async function exportAllChats() {
-    try {
-        const selectedID = get(selectedCharID)
-        const db = getDatabase()
-        const char = db.characters[selectedID]
-        const date = new Date().toISOString().replace(/[:.]/g, "-")
-        const allChats = char.chats
-        const allFolders = char.chatFolders
-        const stringl = Buffer.from(JSON.stringify({
-            type: 'risuAllChats',
-            ver: 2,
-            data: allChats,
-            folders: allFolders
-        }), 'utf-8')
-        await downloadFile(`${char.name}_all_chats_${date}`.replace(/[<>:"/\\|?*.,]/g, "") + '.json', stringl)
-        alertNormal(language.successExport)
-    } catch (error) {
-        alertError(error)
-    }
+  try {
+    const selectedID = get(selectedCharID);
+    const db = getDatabase();
+    const char = db.characters[selectedID];
+    const date = new Date().toISOString().replace(/[:.]/g, "-");
+    const allChats = char.chats;
+    const allFolders = char.chatFolders;
+    const stringl = Buffer.from(
+      JSON.stringify({
+        type: "risuAllChats",
+        ver: 2,
+        data: allChats,
+        folders: allFolders,
+      }),
+      "utf-8",
+    );
+    await downloadFile(
+      `${char.name}_all_chats_${date}`.replace(/[<>:"/\\|?*.,]/g, "") + ".json",
+      stringl,
+    );
+    alertNormal(language.successExport);
+  } catch (error) {
+    alertError(error);
+  }
 }
 
-function formatTavernChat(chat:string, charName:string){
-    const db = getDatabase()
-    return chat.replace(/<([Uu]ser)>|\{\{([Uu]ser)\}\}/g, getUserName()).replace(/((\{\{)|<)([Cc]har)(=.+)?((\}\})|>)/g, charName)
+function formatTavernChat(chat: string, charName: string) {
+  const db = getDatabase();
+  return chat
+    .replace(/<([Uu]ser)>|\{\{([Uu]ser)\}\}/g, getUserName())
+    .replace(/((\{\{)|<)([Cc]har)(=.+)?((\}\})|>)/g, charName);
 }
 
-export function characterFormatUpdate(indexOrCharacter:number|character, arg:{
-    updateInteraction?:boolean,
-} = {}){
-    const originalCharacter = typeof(indexOrCharacter) === 'number' ? getCharacterByIndex(indexOrCharacter) : indexOrCharacter
-    let cha = originalCharacter
-    if(cha.chats.length === 0){
-        cha.chats = [{
-            message: [],
-            note: '',
-            name: 'Chat 1',
-            localLore: []
-        }]
+export function characterFormatUpdate(
+  indexOrCharacter: number | character,
+  arg: {
+    updateInteraction?: boolean;
+  } = {},
+) {
+  let cha =
+    typeof indexOrCharacter === "number"
+      ? getCharacterByIndex(indexOrCharacter)
+      : indexOrCharacter;
+  if (cha.chats.length === 0) {
+    cha.chats = [
+      {
+        message: [],
+        note: "",
+        name: "Chat 1",
+        localLore: [],
+      },
+    ];
+  }
+  if (!cha.chats[cha.chatPage]) {
+    cha.chatPage = 0;
+  }
+  if (!cha.chats[cha.chatPage].message) {
+    cha.chats[cha.chatPage].message = [];
+  }
+  if (!cha.type) {
+    cha.type = "character";
+  }
+  if (!cha.chaId) {
+    cha.chaId = uuidv4();
+  }
+  if (cha.type !== "group") {
+    if (checkNullish(cha.sdData)) {
+      cha.sdData = defaultSdDataFunc();
     }
-    if(!cha.chats[cha.chatPage]){
-        cha.chatPage = 0
+    if (checkNullish(cha.utilityBot)) {
+      cha.utilityBot = false;
     }
-    if(!cha.chats[cha.chatPage].message){
-        cha.chats[cha.chatPage].message = []
+    cha.triggerscript = cha.triggerscript ?? [];
+    cha.alternateGreetings = cha.alternateGreetings ?? [];
+    cha.exampleMessage = cha.exampleMessage ?? "";
+    cha.creatorNotes = cha.creatorNotes ?? "";
+    cha.systemPrompt = cha.systemPrompt ?? "";
+    cha.tags = cha.tags ?? [];
+    cha.creator = cha.creator ?? "";
+    cha.characterVersion = cha.characterVersion ?? "";
+    cha.personality = cha.personality ?? "";
+    cha.scenario = cha.scenario ?? "";
+    cha.firstMsgIndex = cha.firstMsgIndex ?? -1;
+    cha.additionalData = cha.additionalData ?? {
+      tag: [],
+      creator: "",
+      character_version: "",
+    };
+    cha.voicevoxConfig = cha.voicevoxConfig ?? {
+      SPEED_SCALE: 1,
+      PITCH_SCALE: 0,
+      INTONATION_SCALE: 1,
+      VOLUME_SCALE: 1,
+    };
+    if (cha.postHistoryInstructions) {
+      cha.chats[cha.chatPage].note += "\n" + cha.postHistoryInstructions;
+      cha.chats[cha.chatPage].note = cha.chats[cha.chatPage].note.trim();
+      cha.postHistoryInstructions = null;
     }
-    if(!cha.type){
-        cha.type = 'character'
+    cha.additionalText ??= "";
+    cha.depth_prompt ??= {
+      depth: 0,
+      prompt: "",
+    };
+    cha.hfTTS ??= {
+      model: "",
+      language: "en",
+    };
+    cha.backgroundHTML ??= "";
+    cha.backgroundCSS ??= "";
+    cha.creation_date ??= Date.now();
+    cha.globalLore = updateLorebooks(cha.globalLore);
+    if (!cha.newGenData) {
+      cha = updateInlayScreen(cha);
     }
-    if(!cha.chaId){
-        cha.chaId = uuidv4()
+    // Migrate legacy 'none' value to '' for UI dropdown compatibility
+    // Using '' because it's falsy, so `if (ttsMode)` correctly detects enabled TTS
+    if (cha.ttsMode === "none") {
+      cha.ttsMode = "";
     }
-    if(cha.type !== 'group'){
-        if(checkNullish(cha.sdData)){
-            cha.sdData = defaultSdDataFunc()
-        }
-        if(checkNullish(cha.utilityBot)){
-            cha.utilityBot = false
-        }
-        cha.triggerscript ??= []
-        cha.alternateGreetings ??= []
-        cha.exampleMessage ??= ''
-        cha.creatorNotes ??= ''
-        cha.systemPrompt ??= ''
-        cha.tags ??= []
-        cha.creator ??= ''
-        cha.characterVersion ??= ''
-        cha.personality ??= ''
-        cha.scenario ??= ''
-        cha.firstMsgIndex ??= -1
-        cha.additionalData ??= {
-            tag: [],
-            creator: '',
-            character_version: ''
-        }
-        cha.voicevoxConfig ??= {
-            SPEED_SCALE: 1,
-            PITCH_SCALE: 0,
-            INTONATION_SCALE: 1,
-            VOLUME_SCALE: 1
-        }
-        if(cha.postHistoryInstructions){
-            cha.chats[cha.chatPage].note += "\n" + cha.postHistoryInstructions
-            cha.chats[cha.chatPage].note = cha.chats[cha.chatPage].note.trim()
-            cha.postHistoryInstructions = null
-        }
-        cha.additionalText ??= ''
-        cha.depth_prompt ??= {
-            depth: 0,
-            prompt: ''
-        }
-        cha.hfTTS ??= {
-            model: '',
-            language: 'en'
-        }
-        cha.backgroundHTML ??= ''
-        cha.backgroundCSS ??= ''
-        cha.creation_date ??= Date.now()
-        const updatedGlobalLore = updateLorebooks(cha.globalLore)
-        if(updatedGlobalLore !== cha.globalLore){
-            cha.globalLore = updatedGlobalLore
-        }
-        if(!cha.newGenData){
-            cha = updateInlayScreen(cha)
-        }
-        // Migrate legacy 'none' value to '' for UI dropdown compatibility
-        // Using '' because it's falsy, so `if (ttsMode)` correctly detects enabled TTS
-        if (cha.ttsMode === 'none') {
-            cha.ttsMode = ''
-        }
-        cha.ttsMode ??= ''
+    cha.ttsMode ??= "";
+  } else {
+    if (
+      !cha.characterTalks ||
+      cha.characterTalks.length !== cha.characters.length
+    ) {
+      cha.characterTalks = [];
+      for (let i = 0; i < cha.characters.length; i++) {
+        cha.characterTalks.push((1 / 6) * 4);
+      }
     }
-    else{
-        if((!cha.characterTalks) || cha.characterTalks.length !== cha.characters.length){
-            cha.characterTalks = []
-            for(let i=0;i<cha.characters.length;i++){
-                cha.characterTalks.push(1 / 6 * 4)
-            }
-        }
-        if((!cha.characterActive) || cha.characterActive.length !== cha.characters.length){
-            cha.characterActive = []
-            for(let i=0;i<cha.characters.length;i++){
-                cha.characterActive.push(true)
-            }
-        }
+    if (
+      !cha.characterActive ||
+      cha.characterActive.length !== cha.characters.length
+    ) {
+      cha.characterActive = [];
+      for (let i = 0; i < cha.characters.length; i++) {
+        cha.characterActive.push(true);
+      }
     }
-    if(checkNullish(cha.customscript)){
-        cha.customscript = []
+  }
+  if (checkNullish(cha.customscript)) {
+    cha.customscript = [];
+  }
+  cha.lastInteraction = Date.now();
+  if (typeof indexOrCharacter === "number") {
+    setCharacterByIndex(indexOrCharacter, cha);
+  }
+  for (let i = 0; i < cha.chats.length; i++) {
+    const chat = cha.chats[i];
+    chat.fmIndex ??= cha.firstMsgIndex ?? -1;
+    if (!chat.id) {
+      chat.id = uuidv4();
     }
-    // Keep the historical default for callers that omit the option, while
-    // allowing read-only consumers to normalize a detached character without
-    // manufacturing an interaction timestamp.
-    if(arg.updateInteraction ?? true){
-        cha.lastInteraction = Date.now()
+    if (!chat.localLore) {
+      chat.localLore = [];
     }
-    // Mutations on the database's state proxy are already observable. Avoid a
-    // redundant same-reference array write, which otherwise marks an already
-    // normalized read as a database change. Keep replacement-object behavior.
-    if(typeof(indexOrCharacter) === 'number' && cha !== originalCharacter){
-        setCharacterByIndex(indexOrCharacter, cha)
-    }
-    for(let i = 0; i < cha.chats.length; i++){
-        const chat = cha.chats[i]
-        chat.fmIndex ??= cha.firstMsgIndex ?? -1
-        if(!chat.id){
-            chat.id = uuidv4()
-        }
-        if(!chat.localLore){
-            chat.localLore = []
-        }
-    }
-    return cha
+  }
+  return cha;
 }
 
-export function updateLorebooks(book:loreBook[]){
-    let migrated = false
-    const updatedBooks = book.map((v) => {
-        const bookVersion = v.bookVersion ?? 1
-        if(bookVersion >= 2){
-            return v
-        }
-        migrated = true
-        v.bookVersion = bookVersion
-        if(v.activationPercent){
-            const perc = v.activationPercent
-            v.activationPercent = null
-
-            v.content = `@@probability ${perc}\n${v.content}`
-        }
-        v.content = v.content.replace(/@@@?end/g, '@@depth 0').replace(/\<(char|bot)\>/g, '{{char}}').replace(/\<(user)\>/g, '{{user}}')
-        v.bookVersion = 2
-        return v
-    })
-    return migrated ? updatedBooks : book
-
-}
-
-export function createBlankChar():character{
-    return {
-        name: '',
-        firstMessage: '',
-        desc: '',
-        notes: '',
-        chats: [{
-            message: [],
-            note: '',
-            name: 'Chat 1',
-            localLore: []
-        }],
-        chatFolders: [],
-        chatPage: 0,
-        emotionImages: [],
-        bias: [],
-        viewScreen: 'none',
-        globalLore: [],
-        chaId: uuidv4(),
-        type: 'character',
-        sdData: defaultSdDataFunc(),
-        utilityBot: false,
-        customscript: [],
-        exampleMessage: '',
-        creatorNotes:'',
-        systemPrompt:'',
-        postHistoryInstructions:'',
-        alternateGreetings:[],
-        tags:[],
-        creator:"",
-        characterVersion: '',
-        personality:"",
-        scenario:"",
-        firstMsgIndex: -1,
-        replaceGlobalNote: "",
-        triggerscript: [{
-            comment: "",
-            type: "manual",
-            conditions: [],
-            effect: [{
-                type: "v2Header",
-                code: "",
-                indent: 0
-            }]
-        }, {
-            comment: "New Event",
-            type: 'manual',
-            conditions: [],
-            effect: []
-        }],
-        additionalText: ''
+export function updateLorebooks(book: loreBook[]) {
+  return book.map((v) => {
+    v.bookVersion ??= 1;
+    if (v.bookVersion >= 2) {
+      return v;
     }
+    if (v.activationPercent) {
+      const perc = v.activationPercent;
+      v.activationPercent = null;
+
+      v.content = `@@probability ${perc}\n${v.content}`;
+    }
+    v.content = v.content
+      .replace(/@@@?end/g, "@@depth 0")
+      .replace(/\<(char|bot)\>/g, "{{char}}")
+      .replace(/\<(user)\>/g, "{{user}}");
+    v.bookVersion = 2;
+    return v;
+  });
 }
 
+export function createBlankChar(): character {
+  return getContextRuntime().createBlankChar();
+}
 
 export async function makeGroupImage() {
-    try {
-        alertStore.set({
-            type: 'wait',
-            msg: `Loading..`
-        })
-        const db = getDatabase()
-        const charID = get(selectedCharID)
-        const group = db.characters[charID]
-        if(group.type !== 'group'){
-            return
-        }
-    
-        const imageUrls = await Promise.all(group.characters.map((v) => {
-            return getCharImage(findCharacterbyId(v).image, 'plain')
-        }))
-    
-        
-    
-        const canvas = document.createElement("canvas");
-        canvas.width = 256
-        canvas.height = 256
-        const ctx = canvas.getContext("2d");
-      
-        // Load the images
-        const images = [];
-        let loadedImages = 0;
-      
-        await Promise.all(
-            imageUrls.map(
-            (url) =>
-                new Promise<void>((resolve) => {
-                    const img = new Image();
-                    img.crossOrigin="anonymous"
-                    img.onload = () => {
-                        images.push(img);
-                        resolve();
-                    };
-                    img.src = url;
-                })
-            )
-        );
-      
-        // Calculate dimensions and draw the grid
-        const numImages = images.length;
-        const numCols = Math.ceil(Math.sqrt(images.length));
-        const numRows = Math.ceil(images.length / numCols);
-        const cellWidth = canvas.width / numCols;
-        const cellHeight = canvas.height / numRows;
-      
-        for (let row = 0; row < numRows; row++) {
-          for (let col = 0; col < numCols; col++) {
-            const index = row * numCols + col;
-            if (index >= numImages) break;
-            ctx.drawImage(
-              images[index],
-              col * cellWidth,
-              row * cellHeight,
-              cellWidth,
-              cellHeight
-            );
-          }
-        }
-      
-        // Return the image URI
-    
-        const uri = canvas.toDataURL()
-        canvas.remove()
-        db.characters[charID].image = await saveImage(dataURLtoBuffer(uri));
-        alertStore.set({
-            type: 'none',
-            msg: ''
-        })
-    } catch (error) {
-        alertError(error)
-    }
-}
-
-function dataURLtoBuffer(string:string){
-    const regex = /^data:.+\/(.+);base64,(.*)$/;
-
-    const matches = string.match(regex);
-    const ext = matches[1];
-    const data = matches[2];
-    return Buffer.from(data, 'base64');
-}
-
-export async function removeChar(identifier:string|number,name:string, type:'normal'|'permanent'|'permanentForce' = 'normal'){
-    const db = getDatabase()
-    if(type !== 'permanentForce'){
-        const conf = await alertConfirm(language.removeConfirm + name)
-        if(!conf){
-            return
-        }
-        const conf2 = await alertConfirm(language.removeConfirm2 + name)
-        if(!conf2){
-            return
-        }
-    }
-    let chars = db.characters
-    // Resolve identifier to actual index at the time of deletion to avoid
-    // race conditions when concurrent deletions shift the array.
-    const index = typeof identifier === 'string'
-        ? findCharacterIndexbyId(identifier)
-        : identifier
-    if (index === -1 || index >= chars.length) {
-        return
-    }
-    if(type === 'normal'){
-        chars[index].trashTime = Date.now()
-    }
-    else{
-        chars.splice(index, 1)
-    }
-    checkCharOrder()
-    DBState.db.characters = chars
-    requiresFullEncoderReload.state = true
-    selectedCharID.set(-1)
-}
-
-export async function addCharacter(arg:{
-    reseter?:()=>any,
-} = {}){
-    MobileGUIStack.set(100)
-    const reseter = arg.reseter ?? (() => {})
-    const r = await alertAddCharacter()
-    if(r === 'importFromRealm'){
-        selectedCharID.set(-1)
-        OpenRealmStore.set(true)
-        MobileGUIStack.set(0)
-        return
-    }
-    reseter();
-    switch(r){
-        case 'createfromScratch':
-            createNewCharacter()
-            break
-        case 'createGroup':
-            createNewGroup()
-            break
-        case 'importCharacter':
-            await importCharacter()
-            break
-        default:
-            MobileGUIStack.set(1)
-            return
-    }
-    let db = getDatabase()
-    if(db.characters[db.characters.length-1]){
-        changeChar(db.characters.length-1)
-    }
-    MobileGUIStack.set(1)
-}
-
-export async function changeChar(index: number, arg:{
-    reseter?:()=>any,
-} = {}) {
-    const reseter = arg.reseter ?? (() => {})
-    const navigationMode = resolveCharacterNavigationMode({
-        doingChat: get(doingChat),
-        localExecutionActive: get(localGenerationExecutionActive),
-        runtimeActive: get(runtimeGenerationActive),
-    })
-    if(navigationMode === 'locked'){
-        return
-    }
-    if(!Number.isInteger(index) || index < 0 || !DBState.db.characters?.[index]){
-        return
-    }
-    reseter();
-    if(navigationMode === 'selection-only'){
-        // Cold-storage entries are intentionally incomplete list stubs. Do not
-        // present one as a real chat until the normal, persistence-capable
-        // hydration path can run after the resident command has settled.
-        if(DBState.db.characters[index].coldstorage){
-            return
-        }
-        setSelectedCharacterForPresentation(index)
-        return
-    }
-    if(DBState.db.characters?.[index]?.coldstorage){
-        const coldData = await getColdStorageItem(DBState.db.characters[index].coldstorage!)
-        if(coldData?.character && coldData.character.chaId === DBState.db.characters[index].chaId){
-            DBState.db.characters[index] = coldData.character
-        }
-        else{
-            alertError(language.errors.coldStorageRestoreFailed)
-            return
-        }
-    }
-    const updateInteraction = shouldUpdateCharacterInteraction()
-    characterFormatUpdate(index, {
-      updateInteraction,
+  try {
+    alertStore.set({
+      type: "wait",
+      msg: `Loading..`,
     });
-    if(updateInteraction){
-        selectedCharID.set(index);
+    const db = getDatabase();
+    const charID = get(selectedCharID);
+    const group = db.characters[charID];
+    if (group.type !== "group") {
+      return;
     }
-    else{
-        // The delegated viewer's selection is local presentation state. Using
-        // the regular store setter here can wake canonical-data subscribers
-        // (for example HypaV3) during the runtime discovery gap.
-        setSelectedCharacterForPresentation(index)
+
+    const imageUrls = await Promise.all(
+      group.characters.map((v) => {
+        return getCharImage(findCharacterbyId(v).image, "plain");
+      }),
+    );
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+
+    // Load the images
+    const images = [];
+    let loadedImages = 0;
+
+    await Promise.all(
+      imageUrls.map(
+        (url) =>
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+              images.push(img);
+              resolve();
+            };
+            img.src = url;
+          }),
+      ),
+    );
+
+    // Calculate dimensions and draw the grid
+    const numImages = images.length;
+    const numCols = Math.ceil(Math.sqrt(images.length));
+    const numRows = Math.ceil(images.length / numCols);
+    const cellWidth = canvas.width / numCols;
+    const cellHeight = canvas.height / numRows;
+
+    for (let row = 0; row < numRows; row++) {
+      for (let col = 0; col < numCols; col++) {
+        const index = row * numCols + col;
+        if (index >= numImages) break;
+        ctx.drawImage(
+          images[index],
+          col * cellWidth,
+          row * cellHeight,
+          cellWidth,
+          cellHeight,
+        );
+      }
     }
+
+    // Return the image URI
+
+    const uri = canvas.toDataURL();
+    canvas.remove();
+    db.characters[charID].image = await saveImage(dataURLtoBuffer(uri));
+    alertStore.set({
+      type: "none",
+      msg: "",
+    });
+  } catch (error) {
+    alertError(error);
+  }
 }
 
-export type CharacterNavigationMode = 'normal' | 'locked' | 'selection-only'
+function dataURLtoBuffer(string: string) {
+  const regex = /^data:.+\/(.+);base64,(.*)$/;
 
-export function resolveCharacterNavigationMode(
-    activity: {
-        doingChat: boolean
-        localExecutionActive: boolean
-        runtimeActive: boolean
-    },
-    platform: {
-        isNodeServer: boolean
-        isServerResidentExecutor: boolean
-    } = { isNodeServer, isServerResidentExecutor },
-): CharacterNavigationMode {
-    if (activity.localExecutionActive) {
-        return 'locked'
-    }
-
-    const isDelegatedViewer = platform.isNodeServer && !platform.isServerResidentExecutor
-    if (isDelegatedViewer && (activity.runtimeActive || activity.doingChat)) {
-        // A delegated admission/command is bound to its original target. Only
-        // move the viewer selection: formatting or restoring cold storage here
-        // would dirty the canonical database while the executor is saving it.
-        return 'selection-only'
-    }
-
-    if (!activity.doingChat) {
-        return 'normal'
-    }
-
-    // This covers local/preview execution, non-Node builds, and the resident
-    // executor, all of which still depend on stable live client state.
-    return 'locked'
+  const matches = string.match(regex);
+  const ext = matches[1];
+  const data = matches[2];
+  return Buffer.from(data, "base64");
 }
 
-export function shouldUpdateCharacterInteraction(
-    platform: {
-        isNodeServer: boolean
-        isServerResidentExecutor: boolean
-    } = { isNodeServer, isServerResidentExecutor },
-): boolean {
-    return !platform.isNodeServer || platform.isServerResidentExecutor
+export async function removeChar(
+  identifier: string | number,
+  name: string,
+  type: "normal" | "permanent" | "permanentForce" = "normal",
+) {
+  const db = getDatabase();
+  if (type !== "permanentForce") {
+    const conf = await alertConfirm(language.removeConfirm + name);
+    if (!conf) {
+      return;
+    }
+    const conf2 = await alertConfirm(language.removeConfirm2 + name);
+    if (!conf2) {
+      return;
+    }
+  }
+  let chars = db.characters;
+  // Resolve identifier to actual index at the time of deletion to avoid
+  // race conditions when concurrent deletions shift the array.
+  const index =
+    typeof identifier === "string"
+      ? findCharacterIndexbyId(identifier)
+      : identifier;
+  if (index === -1 || index >= chars.length) {
+    return;
+  }
+  if (entityRuntimeEnabled) {
+    try {
+      await browserRuntime().removeCharacter(
+        chars[index].chaId,
+        type !== "normal",
+      );
+    } catch (error) {
+      reportRuntimeError(error);
+    }
+    return;
+  }
+  if (type === "normal") {
+    chars[index].trashTime = Date.now();
+  } else {
+    chars.splice(index, 1);
+  }
+  checkCharOrder();
+  DBState.db.characters = chars;
+  requiresFullEncoderReload.state = true;
+  selectedCharID.set(-1);
+}
+
+export async function addCharacter(
+  arg: {
+    reseter?: () => any;
+  } = {},
+) {
+  MobileGUIStack.set(100);
+  const reseter = arg.reseter ?? (() => {});
+  const r = await alertAddCharacter();
+  if (r === "importFromRealm") {
+    selectedCharID.set(-1);
+    OpenRealmStore.set(true);
+    MobileGUIStack.set(0);
+    return;
+  }
+  reseter();
+  if (entityRuntimeEnabled) MobileGUIStack.set(1);
+  try {
+    switch (r) {
+      case "createfromScratch":
+        await createNewCharacter();
+        break;
+      case "createGroup":
+        await createNewGroup();
+        break;
+      case "importCharacter":
+        await importCharacter();
+        break;
+      default:
+        MobileGUIStack.set(1);
+        return;
+    }
+  } catch (error) {
+    reportRuntimeError(error);
+    MobileGUIStack.set(1);
+    return;
+  }
+  let db = getDatabase();
+  if (!entityRuntimeEnabled && db.characters[db.characters.length - 1]) {
+    changeChar(db.characters.length - 1);
+  }
+  MobileGUIStack.set(1);
+}
+
+export async function changeChar(
+  index: number,
+  arg: {
+    reseter?: () => any;
+  } = {},
+) {
+  const reseter = arg.reseter ?? (() => {});
+  if (entityRuntimeEnabled) {
+    const id = DBState.db.characters[index]?.chaId;
+    if (!id) return;
+    try {
+      if (await browserRuntime().selectCharacter(id)) reseter();
+    } catch (error) {
+      reportRuntimeError(error);
+    }
+    return;
+  }
+  if (get(doingChat)) {
+    return;
+  }
+  reseter();
+  if (DBState.db.characters?.[index]?.coldstorage) {
+    const coldData = await getColdStorageItem(
+      DBState.db.characters[index].coldstorage!,
+    );
+    if (
+      coldData?.character &&
+      coldData.character.chaId === DBState.db.characters[index].chaId
+    ) {
+      DBState.db.characters[index] = coldData.character;
+    } else {
+      alertError(language.errors.coldStorageRestoreFailed);
+      return;
+    }
+  }
+  characterFormatUpdate(index, {
+    updateInteraction: true,
+  });
+  selectedCharID.set(index);
+}
+import { createCharacterFactory } from "./characterFactory";
+let contextRuntime: ReturnType<typeof createCharacterFactory>;
+function getContextRuntime() {
+  return (contextRuntime ??= createCharacterFactory({
+    uuidv4,
+    defaultSdDataFunc,
+  }));
 }

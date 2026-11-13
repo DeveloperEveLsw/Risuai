@@ -8,6 +8,7 @@ import {
     remove
 } from "@tauri-apps/plugin-fs"
 import { changeFullscreen, checkNullish, sleep } from "./util"
+import { refreshModules } from "./process/modules";
 import { v4 as uuidv4 } from 'uuid';
 import { get } from "svelte/store";
 import { setDatabase, defaultSdDataFunc, getDatabase } from "./storage/database.svelte";
@@ -20,15 +21,13 @@ import { checkDriverInit } from "./drive/drive";
 import { characterURLImport } from "./characterCards";
 import { defaultJailbreak, defaultMainPrompt, oldJailbreak, oldMainPrompt } from "./storage/defaultPrompts";
 import { loadRisuAccountData } from "./drive/accounter";
-import {
-    clearRisuSaveClientCache,
-    decodeRisuSave,
-    encodeRisuSaveLegacy,
-} from "./storage/risuSave";
+import { decodeRisuSave, encodeRisuSaveLegacy } from "./storage/risuSave";
 import { updateAnimationSpeed } from "./gui/animation";
 import { updateColorScheme, updateTextThemeAndCSS } from "./gui/colorscheme";
 import { autoServerBackup } from "./kei/backup";
-import { language } from "src/lang";
+import { language, changeLanguage } from "src/lang";
+import { entityRuntimeEnabled, installBrowserRuntime } from "./runtime/browserRuntimeState.svelte";
+import { chatProcessStage, doingChat } from "./process/index.svelte";
 import { startObserveDom } from "./observer.svelte";
 import { updateGuisize } from "./gui/guisize";
 import { updateLorebooks } from "./characters";
@@ -44,24 +43,12 @@ import {
     getUncleanables,
     getBasename,
     setUsingSw,
-    checkCharOrder,
-    initializeNodeDatabaseRuntime,
-    waitForNodeDatabasePersistence,
+    checkCharOrder
 } from "./globalApi.svelte";
-import { isNodeServer, isServerResidentExecutor, isTauri } from "./platform";
+import { isTauri } from "./platform";
 import { registerModelDynamic } from "./model/modellist";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { appDataDir, join } from "@tauri-apps/api/path";
-import { startResidentGenerationExecutor } from "./runtime/residentExecutor";
-import {
-    installRuntimeGenerationDelegation,
-    startRuntimeGenerationFollower,
-} from "./runtime/generationDelegation.svelte";
-import {
-    startResidentRuntimeStartupBroker,
-    startRuntimeStartupFollower,
-    type ResidentRuntimeStartupBrokerHandle,
-} from "./runtime/startupPromptBroker";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -71,8 +58,27 @@ const appWindow = isTauri ? getCurrentWebviewWindow() : null
 export async function loadData() {
     const loaded = get(loadedStore)
     if (!loaded) {
-        let residentStartupBroker: ResidentRuntimeStartupBrokerHandle | null = null
         try {
+            if (entityRuntimeEnabled) {
+                LoadingStatusState.text = "Connecting to local runtime...";
+                const { BrowserRuntimeController } = await import("./runtime/browserRuntimeController.svelte");
+                const runtime = await BrowserRuntimeController.connect({
+                    DBState,
+                    selected: (index) => selectedCharID.set(index),
+                    busy: (busy, stage) => { doingChat.set(busy); chatProcessStage.set(stage); },
+                    onSettings: () => { changeLanguage(DBState.db.language); },
+                    onResources: () => { refreshModules(); },
+                });
+                installBrowserRuntime(runtime);
+                updateColorScheme(); updateTextThemeAndCSS(); updateAnimationSpeed();
+                updateHeightMode(); updateErrorHandling(); updateGuisize();
+                if (DBState.db.betaMobileGUI && window.innerWidth <= 800) {
+                    initMobileGesture(); MobileGUI.set(true);
+                }
+                selectedCharID.set(-1); loadedStore.set(true);
+                startObserveDom(); moduleUpdate();
+                return;
+            }
             if (isTauri) {
                 LoadingStatusState.text = "Checking Files..."
                 appWindow.maximize()
@@ -138,12 +144,6 @@ export async function loadData() {
             }
             else {
                 await forageStorage.Init()
-                if (isServerResidentExecutor) {
-                    // Establish an authenticated, fenced liveness session and
-                    // the out-of-command alert bridge before a large database
-                    // decode or plugin top-level await can stall first claim.
-                    residentStartupBroker = await startResidentRuntimeStartupBroker()
-                }
 
                 LoadingStatusState.text = "Loading Local Save File..."
                 let gotStorage: Uint8Array = await forageStorage.getItem('database/database.bin') as unknown as Uint8Array
@@ -216,39 +216,18 @@ export async function loadData() {
                     return
                 }
                 LoadingStatusState.text = "Checking Service Worker..."
-                if (navigator.serviceWorker && !isNodeServer) {
+                if (navigator.serviceWorker) {
                     setUsingSw(true)
                     await registerSw()
                 }
                 else {
                     setUsingSw(false)
-                    if (isNodeServer) {
-                        // Node self-hosting keeps assets in the authoritative
-                        // server store. Remove an older browser-side asset
-                        // cache so each device does not retain a second copy.
-                        const registrations = await navigator.serviceWorker?.getRegistrations?.() ?? []
-                        await Promise.all(registrations
-                            .filter((registration) => registration.active?.scriptURL.endsWith('/sw.js'))
-                            .map((registration) => registration.unregister()))
-                        await globalThis.caches?.delete('risuCache')
-                        await clearRisuSaveClientCache()
-                        await import('./translator/translator')
-                            .then(({ clearNodeLegacyLLMCache }) => clearNodeLegacyLLMCache())
-                    }
                 }
                 if (getDatabase().didFirstSetup) {
                     characterURLImport()
                 }
             }
-            if (isNodeServer && !isServerResidentExecutor) {
-                // Authentication has completed while reading the canonical
-                // Node database. Subscribe before local plugin initialization
-                // so a resident cold-start permission can be answered while
-                // this page still displays its loading screen.
-                startRuntimeStartupFollower()
-            }
             LoadingStatusState.text = "Loading Plugins..."
-            await residentStartupBroker?.setPhase('loading_plugins')
             try {
                 await loadPlugins()
             } catch (error) { }
@@ -278,11 +257,10 @@ export async function loadData() {
             updateHeightMode()
             updateErrorHandling()
             updateGuisize()
-            if (!localStorage.getItem('nightlyWarned') && window.location.hostname === 'nightly.risuai.xyz') {
+            if (!localStorage.getItem('nightlyWarned') && import.meta.env.VITE_RISU_NIGHTLY_BUILD === 'TRUE') {
                 alertMd(language.nightlyWarning)
                 await waitAlert()
-                //for testing, leave empty
-                localStorage.setItem('nightlyWarned', '')
+                localStorage.setItem('nightlyWarned', 'true')
             }
             if (db.botSettingAtStart) {
                 botMakerMode.set(true)
@@ -297,22 +275,7 @@ export async function loadData() {
             startObserveDom()
             assignIds()
             registerModelDynamic()
-            await initializeNodeDatabaseRuntime()
-            if (isNodeServer) {
-                // Older self-host builds left potentially large inlay media in
-                // each device's IndexedDB. Migrate it in the background; any
-                // referenced asset is also migrated lazily on first read.
-                void import('./process/files/inlays')
-                    .then(({ migrateNodeInlayAssets }) => migrateNodeInlayAssets())
-                    .catch((error) => console.error('[Node Inlay Migration]', error))
-            }
             saveDb()
-            installRuntimeGenerationDelegation(waitForNodeDatabasePersistence)
-            await residentStartupBroker?.setPhase('starting_executor')
-            startResidentGenerationExecutor({
-                waitForPersistence: waitForNodeDatabasePersistence,
-            })
-            startRuntimeGenerationFollower()
             moduleUpdate()
             cleanChunks()
             alertTOS().then((a) => {
@@ -322,16 +285,7 @@ export async function loadData() {
             })
             
         } catch (error) {
-            try {
-                alertError(error)
-            }
-            finally {
-                // A startup heartbeat means the resident is alive, not that a
-                // fatal bootstrap failure is healthy. Stop it so the browser
-                // health check can restart Chromium instead of leaving a
-                // permanently green, non-claiming executor.
-                residentStartupBroker?.stop()
-            }
+            alertError(error)
         }
     }
 }

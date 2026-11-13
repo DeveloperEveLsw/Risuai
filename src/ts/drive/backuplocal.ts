@@ -11,6 +11,7 @@ import { hubURL } from "../characterCards";
 import { language } from "src/lang";
 import { collectColdStorageBackupPayloads, confirmIncompleteColdStorageOperation, getColdStorageBackupKey, getColdStorageItem, isColdStorageBackupData, listColdDataKeys, setColdStorageItem } from "../process/coldstorage.svelte";
 import { DBState } from "../stores.svelte";
+import { entityRuntimeEnabled } from "../runtime/browserRuntimeState.svelte";
 
 function getBasename(data:string){
     const baseNameRegex = /\\/g
@@ -20,6 +21,9 @@ function getBasename(data:string){
 }
 
 export async function SaveLocalBackup(){
+  if (entityRuntimeEnabled) {
+    return await (await import("./runtimeBackup")).saveRuntimeLocalBackup();
+  }
     alertWait("Saving local backup...")
     const db = getDatabase()
     const coldStoragePayloads = await collectColdStorageBackupPayloads(db)
@@ -214,6 +218,10 @@ export async function SavePartialLocalBackup(){
     if (!secondConfirm) {
         return
     }
+
+  if (entityRuntimeEnabled) {
+    return await (await import("./runtimeBackup")).saveRuntimeLocalBackup(true);
+  }
     
     alertWait("Saving partial local backup...")
     const db = getDatabase()

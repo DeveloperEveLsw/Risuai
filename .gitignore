@@ -10,6 +10,7 @@ package-lock.json
 node_modules
 dist/
 save/
+.local-runtime/
 dist-web/
 dist-ssr
 *.local
@@ -45,8 +46,6 @@ __pycache__/
 dist.zip
 /scripts/
 .env
-.env.*
-!.env.example
 /server/node/ssl/certificate
 
 

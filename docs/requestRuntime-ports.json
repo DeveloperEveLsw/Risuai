@@ -1,0 +1,212 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/request/request.ts",
+  "core": "src/ts/process/request/requestRuntime.ts",
+  "factory": "createRequestRuntime",
+  "functions": [
+    "getOllamaThinkMode",
+    "formatThinkingOutput",
+    "normalizeFetchHeaders",
+    "ollamaCloudFetch",
+    "normalizeOllamaStreamResponse",
+    "requestChatData",
+    "reformater",
+    "requestChatDataMain",
+    "requestNovelAI",
+    "requestOobaLegacy",
+    "requestOoba",
+    "requestPlugin",
+    "requestEcho",
+    "requestKobold",
+    "requestNovelList",
+    "requestOllama",
+    "requestCohere",
+    "requestHorde",
+    "requestWebLLM"
+  ],
+  "classes": [],
+  "ports": [
+    {
+      "name": "fetchNative",
+      "specifier": "../../globalApi.svelte",
+      "original": "fetchNative"
+    },
+    {
+      "name": "getDatabase",
+      "specifier": "../../storage/database.svelte",
+      "original": "getDatabase"
+    },
+    {
+      "name": "getTools",
+      "specifier": "../mcp/mcp",
+      "original": "getTools"
+    },
+    {
+      "name": "risuUnescape",
+      "specifier": "../../parser/parser.svelte",
+      "original": "risuUnescape"
+    },
+    {
+      "name": "pluginV2",
+      "specifier": "../../plugins/plugins.svelte",
+      "original": "pluginV2"
+    },
+    {
+      "name": "getCurrentCharacter",
+      "specifier": "../../storage/database.svelte",
+      "original": "getCurrentCharacter"
+    },
+    {
+      "name": "runTrigger",
+      "specifier": "../triggers",
+      "original": "runTrigger"
+    },
+    {
+      "name": "getCurrentChat",
+      "specifier": "../../storage/database.svelte",
+      "original": "getCurrentChat"
+    },
+    {
+      "name": "risuEscape",
+      "specifier": "../../parser/parser.svelte",
+      "original": "risuEscape"
+    },
+    {
+      "name": "sleep",
+      "specifier": "../../util",
+      "original": "sleep"
+    },
+    {
+      "name": "LLMFlags",
+      "specifier": "../../model/modellist",
+      "original": "LLMFlags"
+    },
+    {
+      "name": "getModelInfo",
+      "specifier": "../../model/modellist",
+      "original": "getModelInfo"
+    },
+    {
+      "name": "LLMFormat",
+      "specifier": "../../model/modellist",
+      "original": "LLMFormat"
+    },
+    {
+      "name": "requestOpenAI",
+      "specifier": "./openAI/requests",
+      "original": "requestOpenAI"
+    },
+    {
+      "name": "requestOpenAIResponseAPI",
+      "specifier": "./openAI/requests",
+      "original": "requestOpenAIResponseAPI"
+    },
+    {
+      "name": "requestClaude",
+      "specifier": "./anthropic",
+      "original": "requestClaude"
+    },
+    {
+      "name": "requestOpenAILegacyInstruct",
+      "specifier": "./openAI/requests",
+      "original": "requestOpenAILegacyInstruct"
+    },
+    {
+      "name": "requestGoogleCloudVertex",
+      "specifier": "./google",
+      "original": "requestGoogleCloudVertex"
+    },
+    {
+      "name": "language",
+      "specifier": "../../../lang",
+      "original": "language"
+    },
+    {
+      "name": "stringlizeNAIChat",
+      "specifier": "../models/nai",
+      "original": "stringlizeNAIChat"
+    },
+    {
+      "name": "tokenizeNum",
+      "specifier": "../../tokenizer",
+      "original": "tokenizeNum"
+    },
+    {
+      "name": "NovelAIBadWordIds",
+      "specifier": "../models/nai",
+      "original": "NovelAIBadWordIds"
+    },
+    {
+      "name": "applyAdditionalParameters",
+      "specifier": "./shared",
+      "original": "applyAdditionalParameters"
+    },
+    {
+      "name": "getAdditionalParameters",
+      "specifier": "./shared",
+      "original": "getAdditionalParameters"
+    },
+    {
+      "name": "globalFetch",
+      "specifier": "../../globalApi.svelte",
+      "original": "globalFetch"
+    },
+    {
+      "name": "unstringlizeChat",
+      "specifier": "../stringlize",
+      "original": "unstringlizeChat"
+    },
+    {
+      "name": "applyChatTemplate",
+      "specifier": "../templates/chatTemplate",
+      "original": "applyChatTemplate"
+    },
+    {
+      "name": "getStopStrings",
+      "specifier": "../stringlize",
+      "original": "getStopStrings"
+    },
+    {
+      "name": "risuChatParser",
+      "specifier": "../../parser/parser.svelte",
+      "original": "risuChatParser"
+    },
+    {
+      "name": "OobaParams",
+      "specifier": "../prompt",
+      "original": "OobaParams"
+    },
+    {
+      "name": "applyParameters",
+      "specifier": "./shared",
+      "original": "applyParameters"
+    },
+    {
+      "name": "pluginProcess",
+      "specifier": "../../plugins/plugins.svelte",
+      "original": "pluginProcess"
+    },
+    {
+      "name": "stringlizeAINChat",
+      "specifier": "../stringlize",
+      "original": "stringlizeAINChat"
+    },
+    {
+      "name": "unstringlizeAIN",
+      "specifier": "../stringlize",
+      "original": "unstringlizeAIN"
+    },
+    {
+      "name": "Ollama",
+      "specifier": "ollama/dist/browser.mjs",
+      "original": "Ollama"
+    },
+    {
+      "name": "runTransformers",
+      "specifier": "../transformers",
+      "original": "runTransformers"
+    }
+  ],
+  "globals": ["safeStructuredClone", "fetch"],
+  "nativeHostIntegrated": false
+}

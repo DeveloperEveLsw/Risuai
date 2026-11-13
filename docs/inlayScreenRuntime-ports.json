@@ -1,0 +1,22 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/inlayScreen.ts",
+  "core": "src/ts/process/inlayScreenRuntime.ts",
+  "factory": "createInlayScreenRuntime",
+  "functions": ["runInlayScreen", "updateInlayScreen"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "generateAIImage",
+      "specifier": "./stableDiff",
+      "original": "generateAIImage"
+    },
+    {
+      "name": "writeInlayImage",
+      "specifier": "./files/inlays",
+      "original": "writeInlayImage"
+    }
+  ],
+  "globals": ["Image"],
+  "nativeHostIntegrated": false
+}

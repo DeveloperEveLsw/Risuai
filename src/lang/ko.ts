@@ -821,6 +821,7 @@ export const languageKorean = {
     "account": "계정",
     "remove": "삭제",
     "able": "활성화됨",
+    "close": "닫기",
     "assetWidth": "에셋 넓이",
     "animationSpeed": "에니메이션 속도",
     "screenshot": "스크린샷",
@@ -1478,6 +1479,7 @@ export const languageKorean = {
         "save": "저장",
         "cancel": "취소",
     },
+    "providerPermissionDenied": "사용자가 플러그인의 제공자 접근 권한을 거부했습니다.",
     "hamburgerButtonBottom": "메뉴 버튼을 사이드바 하단으로 이동",
     "nanoGPTLoadingAccountInfo": "계정 정보 불러오는 중…",
     "nanoGPTCreditBalance": "크레딧 잔액:",
@@ -1520,4 +1522,7 @@ export const languageKorean = {
     nanoGPTSelectFromList: "목록에서 선택",
     nanoGPTManualInput: "수동 입력",
     nanoGPTManualModelSelect: "수동 모델 선택",
+    localToggles: "로컬 토글",
+    preparingMessageDisplay: "메시지 표시 준비 중…",
+    messageDisplayFailed: "메시지를 표시하지 못했습니다.",
 } satisfies DeepPartial<typeof import('./en').languageEnglish>

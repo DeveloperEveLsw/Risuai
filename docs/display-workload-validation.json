@@ -1,0 +1,853 @@
+{
+  "baselineCommit": "5a6bdd3d1b25891e13b0ff7842b6724f272ae7ab",
+  "schemaVersion": 21,
+  "verifiedAt": "2026-10-04T08:45:26.463443+00:00",
+  "wholeGoalComplete": false,
+  "all15ConditionsActive": true,
+  "completionBlockSha256": "9e4dd943ab1ceb6698f47f271c770fc3c46fedba46d0a171f741be3a207842d0",
+  "scope": {
+    "local": true,
+    "syntheticOnly": true,
+    "productionAccess": false,
+    "privateReads": false,
+    "realModelCalls": 0,
+    "deployments": 0,
+    "pushes": 0
+  },
+  "runtimeImplementationChanged": false,
+  "codeSpeedupClaim": false,
+  "matrix": {
+    "executionsPassed": 8,
+    "warmObservations": 96,
+    "order": "forward/reverse",
+    "perScenarioPerConditionPerRun": 6,
+    "medianConvention": "average middle two",
+    "p95IsObservedMaximum": true,
+    "pooledPercentileClaim": false,
+    "fixtures": {
+      "rows": 100,
+      "cellsPerRow": [1, 96],
+      "extraLuaIterationsPerRow": [0, 600000]
+    },
+    "countedRowCallbacks": 106,
+    "independentRows": 94,
+    "stableDomAndFinalValuesEnforcedByOriginalHelper": true,
+    "observations": [
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 23.0,
+          "p95": 23.30000001192093,
+          "max": 23.30000001192093,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 414.15000000596046,
+          "p95": 523.5,
+          "max": 523.5,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100,
+          "max": 100,
+          "samples": 6
+        },
+        "longTaskCount": 0,
+        "longestTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "small-idle",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 46.849999994039536,
+          "p95": 51.5,
+          "max": 51.5,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 1269.0,
+          "p95": 1561.699999988079,
+          "max": 1561.699999988079,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 125.04999999999973,
+          "p95": 133.39999999999964,
+          "max": 133.39999999999964,
+          "samples": 6
+        },
+        "longTaskCount": 6,
+        "longestTaskMs": 136
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 20.349999994039536,
+          "p95": 34.29999998211861,
+          "max": 34.29999998211861,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 702.75,
+          "p95": 743.1999999880791,
+          "max": 743.1999999880791,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.10000000000036,
+          "max": 100.10000000000036,
+          "samples": 6
+        },
+        "longTaskCount": 3,
+        "longestTaskMs": 58
+      },
+      {
+        "run": 1,
+        "condition": "large-idle",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 54.8500000089407,
+          "p95": 81.7000000178814,
+          "max": 81.7000000178814,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 2001.7000000029802,
+          "p95": 2168.300000011921,
+          "max": 2168.300000011921,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 200.10000000000036,
+          "p95": 216.6999999999971,
+          "max": 216.6999999999971,
+          "samples": 6
+        },
+        "longTaskCount": 8,
+        "longestTaskMs": 222
+      },
+      {
+        "run": 1,
+        "condition": "small-cpu",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 22.30000001192093,
+          "p95": 25.599999994039536,
+          "max": 25.599999994039536,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 957.0999999940395,
+          "p95": 987.9000000059605,
+          "max": 987.9000000059605,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.09999999999854,
+          "max": 100.09999999999854,
+          "samples": 6
+        },
+        "longTaskCount": 0,
+        "longestTaskMs": 0
+      },
+      {
+        "run": 1,
+        "condition": "small-cpu",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 42.44999998807907,
+          "p95": 84.59999999403954,
+          "max": 84.59999999403954,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 1822.8499999940395,
+          "p95": 2351.199999988079,
+          "max": 2351.199999988079,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 141.69999999999982,
+          "p95": 200,
+          "max": 200,
+          "samples": 6
+        },
+        "longTaskCount": 6,
+        "longestTaskMs": 225
+      },
+      {
+        "run": 1,
+        "condition": "large-cpu",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 21.05000001192093,
+          "p95": 23,
+          "max": 23,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 1186.4500000029802,
+          "p95": 1271.300000011921,
+          "max": 1271.300000011921,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.09999999999945,
+          "max": 100.09999999999945,
+          "samples": 6
+        },
+        "longTaskCount": 1,
+        "longestTaskMs": 50
+      },
+      {
+        "run": 1,
+        "condition": "large-cpu",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 43.74999998509884,
+          "p95": 71,
+          "max": 71,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 2573.8999999910593,
+          "p95": 2793.199999988079,
+          "max": 2793.199999988079,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 249.90000000000055,
+          "p95": 300,
+          "max": 300,
+          "samples": 6
+        },
+        "longTaskCount": 7,
+        "longestTaskMs": 286
+      },
+      {
+        "run": 2,
+        "condition": "large-cpu",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 21.600000008940697,
+          "p95": 22.80000001192093,
+          "max": 22.80000001192093,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 1204.3500000089407,
+          "p95": 1254.3999999761581,
+          "max": 1254.3999999761581,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.10000000000036,
+          "max": 100.10000000000036,
+          "samples": 6
+        },
+        "longTaskCount": 4,
+        "longestTaskMs": 55
+      },
+      {
+        "run": 2,
+        "condition": "large-cpu",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 43.349999994039536,
+          "p95": 52.29999998211861,
+          "max": 52.29999998211861,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 2521.7000000029802,
+          "p95": 2874.5999999940395,
+          "max": 2874.5999999940395,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 225.0,
+          "p95": 266.60000000000036,
+          "max": 266.60000000000036,
+          "samples": 6
+        },
+        "longTaskCount": 7,
+        "longestTaskMs": 255
+      },
+      {
+        "run": 2,
+        "condition": "small-cpu",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 20.950000002980232,
+          "p95": 23.30000001192093,
+          "max": 23.30000001192093,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 980.25,
+          "p95": 1087.199999988079,
+          "max": 1087.199999988079,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100,
+          "max": 100,
+          "samples": 6
+        },
+        "longTaskCount": 0,
+        "longestTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "small-cpu",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 38.20000000298023,
+          "p95": 67.30000001192093,
+          "max": 67.30000001192093,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 1858.9500000178814,
+          "p95": 2008,
+          "max": 2008,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 133.39999999999873,
+          "p95": 150,
+          "max": 150,
+          "samples": 6
+        },
+        "longTaskCount": 6,
+        "longestTaskMs": 140
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 20.100000008940697,
+          "p95": 32.900000005960464,
+          "max": 32.900000005960464,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 680.8999999910593,
+          "p95": 703.9000000059605,
+          "max": 703.9000000059605,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100.10000000000036,
+          "max": 100.10000000000036,
+          "samples": 6
+        },
+        "longTaskCount": 3,
+        "longestTaskMs": 65
+      },
+      {
+        "run": 2,
+        "condition": "large-idle",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 69.09999999403954,
+          "p95": 96,
+          "max": 96,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 2261.6000000089407,
+          "p95": 2398.4000000059605,
+          "max": 2398.4000000059605,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 225.05000000000018,
+          "p95": 266.60000000000036,
+          "max": 266.60000000000036,
+          "samples": 6
+        },
+        "longTaskCount": 7,
+        "longestTaskMs": 269
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "scenario": "desktop",
+        "feedbackMs": {
+          "median": 21.25,
+          "p95": 23,
+          "max": 23,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 463.65000000596046,
+          "p95": 636.5,
+          "max": 636.5,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 100.0,
+          "p95": 100,
+          "max": 100,
+          "samples": 6
+        },
+        "longTaskCount": 0,
+        "longestTaskMs": 0
+      },
+      {
+        "run": 2,
+        "condition": "small-idle",
+        "scenario": "mobile-emulation-4x",
+        "feedbackMs": {
+          "median": 54.25000001490116,
+          "p95": 80,
+          "max": 80,
+          "samples": 6
+        },
+        "settledMs": {
+          "median": 1410.6499999910593,
+          "p95": 1607.2000000178814,
+          "max": 1607.2000000178814,
+          "samples": 6
+        },
+        "maxFrameGapMs": {
+          "median": 141.60000000000036,
+          "p95": 183.29999999999927,
+          "max": 183.29999999999927,
+          "samples": 6
+        },
+        "longTaskCount": 6,
+        "longestTaskMs": 184
+      }
+    ]
+  },
+  "diagnostics": {
+    "profiledExecutionsPassed": 2,
+    "historyProbeExecutionsPassed": 1,
+    "excludedFrom96Observations": true,
+    "workerProfilesVerified": false,
+    "workerCpuThrottleVerified": false,
+    "profiles": [
+      {
+        "condition": "large-idle",
+        "scenario": "desktop",
+        "idleFrames": {
+          "median": 16.699999999999818,
+          "p95": 16.799999999999727,
+          "max": 16.799999999999727,
+          "samples": 12
+        },
+        "packetCount": 107,
+        "definitionCount": 1,
+        "definitionBytes": 1092001,
+        "mainProfile": {
+          "diagnosticOnly": true,
+          "notFullWallTimeAttribution": true,
+          "topSelfSampleMs": [
+            {
+              "function": "(idle)",
+              "url": "",
+              "ms": 274.463
+            },
+            {
+              "function": "(program)",
+              "url": "",
+              "ms": 222.021
+            },
+            {
+              "function": "stringBytes",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 52.594
+            },
+            {
+              "function": "i",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 36.08
+            },
+            {
+              "function": "(garbage collector)",
+              "url": "",
+              "ms": 35.547
+            },
+            {
+              "function": "encode",
+              "url": "",
+              "ms": 35.366
+            },
+            {
+              "function": "Worker.postMessage",
+              "url": "",
+              "ms": 20.488
+            },
+            {
+              "function": "",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 19.723
+            },
+            {
+              "function": "_",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 13.047
+            },
+            {
+              "function": "wG",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 9.805
+            }
+          ]
+        }
+      },
+      {
+        "condition": "large-idle",
+        "scenario": "mobile-emulation-4x",
+        "idleFrames": {
+          "median": 16.69999999999891,
+          "p95": 16.80000000000109,
+          "max": 16.80000000000109,
+          "samples": 12
+        },
+        "packetCount": 107,
+        "definitionCount": 1,
+        "definitionBytes": 1092001,
+        "mainProfile": {
+          "diagnosticOnly": true,
+          "notFullWallTimeAttribution": true,
+          "topSelfSampleMs": [
+            {
+              "function": "(program)",
+              "url": "",
+              "ms": 932.224
+            },
+            {
+              "function": "(idle)",
+              "url": "",
+              "ms": 279.161
+            },
+            {
+              "function": "stringBytes",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 169.041
+            },
+            {
+              "function": "i",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 159.455
+            },
+            {
+              "function": "encode",
+              "url": "",
+              "ms": 149.503
+            },
+            {
+              "function": "",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 88.604
+            },
+            {
+              "function": "wG",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 76.681
+            },
+            {
+              "function": "(garbage collector)",
+              "url": "",
+              "ms": 75.267
+            },
+            {
+              "function": "SG",
+              "url": "http://127.0.0.1:45209/assets/database.svelte-D8i2JGqF.js",
+              "ms": 67.704
+            },
+            {
+              "function": "Worker.postMessage",
+              "url": "",
+              "ms": 59.394
+            }
+          ]
+        }
+      },
+      {
+        "condition": "large-cpu",
+        "scenario": "desktop",
+        "idleFrames": {
+          "median": 16.699999999999818,
+          "p95": 16.800000000000182,
+          "max": 16.800000000000182,
+          "samples": 12
+        },
+        "packetCount": 107,
+        "definitionCount": 1,
+        "definitionBytes": 1092001,
+        "mainProfile": {
+          "diagnosticOnly": true,
+          "notFullWallTimeAttribution": true,
+          "topSelfSampleMs": [
+            {
+              "function": "(idle)",
+              "url": "",
+              "ms": 765.233
+            },
+            {
+              "function": "(program)",
+              "url": "",
+              "ms": 238.605
+            },
+            {
+              "function": "stringBytes",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 43.591
+            },
+            {
+              "function": "i",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 39.12
+            },
+            {
+              "function": "(garbage collector)",
+              "url": "",
+              "ms": 35.531
+            },
+            {
+              "function": "encode",
+              "url": "",
+              "ms": 33.36
+            },
+            {
+              "function": "Worker.postMessage",
+              "url": "",
+              "ms": 27.954
+            },
+            {
+              "function": "",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 20.457
+            },
+            {
+              "function": "_",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 13.917
+            },
+            {
+              "function": "l",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 12.929
+            }
+          ]
+        }
+      },
+      {
+        "condition": "large-cpu",
+        "scenario": "mobile-emulation-4x",
+        "idleFrames": {
+          "median": 16.600000000000364,
+          "p95": 16.80000000000109,
+          "max": 16.80000000000109,
+          "samples": 12
+        },
+        "packetCount": 107,
+        "definitionCount": 1,
+        "definitionBytes": 1092001,
+        "mainProfile": {
+          "diagnosticOnly": true,
+          "notFullWallTimeAttribution": true,
+          "topSelfSampleMs": [
+            {
+              "function": "(program)",
+              "url": "",
+              "ms": 1046.548
+            },
+            {
+              "function": "(idle)",
+              "url": "",
+              "ms": 702.481
+            },
+            {
+              "function": "stringBytes",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 196.659
+            },
+            {
+              "function": "i",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 149.67
+            },
+            {
+              "function": "encode",
+              "url": "",
+              "ms": 139.05
+            },
+            {
+              "function": "",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 91.125
+            },
+            {
+              "function": "wG",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 87.704
+            },
+            {
+              "function": "(garbage collector)",
+              "url": "",
+              "ms": 77.41
+            },
+            {
+              "function": "SG",
+              "url": "http://127.0.0.1:45925/assets/database.svelte-D8i2JGqF.js",
+              "ms": 61.329
+            },
+            {
+              "function": "Worker.postMessage",
+              "url": "",
+              "ms": 59.431
+            }
+          ]
+        }
+      }
+    ],
+    "history": [
+      {
+        "scenario": "desktop",
+        "packets": 107,
+        "unchanged100RowHistoryDefinitions": 1,
+        "historyDefinitionBytes": 1092001,
+        "comparedWithEarlierSameVMDefinitionFullJSON": true,
+        "bodiesSaved": false
+      },
+      {
+        "scenario": "mobile-emulation-4x",
+        "packets": 107,
+        "unchanged100RowHistoryDefinitions": 1,
+        "historyDefinitionBytes": 1092001,
+        "comparedWithEarlierSameVMDefinitionFullJSON": true,
+        "bodiesSaved": false
+      }
+    ],
+    "workerProfilerAttempts": [
+      "zero matching targets",
+      "target URL/title empty",
+      "attached Runtime.evaluate timeout"
+    ],
+    "initialFailureLogsAndPreloadVersionsPreserved": true
+  },
+  "sourceFingerprints": {
+    "src/lib/ChatScreens/Chat.svelte": "06b1af8b63f4ceafd299331643e1f558d05215c7d729d93273e87ae4a7d776f7",
+    "src/lib/ChatScreens/ChatBody.svelte": "2501e1ae5243b0df8f0a15ccd948de7f562d9544eb340176d282f174ebdb577f",
+    "src/ts/parser/parser.svelte.ts": "78f47a5fb4b853d97cc929ecb3694cf11ae86c4db647e89fc57fbffc213f9e5f",
+    "src/ts/parser/cbsRuntime.ts": "0d8f4fe2f9f7c8819d7242c914c7df33af3a208c2833fae03527b3d33439a4d3",
+    "src/ts/process/scripts.ts": "7efc5a10953b203a96d65f07bb3f3dc572c215ddf6eb3ffb7034b8dcb0be6edc",
+    "src/ts/process/triggers.ts": "0380dbc1a60349dc3003412c90eefd19bf373cc7e7f6c0efbaedd22ffcf4cbf6",
+    "src/ts/runtime/displayCbsScope.ts": "0f7ade67c1240203e426066a4f72f3c5e654ef9cafccb5ab10b824f8135b2556",
+    "src/ts/runtime/displayReadDependencies.ts": "586ed4865c891607447ef17f482653dd34775810da576c196113e02242031c47",
+    "src/ts/runtime/canonicalDisplayHistory.ts": "40ace21dbdb8223a0fd2445c31482c72ba5f474b35abcc0ca2b6dbbb45fa3d82",
+    "src/ts/runtime/browserDisplayMetadata.ts": "890cacd57f9cd4e269dbaf7b7404a6297b6e6a0a0e30e3ecec37d3a8a7030942",
+    "src/ts/runtime/displayRenderCache.ts": "2b8ebe1e1edcec14f5f8ddb8eb6f7637f7dbc4e6e8e9ff1c37cef7744e54d8e4",
+    "src/ts/runtime/stableDisplayDom.ts": "682b6e958abf6422621769176162d68cbe65aa7cd3c53d197b39e4da4a129251",
+    "src/ts/observer.svelte.ts": "e9f03dae411b056e0e37bec2da03111f34559eee811df53a9d804184c47b4bf7",
+    "src/ts/runtime/browserDisplayLua.ts": "0f38227bc78c4ced453bde55bf5ed30f071d13f39ecfbc321428468119a0cca8",
+    "src/ts/runtime/displayScheduling.ts": "296a4041075652168cbce5c08ecd16df90323749c6fa4fad3763991bf62b6b17",
+    "src/ts/runtime/displayLuaContext.ts": "90f94001d8223750a9fe6656fba6a7ed62ab4ed4248a4e83f59d8e1e2ff46f3e",
+    "src/ts/runtime/displayWorkerExecutor.ts": "4beb16ae7fe4aa443786d82aede03508198ae76b4a73ef76c1bc9b32b6bfe5f3",
+    "src/ts/runtime/displayWireBudget.ts": "d1fe817792b9630fc662e7ce659ac0c30429bb21f10eefefcca04b841b6a4ec6",
+    "src/ts/runtime/displayScopeCache.svelte.ts": "c23b931a99a316950e44aac54783a6cfefc9d6280557f4e5907f58c89d0cb8e7",
+    "src/ts/runtime/displayScopeIdentity.ts": "ce51463992207f2164d9775ded898b35aff81ec571d2eec8e410c6e8fee01736",
+    "src/ts/runtime/browserRuntimeController.svelte.ts": "686e90dcf843eb651b542e27e333f8d2f42bf2a402089bab12b5351eb4a7205b",
+    "src/ts/runtime/risuReadModel.ts": "9399e318777fda8ce190b80fbf8d35d36b0cd13a5d367bdcffd463fb3ef8bc05",
+    "server/entity/store.cjs": "0895f3e8d5c7f14a6ed33219c3b88bceacfca5582d11fb5e1c3eabef2840aaea",
+    "src/ts/runtime/browserRuntimeState.svelte.ts": "e1b8020757cf2ad87a50e566b9e11ee24a5f220193c40b836d96a0bdf5ee6238",
+    "src/ts/runtime/display.worker.ts": "ce6fa7fcccee6743e025edbf258b0d91c833b665a1f509d725629c2a893d5142",
+    "src/ts/runtime/displayEffects.ts": "ad79908aba18888f8d59e1de6ca9ab6a631ecb16248d84818d0831c215a0d3a1",
+    "src/ts/process/scriptings.ts": "8003d77c792fe43c4c02f6094e5296b95c26c7ef460830475f3f9ceaf6aafac7",
+    "server/browser/chromium.cjs": "4f03356ed5f1fe819e1959adee7372af56a0e2dc90899f9148cd5fb1aa42cf89",
+    "server/browser/displayPerformance.test.cjs": "3e0fc743dd1cba765ae6df6266faf85d4a06670ddb23e5defe2cd9e893309176"
+  },
+  "buildIndexSha256": "1358cd6baf83d9ec8a1126f9063f75ab020ce2fc30e9811a7a468cfc2ad299f4",
+  "reusedImplementationValidation": "evidence/local-progress-relation-20261004.json;494app+3existing skips/377server/14UI/types0/0/169audit explicitly reused, not fresh here",
+  "reusedBuilds": "8ce native/entity/ordinary; all tracked src still match8ce; no fresh builds or candidateNode24",
+  "evidenceFingerprints": {
+    "evidence/local-display-workloads-1-large-cpu.json": "36b61365d9b16de1b0ba8211b333a3077324d1e1a7ae4135f34246c0739c5ed6",
+    "evidence/local-display-workloads-1-large-cpu.log": "766a87ae796ed17dacbbeda1ef7f1a5d81d786df809a2f05f2326d060a919a8e",
+    "evidence/local-display-workloads-1-large-idle.json": "4d2f40687cd038e33ac55e0418dbcbefa465f308143677235660eeb4598d6640",
+    "evidence/local-display-workloads-1-large-idle.log": "a2710d2cd65e7252c5b7a04755698477215cfcf0070a380463c132bb6918866e",
+    "evidence/local-display-workloads-1-small-cpu.json": "3ee40082e644d8dd3b30ec1a160cbf22f8b6997694a6bc8b2bc6c98d2fd6a0bc",
+    "evidence/local-display-workloads-1-small-cpu.log": "6b6987456591e99aa9368cb6a5807dda070d0ea5421691ee3e12c89b9775f5c9",
+    "evidence/local-display-workloads-1-small-idle.json": "5796905c28c202cc66c4f3f98670109cae59e2de01f6bd660b7cffdf59ed285c",
+    "evidence/local-display-workloads-1-small-idle.log": "d7d6f1b4f2b53e77ebab668336380b747304ba308de61b631585e84b96572cab",
+    "evidence/local-display-workloads-2-large-cpu.json": "e297bde666c056b97b3e076954c5260ef5a91ac778360567e6c030d35de8d2a7",
+    "evidence/local-display-workloads-2-large-cpu.log": "ff8fe067cb76afc33059154c2ed84fba3957ee7a0dee6a17332c2626b9ba88b3",
+    "evidence/local-display-workloads-2-large-idle.json": "552ff21ce6a88186f3cc99b5d0a0d553a771ac13a47ea84c07357a86382191d1",
+    "evidence/local-display-workloads-2-large-idle.log": "8da5d0ea3440eb617f739e5ba9bfc76d355594f8223238cb1920f973b1560f7d",
+    "evidence/local-display-workloads-2-small-cpu.json": "c0192b7feb277205abeec4cc4f21ac3912f3e7b728dd74b4cf5bfbd8fe8754a1",
+    "evidence/local-display-workloads-2-small-cpu.log": "6dc65c57831c871b75d2652bfaa03670eecb37ca7560fb278f3a1e6cb56748fb",
+    "evidence/local-display-workloads-2-small-idle.json": "21d6268ccea9176dc2be7c64188c6b44121e7197def24909996545ff0a8c865d",
+    "evidence/local-display-workloads-2-small-idle.log": "f576e3d65e7a402065bfce5b825e4260a6875df4aad98ecad86dfa347d112ce5",
+    "evidence/local-display-workloads-history-probe-desktop.json": "7ac8c910c01b9f2fd1d75e51cc0420514ef051e71c94eaf764028334e45af721",
+    "evidence/local-display-workloads-history-probe-mobile-emulation-4x.json": "a32f65cd5465cb8ca1052a83ce6acfd08e0a24c0b1d1d1b8571aeee69f05ab80",
+    "evidence/local-display-workloads-history-probe.json": "068af837899e27fe30446581e0cf05f7ce7f9b10daf35ec2a7c2323650cf08e1",
+    "evidence/local-display-workloads-history-probe.log": "e37acf2f613bae040632bdd73a5190aec91af109e5dc80b763949fdbca5aa728",
+    "evidence/local-display-workloads-main-profile-large-cpu-desktop-idle-frames.json": "c668b1f9c4349f01795adc9943dc5a503494ac9cd9091ba18550829fb61c8c94",
+    "evidence/local-display-workloads-main-profile-large-cpu-desktop-wire-frames.json": "88c47c64f525001600b07de817400281c461a56d409d935fb002b7818bc3d770",
+    "evidence/local-display-workloads-main-profile-large-cpu-desktop.json": "0e18adca46bc9e66ba67bcb59bd4e6324a2b3ac8045c84c14729423be2a61372",
+    "evidence/local-display-workloads-main-profile-large-cpu-mobile-emulation-4x-idle-frames.json": "93b02b1047e8e095cd6671560d9d274715c9350a177a49781d82b13d17c83fcc",
+    "evidence/local-display-workloads-main-profile-large-cpu-mobile-emulation-4x-wire-frames.json": "7f2346f99bdd4315a1b5bc64eaa141875738bed5729d66ed526cd412bc153212",
+    "evidence/local-display-workloads-main-profile-large-cpu-mobile-emulation-4x.json": "1b5ff40afc890eb237fe7ecd741db3f41dab6ca84e11e800e824fc4f4a05e58f",
+    "evidence/local-display-workloads-main-profile-large-cpu.json": "2f9925d6cdb26bf50ab942b3914830f27e35fee6e0dbf1c337896742eff1a0b8",
+    "evidence/local-display-workloads-main-profile-large-cpu.log": "7793803c1a0fba5c85b07790a2b0e2dec9f213d96b446fdb465020469665921f",
+    "evidence/local-display-workloads-main-profile-large-idle-desktop-idle-frames.json": "599264b18a4f3fb029612ea98b2af1de2d17d413d65f0225c9ca89c1c33a02ae",
+    "evidence/local-display-workloads-main-profile-large-idle-desktop-wire-frames.json": "668c5b36d749706f1e53ce360de6bd534b1c0771e602bf2cbf47e7dd9dc8f607",
+    "evidence/local-display-workloads-main-profile-large-idle-desktop.json": "8d62d22b81ba5a0a2eef77ce9a3b9ac06470c75ea2812d00f7c9f5ae08d56d68",
+    "evidence/local-display-workloads-main-profile-large-idle-mobile-emulation-4x-idle-frames.json": "319d66b3bec69587692e5d222fff71fb577f8b603ea7e7bd395c60e55b37e635",
+    "evidence/local-display-workloads-main-profile-large-idle-mobile-emulation-4x-wire-frames.json": "f95397f0f71851388b1634afac01879a925b1dab54e615fbc06f1bd6cda80dbc",
+    "evidence/local-display-workloads-main-profile-large-idle-mobile-emulation-4x.json": "312e8b2189879f2315433a0040cac180df76ff71d45145a65611b82978c90372",
+    "evidence/local-display-workloads-main-profile-large-idle.json": "d173407b5bb86d4e8327214f29e2f0ff22e19a93bd8a337fc506644517c2bde0",
+    "evidence/local-display-workloads-main-profile-large-idle.log": "0925b98d635097e689e9ff415eeaed2b15dbc2ceaa246dee5d5ff28a38b97c62",
+    "evidence/local-display-workloads-main-profiles-run.json": "ce1ab170ddbe84c545cb253c99696c5b819867ab1e4f18e34cc677ce4f13772c",
+    "evidence/local-display-workloads-profile-discovery-issue.json": "2fbeb3c986a756eb9e60094ed262acf3da263f35b117e9d5a80d26a2555e087b",
+    "evidence/local-display-workloads-profile-discovery-large-idle-desktop-idle-frames.json": "c787ebaa53b1f3e1ace48ee36ab99e168a47c2c90c52ac541d97fb6af1234007",
+    "evidence/local-display-workloads-profile-discovery-large-idle-desktop-targets.json": "25dc19e5b26ac04c022a639157ca0c105fc5410f64ac7b3313d248e0e85db1f6",
+    "evidence/local-display-workloads-profile-discovery-large-idle.log": "f06102f2795dd254692aa6b2da7c6abd41d7dffc513087886891c21bade7e485",
+    "evidence/local-display-workloads-profile-initial-issue.json": "c2668e41adf439cc8eb3bfef24f441ec7ce267a68777f9344278b5895a4369f1",
+    "evidence/local-display-workloads-profile-initial-large-idle-desktop-idle-frames.json": "4e7cf9c12ff1946b72acc9530e7e001197570d25b04a17601ff06823e52b6883",
+    "evidence/local-display-workloads-profile-initial-large-idle.log": "7f090bca8807d5fa7cf42d7cc822deb333be5bf7665f7f748c21ffd325651cb3",
+    "evidence/local-display-workloads-profile-preload-discovery.cjs": "89de2414037fd73c72243420d7b985f7babed64d374676674746fc2f03e46b19",
+    "evidence/local-display-workloads-profile-preload-initial.cjs": "57d83bea672d00fab6df05833835c0ebf549214f03e5d4ab75a8fd315cfaec29",
+    "evidence/local-display-workloads-profile-preload-timeout.cjs": "accc0a85cf700a62c01d8ed98dbed1d4d7e6b771ae7e63ef955346abeb68a0fb",
+    "evidence/local-display-workloads-profile-worker-timeout-issue.json": "84b6ea73380790d739878ce5b7568d6e29e9973727bbb72dce5784c914c3f90c",
+    "evidence/local-display-workloads-profile-worker-timeout-large-idle-desktop-idle-frames.json": "7bec70855601ee4e6b6c8e835897ac9ed8727c59e57ca719f37bc3718600e45f",
+    "evidence/local-display-workloads-profile-worker-timeout-large-idle-desktop-targets.json": "397ef7c06a1b3d5c9709b837c9edec95c2595f5f41f22e7b074122675bfdec8a",
+    "evidence/local-display-workloads-profile-worker-timeout-large-idle.log": "668d8ebddd7d6683040add44ed0ffe1599875efe2c02f2a1f26a03e248653b55",
+    "evidence/local-display-workloads-profiles-discovery-run.json": "9f311423f2624f0decf9b8e58771c4e4bdadf621dc1ee63fe8919438e6320c00",
+    "evidence/local-display-workloads-profiles-initial-run.json": "9f311423f2624f0decf9b8e58771c4e4bdadf621dc1ee63fe8919438e6320c00",
+    "evidence/local-display-workloads-profiles-worker-timeout-run.json": "9f311423f2624f0decf9b8e58771c4e4bdadf621dc1ee63fe8919438e6320c00",
+    "evidence/local-display-workloads-run.json": "8466436916c8a8198286259c8935b177e2f18087f824fdf578b4a75ae6d85a2d"
+  },
+  "scriptFingerprints": {
+    "scripts/record_display_workloads.py": "33b3e1759a0fa260be149bf65f04c196d0fa494fcb50554f3f1a14deeb0e430f",
+    "scripts/measure_display_workloads.py": "dc3212329fef878c723b7fdd0fac75f950e814f5bca136e2da64078ac4d5277e",
+    "scripts/profile_display_worker.cjs": "accc0a85cf700a62c01d8ed98dbed1d4d7e6b771ae7e63ef955346abeb68a0fb",
+    "scripts/observe_display_wire.cjs": "105cd2c15a5fda6718b87e01fbd1da957c544d8ecbbf18061c9bba60e63f6fcc",
+    "scripts/observe_display_history_wire.cjs": "f29d15872c432fae16a93fd6144bc6eed748050cbcdbce996114d2f401ccd7ad"
+  },
+  "limits": [
+    "warm headless desktop/pageCPU4x emulation only; physical mobile and worker throttle unverified",
+    "synthetic stress workloads do not establish every real card/provider behavior",
+    "main sampled CPU attribution incomplete; no verified worker CPU profile or percentages",
+    "107 transport requests include an uncounted greeting;106 refers to labelled row callbacks",
+    "history definition bytes are logical UTF8 JSON metadata, not measured physical IPC/network bytes",
+    "cold/changed single large HTML/assets/concurrent devices/full reads/extensions/storage/import-export/trial remain"
+  ]
+}

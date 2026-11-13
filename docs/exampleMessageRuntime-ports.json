@@ -1,0 +1,17 @@
+{
+  "baseline": "f9728b14",
+  "source": "src/ts/process/exampleMessages.ts",
+  "core": "src/ts/process/exampleMessageRuntime.ts",
+  "factory": "createExampleMessageRuntime",
+  "functions": ["exampleMessage"],
+  "classes": [],
+  "ports": [
+    {
+      "name": "risuChatParser",
+      "specifier": "./scripts",
+      "original": "risuChatParser"
+    }
+  ],
+  "globals": [],
+  "nativeHostIntegrated": false
+}

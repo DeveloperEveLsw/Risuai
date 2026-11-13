@@ -17,7 +17,13 @@
     settingsOpen,
     SettingsMenuIndex,
   } from "src/ts/stores.svelte";
-  import type { SearchState, BulkEditState, CategoryManagerState, FilterState, UIState } from "./types";
+  import type {
+    SearchState,
+    BulkEditState,
+    CategoryManagerState,
+    FilterState,
+    UIState,
+  } from "./types";
 
   interface Props {
     searchState: SearchState;
@@ -48,7 +54,6 @@
     onToggleBulkEditMode,
     onOpenCategoryManager,
   }: Props = $props();
-
 
   async function toggleSearch() {
     if (searchState === null) {
@@ -149,6 +154,7 @@
           ? 'text-blue-400 hover:text-blue-300'
           : 'text-zinc-400 hover:text-zinc-200'}"
         tabindex="-1"
+        data-hypa-v3-bulk-mode
         onclick={toggleBulkEditMode}
       >
         <SquarePenIcon class="w-6 h-6" />
@@ -160,6 +166,7 @@
       <button
         class="p-2 text-zinc-400 hover:text-zinc-200 transition-colors"
         tabindex="-1"
+        data-hypa-v3-categories
         onclick={openCategoryManager}
       >
         <TagIcon class="w-6 h-6" />
@@ -180,6 +187,7 @@
       <button
         class="p-2 transition-colors text-zinc-400 hover:text-zinc-200"
         tabindex="-1"
+        data-hypa-v3-options
         onclick={openDropdown}
       >
         <MoreVerticalIcon class="w-6 h-6" />
@@ -206,6 +214,7 @@
             <button
               class="p-2 transition-colors text-zinc-400 hover:text-rose-300"
               tabindex="-1"
+              data-hypa-v3-reset
               onclick={async () => await resetData()}
             >
               <Trash2Icon class="w-6 h-6" />
@@ -219,6 +228,7 @@
     <button
       class="p-2 transition-colors text-zinc-400 hover:text-zinc-200"
       tabindex="-1"
+      data-hypa-v3-close
       onclick={closeModal}
     >
       <XIcon class="w-6 h-6" />

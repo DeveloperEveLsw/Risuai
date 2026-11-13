@@ -4,8 +4,6 @@ import { getImageType } from "src/ts/media";
 import { getDatabase } from "../../storage/database.svelte";
 import { getModelInfo, LLMFlags, LLMFormat } from "src/ts/model/modellist";
 import { asBuffer } from "../../util";
-import { isNodeServer } from "../../platform";
-import { NodeInlayStorage } from "../../storage/nodeInlayStorage";
 
 export type InlayAsset = {
     data: string | Blob
@@ -33,47 +31,6 @@ const inlayStorage = localforage.createInstance({
     name: 'inlay',
     storeName: 'inlay'
 })
-let nodeInlayStoragePromise: Promise<NodeInlayStorage> | null = null
-
-async function getNodeInlayStorage() {
-    if (!isNodeServer) {
-        return null
-    }
-    nodeInlayStoragePromise ??= import('../../storage/nodeStorage')
-        .then(({ getSharedNodeStorage }) => new NodeInlayStorage(getSharedNodeStorage()))
-    return await nodeInlayStoragePromise
-}
-
-async function readStoredInlay(id: string): Promise<InlayAsset | null> {
-    const nodeInlayStorage = await getNodeInlayStorage()
-    if (!nodeInlayStorage) {
-        return await inlayStorage.getItem<InlayAsset | null>(id)
-    }
-    const serverAsset = await nodeInlayStorage.getItem(id)
-    if (serverAsset) {
-        // Clean a duplicate left by an older Node build without retaining a
-        // second full media copy in this browser profile.
-        await inlayStorage.removeItem(id)
-        return serverAsset
-    }
-    const legacyAsset = await inlayStorage.getItem<InlayAsset | null>(id)
-    if (!legacyAsset) {
-        return null
-    }
-    await nodeInlayStorage.setItem(id, legacyAsset)
-    await inlayStorage.removeItem(id)
-    return legacyAsset
-}
-
-async function writeStoredInlay(id: string, asset: InlayAsset) {
-    const nodeInlayStorage = await getNodeInlayStorage()
-    if (!nodeInlayStorage) {
-        await inlayStorage.setItem(id, asset)
-        return
-    }
-    await nodeInlayStorage.setItem(id, asset)
-    await inlayStorage.removeItem(id)
-}
 
 export async function postInlayAsset(img:{
     name:string,
@@ -96,7 +53,7 @@ export async function postInlayAsset(img:{
         const audioBlob = new Blob([asBuffer(img.data)], {type: `audio/${extention}`})
         const imgid = v4()
 
-        await writeStoredInlay(imgid, {
+        await inlayStorage.setItem(imgid, {
             name: img.name,
             data: audioBlob,
             ext: extention,
@@ -110,7 +67,7 @@ export async function postInlayAsset(img:{
         const videoBlob = new Blob([asBuffer(img.data)], {type: `video/${extention}`})
         const imgid = v4()
 
-        await writeStoredInlay(imgid, {
+        await inlayStorage.setItem(imgid, {
             name: img.name,
             data: videoBlob,
             ext: extention,
@@ -150,15 +107,12 @@ export async function writeInlayImage(imgObj:HTMLImageElement, arg:{name?:string
             resolve(null)
         }
     })
-    const imageBlob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
-        (blob) => blob ? resolve(blob) : reject(new Error('Failed to encode inlay image')),
-        'image/png',
-    ));
+    const imageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 
 
     const imgid = arg.id ?? v4()
 
-    await writeStoredInlay(imgid, {
+    await inlayStorage.setItem(imgid, {
         name: arg.name ?? imgid,
         data: imageBlob,
         ext: 'png',
@@ -180,7 +134,7 @@ export type InlaySignature = {
 }
 
 export async function saveInlayedSignature(sigid:string,signature:InlaySignature){
-    await writeStoredInlay(sigid, {
+    await inlayStorage.setItem(sigid, {
         name: sigid,
         data: JSON.stringify(signature),
         ext: 'json',
@@ -217,7 +171,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 // Returns with base64 data URI
 export async function getInlayAsset(id: string){
-    const img = await readStoredInlay(id)
+    const img = await inlayStorage.getItem<InlayAsset | null>(id)
     if(img === null){
         return null
     }
@@ -234,7 +188,7 @@ export async function getInlayAsset(id: string){
 
 // Returns with Blob
 export async function getInlayAssetBlob(id: string){
-    const img = await readStoredInlay(id)
+    const img = await inlayStorage.getItem<InlayAsset | null>(id)
     if(img === null){
         return null
     }
@@ -252,11 +206,6 @@ export async function getInlayAssetBlob(id: string){
 }
 
 export async function listInlayAssets(): Promise<[id: string, InlayAsset][]> {
-    const nodeInlayStorage = await getNodeInlayStorage()
-    if (nodeInlayStorage) {
-        await migrateNodeInlayAssets()
-        return await nodeInlayStorage.entries()
-    }
     const assets: [id: string, InlayAsset][] = []
     await inlayStorage.iterate<InlayAsset, void>((value, key) => {
         assets.push([key, value])
@@ -265,36 +214,11 @@ export async function listInlayAssets(): Promise<[id: string, InlayAsset][]> {
     return assets
 }
 
-/** Moves assets created by older Node builds out of this browser's IndexedDB.
- * Server IDs are checked without downloading their media payloads. */
-export async function migrateNodeInlayAssets() {
-    const nodeInlayStorage = await getNodeInlayStorage()
-    if (!nodeInlayStorage) {
-        return 0
-    }
-    const serverIds = new Set(await nodeInlayStorage.ids())
-    const legacyEntries: [string, InlayAsset][] = []
-    await inlayStorage.iterate<InlayAsset, void>((value, key) => {
-        legacyEntries.push([key, value])
-    })
-    for (const [id, asset] of legacyEntries) {
-        if (!serverIds.has(id)) {
-            await nodeInlayStorage.setItem(id, asset)
-        }
-        await inlayStorage.removeItem(id)
-    }
-    return legacyEntries.length
-}
-
 export async function setInlayAsset(id: string, img: InlayAsset){
-    await writeStoredInlay(id, img)
+    await inlayStorage.setItem(id, img)
 }
 
 export async function removeInlayAsset(id: string){
-    const nodeInlayStorage = await getNodeInlayStorage()
-    if (nodeInlayStorage) {
-        await nodeInlayStorage.removeItem(id)
-    }
     await inlayStorage.removeItem(id)
 }
 
