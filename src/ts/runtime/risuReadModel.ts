@@ -387,6 +387,25 @@ export class RisuReadModel {
       entityEpoch: this.fieldEpochs.get(this.fieldEntityIdentity(target)) ?? 0,
     };
   }
+  private isCurrentFieldVersion(
+    target: FieldTarget,
+    revision: number,
+    entityEpoch: number,
+    cursor: number,
+  ) {
+    if (
+      entityEpoch <
+      (this.fieldEpochs.get(this.fieldEntityIdentity(target)) ?? 0)
+    )
+      return false;
+    const old = this.fieldVersions.get(fieldIdentity(target));
+    return (
+      !old ||
+      entityEpoch !== old.entityEpoch ||
+      revision > old.revision ||
+      (revision === old.revision && cursor >= old.cursor)
+    );
+  }
   private rememberFields(
     target: Omit<FieldTarget, "key">,
     versions: Record<string, number> = {},
@@ -496,14 +515,13 @@ export class RisuReadModel {
         if (cached && record.entityEpoch > (cached.entityEpoch ?? 0))
           await this.ensureResource(record.resourceKind, record.entityId, true);
       }
-      const old = this.fieldVersions.get(fieldIdentity(record));
-      const epoch = this.fieldVersion(record).entityEpoch;
       if (
-        record.entityEpoch < epoch ||
-        (old &&
-          record.entityEpoch === old.entityEpoch &&
-          (record.revision < old.revision ||
-            (record.revision === old.revision && result.cursor < old.cursor)))
+        !this.isCurrentFieldVersion(
+          record,
+          record.revision,
+          record.entityEpoch,
+          result.cursor,
+        )
       )
         continue;
       this.rememberFields(
@@ -515,7 +533,7 @@ export class RisuReadModel {
       const target =
         record.scope === "character"
           ? (this.definitions.get(record.entityId)?.value ??
-            (["name", "trashTime"].includes(record.key)
+            (["name", "trashTime", "image"].includes(record.key)
               ? this.database.characters.find(
                   (value) => value.chaId === record.entityId,
                 )
@@ -1074,6 +1092,29 @@ export class RisuReadModel {
     }
     return this.database.characters[index];
   }
+  private applyCharacterImage(
+    character: Character,
+    image: unknown,
+    revision: unknown,
+    entityEpoch: number,
+    cursor: number,
+  ) {
+    if (
+      typeof revision !== "number" ||
+      (image !== null && typeof image !== "string")
+    )
+      return;
+    const target = {
+      scope: "character",
+      entityId: character.chaId,
+      key: "image",
+    } as const;
+    if (!this.isCurrentFieldVersion(target, revision, entityEpoch, cursor))
+      return;
+    this.rememberFields(target, { image: revision }, entityEpoch, cursor);
+    if (typeof image === "string") character.image = image;
+    else delete character.image;
+  }
   private definition(record: Definition) {
     if (
       !this.alive(
@@ -1271,6 +1312,13 @@ export class RisuReadModel {
       // A summary does not mark the full definition loaded at this revision.
       if ((this.definitions.get(summary.id)?.revision ?? 0) <= summary.revision)
         value.name = summary.name;
+      this.applyCharacterImage(
+        value,
+        summary.image,
+        summary.imageRevision,
+        summary.entityEpoch ?? 0,
+        snapshot.cursor,
+      );
       if (
         "trashTime" in summary &&
         (!existing ||
@@ -2464,6 +2512,13 @@ export class RisuReadModel {
         change.id,
         String(p.name ?? ""),
         String(p.kind ?? "character"),
+      );
+      this.applyCharacterImage(
+        character,
+        p.image,
+        p.imageRevision,
+        Number(p.entityEpoch ?? 0),
+        change.sequence,
       );
       if (
         "trashTime" in p &&

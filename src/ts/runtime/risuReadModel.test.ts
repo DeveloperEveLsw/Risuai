@@ -1833,6 +1833,68 @@ test("bootstrap hydrates only settings and summaries; selecting a character read
   }
 });
 
+test("unopened character thumbnails load at bootstrap and follow peer changes across resync", async () => {
+  const f = fixture();
+  const initialImage = `assets/${"a".repeat(64)}.png`;
+  const updatedImage = `assets/runtime/${"b".repeat(64)}.webp`;
+  const target = { scope: "character", entityId: "d", key: "image" } as const;
+  const thumbnail = (id: string) =>
+    f.model.database.characters.find((character) => character.chaId === id)
+      ?.image;
+  const editImage = (image?: string) => {
+    const field = f.store.readFields([target]).fields[0];
+    f.command({
+      type: "change-fields",
+      edits: [
+        {
+          ...target,
+          expectedRevision: field.revision,
+          expectedEpoch: field.entityEpoch,
+          ...(image === undefined ? { remove: true } : { value: image }),
+        },
+      ],
+    });
+  };
+  try {
+    editImage(initialImage);
+    const initial = f.store.bootstrap();
+    await f.model.bootstrap(initial);
+    expect(thumbnail("d")).toBe(initialImage);
+    expect(f.model.characterLoaded("d")).toBe(false);
+    expect(f.paths).toEqual(["/resources/settings/global"]);
+
+    editImage(updatedImage);
+    await f.replay(initial.cursor);
+    expect(thumbnail("d")).toBe(updatedImage);
+    await f.model.bootstrap(initial);
+    expect(thumbnail("d")).toBe(updatedImage);
+
+    const beforeRemoval = f.store.bootstrap();
+    editImage();
+    f.command({
+      type: "create-character",
+      characterId: "peer-group",
+      definition: {
+        type: "group",
+        name: "Synthetic group",
+        image: initialImage,
+      },
+    });
+    await f.replay(beforeRemoval.cursor);
+    expect(thumbnail("d")).toBeFalsy();
+    expect(thumbnail("peer-group")).toBe(initialImage);
+    expect(f.model.characterLoaded("peer-group")).toBe(false);
+    await f.model.bootstrap(beforeRemoval);
+    expect(thumbnail("d")).toBeFalsy();
+    expect(f.model.characterLoaded("d")).toBe(false);
+    expect(f.paths.every((path) => path === "/resources/settings/global")).toBe(
+      true,
+    );
+  } finally {
+    f.store.close();
+  }
+});
+
 test("source origin headers survive journal and stale page projection but are cleared by an external message edit", async () => {
   const f = fixture();
   try {

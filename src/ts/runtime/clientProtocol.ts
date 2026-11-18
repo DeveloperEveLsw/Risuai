@@ -21,6 +21,8 @@ export interface RuntimeBootstrap {
     name: string;
     kind: string;
     revision: number;
+    image?: string | null;
+    imageRevision?: number;
     chatCount: number;
     entityEpoch?: number;
   }[];

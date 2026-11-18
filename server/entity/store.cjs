@@ -60,6 +60,11 @@ const RESOURCE_KINDS = new Set([
   "plugin",
 ]);
 const MAX_JSON_BYTES = 16 * 1024 * 1024;
+const characterImageColumns = `
+  CASE WHEN json_type(definition, '$.image') = 'text'
+    THEN json_extract(definition, '$.image') END AS image,
+  COALESCE((SELECT revision FROM entity_field_revisions
+    WHERE scope='character' AND kind='' AND entity_id=characters.id AND key='image'),0) AS imageRevision`;
 
 function id(value, label = "id") {
   if (typeof value !== "string" || !value || value.length > 256) {
@@ -339,10 +344,12 @@ class EntityStore {
         ...payload,
         entityEpoch: this.fieldEpoch({ scope: "character", entityId }),
         characterNavigationRevision: this.characterNavigationRevision(),
-        trashTime:
-          this.db
-            .prepare("SELECT trash_time FROM characters WHERE id=?")
-            .get(entityId)?.trash_time ?? null,
+        ...this.db
+          .prepare(
+            `SELECT trash_time AS trashTime, ${characterImageColumns}
+             FROM characters WHERE id=?`,
+          )
+          .get(entityId),
       };
     if (type === "chat" && payload.metadata) {
       const target = { scope: "chat", entityId };
@@ -1121,7 +1128,7 @@ class EntityStore {
         groupImageSourcesVersion: 1,
         characters: this.db
           .prepare(
-            `SELECT id, name, kind, revision, trash_time AS trashTime,
+            `SELECT id, name, kind, revision, trash_time AS trashTime, ${characterImageColumns},
                 COALESCE((SELECT revision FROM entity_tombstones t WHERE t.kind='character' AND t.scope='' AND t.id=characters.id),0) AS entityEpoch,
                 (SELECT last_interaction FROM character_activity WHERE character_id=characters.id) AS lastInteraction,
                 (SELECT revision FROM character_activity WHERE character_id=characters.id) AS activityRevision,
