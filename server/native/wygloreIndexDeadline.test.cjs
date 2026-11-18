@@ -9,6 +9,7 @@ const { createServer } = require("node:http");
 const { setTimeout: delay } = require("node:timers/promises");
 const { EntityStore } = require("../entity/store.cjs");
 const { createServerPluginHost } = require("./serverPluginHost.cjs");
+const { createPluginDom } = require("./pluginDom.cjs");
 const { createPluginStorageSession } = require("./pluginStorageSession.cjs");
 const { makeWygloreContractFixture } = require("./wygloreContractFixtures.cjs");
 const {
@@ -319,6 +320,7 @@ async function realHost(t, version, mode = "headers", isolation = true) {
     lease,
   );
   const lifetime = new AbortController();
+  const dom = createPluginDom({ signal: lifetime.signal });
   let failure, sandbox, host, onModelAbort;
   const context = {
     getCurrentCharacter: () => fixture.character,
@@ -353,6 +355,15 @@ async function realHost(t, version, mode = "headers", isolation = true) {
       sandbox = value;
     return originalCreate(value, ...args);
   };
+  t.after(async () => {
+    await host?.close().catch(() => {});
+    dom.stop();
+    store.close();
+    await new Promise((resolve) => {
+      server.close(resolve);
+      server.closeAllConnections();
+    });
+  });
   try {
     host = await createServerPluginHost({
       plugin: {
@@ -366,6 +377,7 @@ async function realHost(t, version, mode = "headers", isolation = true) {
       storage,
       signal: lifetime.signal,
       isolateProviderFailure: isolation,
+      dom,
       fetch: async (url, init) => {
         assert.equal(init.method, "POST");
         if (new URL(url).hostname === "oauth2.googleapis.com") {
@@ -419,14 +431,6 @@ async function realHost(t, version, mode = "headers", isolation = true) {
     vm.Script = originalScript;
     vm.createContext = originalCreate;
   }
-  t.after(async () => {
-    await host?.close().catch(() => {});
-    store.close();
-    await new Promise((resolve) => {
-      server.close(resolve);
-      server.closeAllConnections();
-    });
-  });
   return {
     host,
     api: sandbox.__SYNTHETIC_INDEX,
@@ -545,7 +549,7 @@ for (const version of ["3.1.6", "3.2.0"]) {
 
   for (const mode of ["headers", "body"])
     test(
-      `${version} real original Canon batch ${mode} deadline preserves existing index, avoids empty cache and commits other memory without HTTP replay`,
+      `${version} real original Canon batch ${mode} deadline with a generation DOM preserves the index and commits other memory without HTTP replay`,
       actual,
       async (t) => {
         const f = await realHost(t, version, mode),

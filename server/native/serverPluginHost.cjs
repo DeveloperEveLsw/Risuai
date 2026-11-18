@@ -56,7 +56,8 @@ async function createServerPluginHost(options) {
     typeof options.dom?.capabilityGlobals?.__RISU_PLUGIN_UI_CONFIRM ===
       "function";
   const indexDeadlines = createWygloreIndexDeadlineRegistry({
-    enabled: options.isolateProviderFailure === true && !options.dom,
+    // Generation uses a scratch DOM for confirmations, separate from settings UI.
+    enabled: options.isolateProviderFailure === true && !uiConfigurationEnabled,
     signal,
   });
   const timers = new Set(),
