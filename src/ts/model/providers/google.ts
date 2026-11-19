@@ -4,6 +4,16 @@ export const GoogleModels: LLMModel[] = [
 
     // ===== Gemini 4 Series (2026) =====
     {
+        name: "Gemini 4 Carbon",
+        id: 'gemini-4-carbon',
+        provider: LLMProvider.GoogleCloud,
+        format: LLMFormat.GoogleCloud,
+        flags: [LLMFlags.hasImageInput, LLMFlags.hasAudioInput, LLMFlags.hasVideoInput, LLMFlags.hasStreaming, LLMFlags.requiresAlternateRole, LLMFlags.geminiThinking, LLMFlags.geminiThinkingNoMinimal, LLMFlags.hasFirstSystemPrompt],
+        parameters: ['reasoning_effort'],
+        tokenizer: LLMTokenizer.GoogleCloud,
+        recommended: true
+    },
+    {
         name: "Gemini 4 Argon",
         id: 'gemini-4-argon',
         provider: LLMProvider.GoogleCloud,

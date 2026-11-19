@@ -8,44 +8,47 @@ import {
 } from "../setting/botSettingsParamsData";
 import type { SettingContext } from "../setting/types";
 
-describe("Gemini 4 Argon catalog and thinking controls", () => {
-  test("Google and the automatically cloned Vertex entry use the official model ID and supported capabilities", () => {
-    const google = LLMModels.find((model) => model.id === "gemini-4-argon")!;
-    const vertex = LLMModels.find(
-      (model) => model.id === "gemini-4-argon-vertex",
-    )!;
-    expect(google).toBeDefined();
-    expect(vertex).toBeDefined();
-    expect(google.provider).toBe(LLMProvider.GoogleCloud);
-    expect(google.format).toBe(LLMFormat.GoogleCloud);
-    expect(vertex.provider).toBe(LLMProvider.VertexAI);
-    expect(vertex.format).toBe(LLMFormat.VertexAIGemini);
-    for (const model of [google, vertex]) {
-      expect(model.internalID).toBe("gemini-4-argon");
-      expect(model.parameters).toEqual(["reasoning_effort"]);
-      expect(model.tokenizer).toBe(LLMTokenizer.GoogleCloud);
-      expect(model.flags).toEqual(
-        expect.arrayContaining([
-          LLMFlags.hasImageInput,
-          LLMFlags.hasAudioInput,
-          LLMFlags.hasVideoInput,
-          LLMFlags.hasStreaming,
-          LLMFlags.requiresAlternateRole,
-          LLMFlags.geminiThinking,
-          LLMFlags.geminiThinkingNoMinimal,
-          LLMFlags.hasFirstSystemPrompt,
-        ]),
-      );
-      expect(model.flags).not.toContain(LLMFlags.hasCache);
-      expect(model.flags).not.toContain(LLMFlags.hasPrefill);
-      expect(model.flags).not.toContain(LLMFlags.hasImageOutput);
-    }
-    expect(vertex.flags).not.toBe(google.flags);
-  });
+describe("Gemini 4 catalog and thinking controls", () => {
+  test.each(["gemini-4-argon", "gemini-4-carbon"])(
+    "%s Google and Vertex entries use the official model ID and supported capabilities",
+    (id) => {
+      const google = LLMModels.find((model) => model.id === id)!;
+      const vertex = LLMModels.find((model) => model.id === `${id}-vertex`)!;
+      expect(google).toBeDefined();
+      expect(vertex).toBeDefined();
+      expect(google.provider).toBe(LLMProvider.GoogleCloud);
+      expect(google.format).toBe(LLMFormat.GoogleCloud);
+      expect(vertex.provider).toBe(LLMProvider.VertexAI);
+      expect(vertex.format).toBe(LLMFormat.VertexAIGemini);
+      for (const model of [google, vertex]) {
+        expect(model.internalID).toBe(id);
+        expect(model.parameters).toEqual(["reasoning_effort"]);
+        expect(model.tokenizer).toBe(LLMTokenizer.GoogleCloud);
+        expect(model.flags).toEqual(
+          expect.arrayContaining([
+            LLMFlags.hasImageInput,
+            LLMFlags.hasAudioInput,
+            LLMFlags.hasVideoInput,
+            LLMFlags.hasStreaming,
+            LLMFlags.requiresAlternateRole,
+            LLMFlags.geminiThinking,
+            LLMFlags.geminiThinkingNoMinimal,
+            LLMFlags.hasFirstSystemPrompt,
+          ]),
+        );
+        expect(model.flags).not.toContain(LLMFlags.hasCache);
+        expect(model.flags).not.toContain(LLMFlags.hasPrefill);
+        expect(model.flags).not.toContain(LLMFlags.hasImageOutput);
+      }
+      expect(vertex.flags).not.toBe(google.flags);
+    },
+  );
 
   test.each([
     ["gemini-4-argon", ["Low", "Medium", "High"]],
     ["gemini-4-argon-vertex", ["Low", "Medium", "High"]],
+    ["gemini-4-carbon", ["Low", "Medium", "High"]],
+    ["gemini-4-carbon-vertex", ["Low", "Medium", "High"]],
     ["gemini-3.1-pro-preview", ["Low", "Medium", "High"]],
     ["gemini-3.8-flash", ["Low", "Medium", "High"]],
     ["gemini-3-flash-preview", ["Minimal", "Low", "Medium", "High"]],

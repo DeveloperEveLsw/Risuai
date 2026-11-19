@@ -33,11 +33,12 @@ import type {
 import type { bodyIntercepterStore } from "src/ts/stores.svelte";
 import { createJsonSseTransform } from "./jsonSse";
 import {
-  applyGemini4ArgonRequestPolicy,
-  finalizeGemini4ArgonRequest,
-  isGemini4ArgonModel,
-  resolveGemini4ArgonVertexRegion,
-} from "./gemini4ArgonPolicy";
+  applyGemini4RequestPolicy,
+  finalizeGemini4Request,
+  isGemini4PolicyModel,
+  resolveGemini4VertexRegion,
+  vertexEndpointHost,
+} from "./gemini4RequestPolicy";
 /** Upstream Google/Vertex algorithms with job-scoped state and explicit host capabilities. */
 export interface GoogleRuntimeHost {
   fetchNative: (typeof import("src/ts/globalApi.svelte"))["fetchNative"];
@@ -572,7 +573,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
     }
     if (
       arg.modelInfo.format === host.LLMFormat.VertexAIGemini &&
-      !isGemini4ArgonModel(arg.modelInfo.internalID)
+      !isGemini4PolicyModel(arg.modelInfo.internalID)
     ) {
       if (db.vertexAccessTokenExpires < Date.now()) {
         if (!db.vertexClientEmail || !db.vertexPrivateKey) {
@@ -625,12 +626,9 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
         : "generateContent";
       // Some models (e.g. Gemini 3 preview) are only available via the global endpoint.
       const effectiveRegion =
-        resolveGemini4ArgonVertexRegion(arg.modelInfo.internalID, REGION) ??
+        resolveGemini4VertexRegion(arg.modelInfo.internalID, REGION) ??
         (isVertexGlobalOnlyModel(arg.modelInfo.internalID) ? "global" : REGION);
-      url =
-        effectiveRegion === "global"
-          ? `https://aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${effectiveRegion}/publishers/google/models/${arg.modelInfo.internalID}:${endpoint}`
-          : `https://${effectiveRegion}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${effectiveRegion}/publishers/google/models/${arg.modelInfo.internalID}:${endpoint}`;
+      url = `https://${vertexEndpointHost(effectiveRegion)}/v1/projects/${PROJECT_ID}/locations/${effectiveRegion}/publishers/google/models/${arg.modelInfo.internalID}:${endpoint}`;
     } else if (
       arg.modelInfo.format === host.LLMFormat.GoogleCloud &&
       arg.useStreaming
@@ -649,7 +647,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
       host.getAdditionalParameters(arg.aiModel),
     );
     try {
-      body = await finalizeGemini4ArgonRequest(
+      body = await finalizeGemini4Request(
         arg.modelInfo.internalID,
         body,
         arg.useStreaming,
@@ -663,7 +661,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
     // Other models keep the original authentication/parameter order above.
     if (
       arg.modelInfo.format === host.LLMFormat.VertexAIGemini &&
-      isGemini4ArgonModel(arg.modelInfo.internalID)
+      isGemini4PolicyModel(arg.modelInfo.internalID)
     ) {
       if (db.vertexAccessTokenExpires < Date.now()) {
         if (!db.vertexClientEmail || !db.vertexPrivateKey) {
@@ -714,7 +712,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
   ): Promise<requestDataResponse> {
     const db = host.getDatabase();
     try {
-      body = applyGemini4ArgonRequestPolicy(
+      body = applyGemini4RequestPolicy(
         arg.modelInfo.internalID,
         body,
         arg.useStreaming,
@@ -741,7 +739,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
       }
       if (
         arg.modelInfo.format === host.LLMFormat.VertexAIGemini ||
-        isGemini4ArgonModel(arg.modelInfo.internalID)
+        isGemini4PolicyModel(arg.modelInfo.internalID)
       ) {
         return {
           type: "fail",
@@ -801,7 +799,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
         method: "POST",
         chatId: arg.chatId,
         signal: arg.abortSignal,
-        interceptor: isGemini4ArgonModel(arg.modelInfo.internalID)
+        interceptor: isGemini4PolicyModel(arg.modelInfo.internalID)
           ? undefined
           : "gemini_base_stream",
       });
@@ -832,7 +830,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
       method: "POST",
       chatId: arg.chatId,
       signal: arg.abortSignal,
-      interceptor: isGemini4ArgonModel(arg.modelInfo.internalID)
+      interceptor: isGemini4PolicyModel(arg.modelInfo.internalID)
         ? undefined
         : "gemini_base",
     });
@@ -1335,7 +1333,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
                 parts: parts,
               });
               body.contents = chat;
-              body = await finalizeGemini4ArgonRequest(
+              body = await finalizeGemini4Request(
                 arg.modelInfo.internalID,
                 body,
                 arg.useStreaming,
@@ -1354,7 +1352,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
                   method: "POST",
                   chatId: arg.chatId,
                   signal: arg.abortSignal,
-                  interceptor: isGemini4ArgonModel(arg.modelInfo.internalID)
+                  interceptor: isGemini4PolicyModel(arg.modelInfo.internalID)
                     ? undefined
                     : "gemini_tool",
                 });

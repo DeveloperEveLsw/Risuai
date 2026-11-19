@@ -178,7 +178,7 @@ for (const region of ["global", "us", "eu", "us-central1"])
         expect(target.hostname).toBe(
           expected === "global"
             ? "aiplatform.googleapis.com"
-            : `${expected}-aiplatform.googleapis.com`,
+            : `aiplatform.${expected}.rep.googleapis.com`,
         );
         expect(target.pathname).toContain(
           `/v1/projects/synthetic-project/locations/${expected}/`,
@@ -203,6 +203,51 @@ for (const tokens of [17, 32768, 65000])
       await f.runtime.requestGoogleCloudVertex({ ...f.arg, maxTokens: tokens }),
     ).toMatchObject({ type: "success" });
   });
+
+test.each([
+  [
+    "gemini-4-carbon",
+    "generativelanguage.googleapis.com",
+    "/v1beta/models/gemini-4-carbon:generateContent",
+  ],
+  [
+    "gemini-4-carbon-vertex",
+    "aiplatform.eu.rep.googleapis.com",
+    "/v1/projects/synthetic-project/locations/eu/publishers/google/models/gemini-4-carbon:generateContent",
+  ],
+])(
+  "%s routes and applies the Gemini 4 request policy",
+  async (id, hostname, pathname) => {
+    const model = LLMModels.find((entry) => entry.id === id)!;
+    const f = fixture(
+      async (url, init) => {
+        const target = new URL(String(url));
+        expect(target.hostname).toBe(hostname);
+        expect(target.pathname).toBe(pathname);
+        expect(JSON.parse(String(init?.body)).generation_config).toEqual({
+          maxOutputTokens: 32768,
+          thinkingConfig: { thinkingLevel: "medium", includeThoughts: true },
+        });
+        return textResponse();
+      },
+      {
+        vertexRegion: "eu",
+        reasoningEffort: 1,
+        applyAdditionalParamsToAll: true,
+        additionalParams: [["generation_config.temperature", "1.5"]],
+      },
+    );
+    expect(
+      await f.runtime.requestGoogleCloudVertex({
+        ...f.arg,
+        aiModel: id,
+        modelInfo: model,
+        maxTokens: 100000,
+      }),
+    ).toMatchObject({ type: "success" });
+    expect(f.transport.calls()).toBe(1);
+  },
+);
 
 test("Argon Google API streams byte-fragmented thoughts and text with its 65536 cap and preserves assistant-ended history", async () => {
   const prefix = "Synthetic complete assistant history and requested prefix: {";

@@ -1,27 +1,30 @@
 // @vitest-environment node
 import { expect, test } from "vitest";
 import {
-  applyGemini4ArgonRequestPolicy,
-  finalizeGemini4ArgonRequest,
-  isGemini4ArgonModel,
-  resolveGemini4ArgonVertexRegion,
-} from "./gemini4ArgonPolicy";
+  applyGemini4RequestPolicy,
+  finalizeGemini4Request,
+  isGemini4PolicyModel,
+  resolveGemini4VertexRegion,
+} from "./gemini4RequestPolicy";
 
-test("Argon policy is exact and keeps earlier Gemini model requests unchanged", () => {
-  expect(isGemini4ArgonModel("gemini-4-argon")).toBe(true);
-  expect(isGemini4ArgonModel("models/gemini-4-argon")).toBe(true);
+test("Gemini 4 request policy applies only to the registered models", () => {
+  for (const id of ["gemini-4-argon", "gemini-4-carbon"]) {
+    expect(isGemini4PolicyModel(id)).toBe(true);
+    expect(isGemini4PolicyModel(`models/${id}`)).toBe(true);
+  }
   for (const id of [
     "gemini-3.5-flash",
     "gemini-2.5-flash",
     "gemini-4-argon-preview",
+    "gemini-4-carbon-preview",
     undefined,
   ]) {
     const body = {
       cachedContent: "synthetic-cache",
       generation_config: { temperature: 1, thinkingBudget: 50 },
     };
-    expect(applyGemini4ArgonRequestPolicy(id, body, false)).toBe(body);
-    expect(resolveGemini4ArgonVertexRegion(id, "us-central1")).toBeUndefined();
+    expect(applyGemini4RequestPolicy(id, body, false)).toBe(body);
+    expect(resolveGemini4VertexRegion(id, "us-central1")).toBeUndefined();
   }
 });
 
@@ -49,7 +52,7 @@ test("Argon normalizes custom configuration aliases while preserving JSON schema
     contents: [{ role: "user", parts: [{ text: "Synthetic user input" }] }],
   };
   const before = structuredClone(body);
-  const result = applyGemini4ArgonRequestPolicy("gemini-4-argon", body, true);
+  const result = applyGemini4RequestPolicy("gemini-4-argon", body, true);
   expect(result.generation_config).toEqual({
     maxOutputTokens: 15,
     thinkingConfig: { thinkingLevel: "low", includeThoughts: true },
@@ -61,14 +64,14 @@ test("Argon normalizes custom configuration aliases while preserving JSON schema
 
 test("Argon omits missing thinking levels so the provider default remains effective", () => {
   expect(
-    applyGemini4ArgonRequestPolicy(
+    applyGemini4RequestPolicy(
       "gemini-4-argon",
       { generation_config: { maxOutputTokens: 50 } },
       false,
     ).generation_config,
   ).toEqual({ maxOutputTokens: 50 });
   expect(
-    applyGemini4ArgonRequestPolicy(
+    applyGemini4RequestPolicy(
       "gemini-4-argon",
       { generation_config: { thinkingConfig: { thinkingBudget: 512 } } },
       false,
@@ -92,19 +95,19 @@ test("Argon preserves complete assistant prefill/history and signatures with one
       assistant,
     ],
   };
-  const result = applyGemini4ArgonRequestPolicy("gemini-4-argon", body, false);
+  const result = applyGemini4RequestPolicy("gemini-4-argon", body, false);
   expect(result.contents).toHaveLength(3);
   expect(result.contents[1]).toBe(assistant);
   expect(result.contents[2].role).toBe("user");
   expect(body.contents).toHaveLength(2);
-  expect(
-    applyGemini4ArgonRequestPolicy("gemini-4-argon", result, false),
-  ).toEqual(result);
+  expect(applyGemini4RequestPolicy("gemini-4-argon", result, false)).toEqual(
+    result,
+  );
 });
 
 test("Argon validates unsupported cached references and malformed explicit controls without disclosing their values", () => {
   expect(() =>
-    applyGemini4ArgonRequestPolicy(
+    applyGemini4RequestPolicy(
       "gemini-4-argon",
       { cachedContent: "synthetic-private-reference" },
       false,
@@ -117,14 +120,14 @@ test("Argon validates unsupported cached references and malformed explicit contr
     { maxOutputTokens: "large" },
   ])
     expect(() =>
-      applyGemini4ArgonRequestPolicy(
+      applyGemini4RequestPolicy(
         "gemini-4-argon",
         { generation_config: config },
         false,
       ),
     ).toThrow(/Gemini 4 Argon/);
   expect(() =>
-    applyGemini4ArgonRequestPolicy(
+    applyGemini4RequestPolicy(
       "gemini-4-argon",
       { generationConfig: "invalid" },
       false,
@@ -139,17 +142,15 @@ test("Argon clamps only the REST/stream upper bound and preserves its three supp
   ] as const)
     for (const requested of [7, limit, 100000])
       expect(
-        applyGemini4ArgonRequestPolicy(
+        applyGemini4RequestPolicy(
           "gemini-4-argon",
           { generation_config: { max_output_tokens: requested } },
           streaming,
         ).generation_config,
       ).toEqual({ maxOutputTokens: Math.min(requested, limit) });
   for (const region of ["global", "us", "eu"])
-    expect(resolveGemini4ArgonVertexRegion("gemini-4-argon", region)).toBe(
-      region,
-    );
-  expect(resolveGemini4ArgonVertexRegion("gemini-4-argon", "us-central1")).toBe(
+    expect(resolveGemini4VertexRegion("gemini-4-argon", region)).toBe(region);
+  expect(resolveGemini4VertexRegion("gemini-4-argon", "us-central1")).toBe(
     "global",
   );
 });
@@ -166,7 +167,7 @@ test("Argon validates the hook's final string body without running non-Argon hoo
   ];
   const body = { generation_config: { maxOutputTokens: 50 } };
   expect(
-    await finalizeGemini4ArgonRequest(
+    await finalizeGemini4Request(
       "gemini-3.5-flash",
       body,
       false,
@@ -176,13 +177,7 @@ test("Argon validates the hook's final string body without running non-Argon hoo
   ).toBe(body);
   expect(calls).toBe(0);
   await expect(
-    finalizeGemini4ArgonRequest(
-      "gemini-4-argon",
-      body,
-      false,
-      "gemini_base",
-      hooks,
-    ),
+    finalizeGemini4Request("gemini-4-argon", body, false, "gemini_base", hooks),
   ).rejects.toThrow("JSON request object");
   expect(calls).toBe(1);
 });

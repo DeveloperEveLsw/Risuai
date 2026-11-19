@@ -1,50 +1,63 @@
-const ARGON_MODEL_ID = "gemini-4-argon";
+const modelNames = new Map([
+  ["gemini-4-argon", "Gemini 4 Argon"],
+  ["gemini-4-carbon", "Gemini 4 Carbon"],
+]);
 const CONTINUATION_INSTRUCTION =
   "Continue the previous assistant message from where it stopped. Preserve its content as conversation history, follow the existing instructions and output format, and do not repeat the previous text.";
 
-export function isGemini4ArgonModel(modelId: string | undefined): boolean {
-  return modelId?.replace(/^models\//, "") === ARGON_MODEL_ID;
+export function isGemini4PolicyModel(modelId: string | undefined): boolean {
+  return !!modelName(modelId);
 }
 
-export function resolveGemini4ArgonVertexRegion(
+function modelName(modelId: string | undefined) {
+  return modelNames.get(modelId?.replace(/^models\//, "") ?? "");
+}
+
+export function resolveGemini4VertexRegion(
   modelId: string | undefined,
   region: string,
 ): string | undefined {
-  if (!isGemini4ArgonModel(modelId)) return undefined;
+  if (!isGemini4PolicyModel(modelId)) return undefined;
   return ["global", "us", "eu"].includes(region) ? region : "global";
 }
 
-function configuration(value: unknown): Record<string, any> {
+export function vertexEndpointHost(region: string): string {
+  if (region === "global") return "aiplatform.googleapis.com";
+  if (region === "us" || region === "eu")
+    return `aiplatform.${region}.rep.googleapis.com`;
+  return `${region}-aiplatform.googleapis.com`;
+}
+
+function configuration(value: unknown, name: string): Record<string, any> {
   if (value === undefined) return {};
   if (!value || typeof value !== "object" || Array.isArray(value))
-    throw new Error(
-      "Gemini 4 Argon generation configuration must be an object.",
-    );
+    throw new Error(`${name} generation configuration must be an object.`);
   return value as Record<string, any>;
 }
 
 /** Apply after user parameters, including on tool follow-up requests. Other
  * models retain their original body. No prompt or setting is persisted here.
  */
-export function applyGemini4ArgonRequestPolicy(
+export function applyGemini4RequestPolicy(
   modelId: string | undefined,
   body: Record<string, any>,
   streaming: boolean | undefined,
 ): Record<string, any> {
-  if (!isGemini4ArgonModel(modelId)) return body;
+  const name = modelName(modelId);
+  if (!name) return body;
 
   for (const key of ["cachedContent", "cached_content"])
     if (body[key] !== undefined && body[key] !== null && body[key] !== "")
       throw new Error(
-        "Gemini 4 Argon does not support cachedContent. Remove the explicit cache reference and supply the complete conversation before sending.",
+        `${name} does not support cachedContent. Remove the explicit cache reference and supply the complete conversation before sending.`,
       );
 
   const next = { ...body };
   delete next.cachedContent;
   delete next.cached_content;
   const config = {
-    ...configuration(body.generation_config),
-    ...configuration(body.generationConfig),
+    ...configuration(body.generation_config, name),
+    ...configuration(body.generationConfig, name),
   };
   for (const key of [
     "temperature",
@@ -68,22 +81,18 @@ export function applyGemini4ArgonRequestPolicy(
     config.thinking_config !== undefined
   ) {
     const thinking = {
-      ...configuration(config.thinkingConfig),
-      ...configuration(config.thinking_config),
+      ...configuration(config.thinkingConfig, name),
+      ...configuration(config.thinking_config, name),
     };
     delete thinking.thinkingBudget;
     delete thinking.thinking_budget;
     const rawLevel = thinking.thinking_level ?? thinking.thinkingLevel;
     if (rawLevel !== undefined) {
       if (typeof rawLevel !== "string")
-        throw new Error(
-          "Gemini 4 Argon thinkingLevel must be low, medium or high.",
-        );
+        throw new Error(`${name} thinkingLevel must be low, medium or high.`);
       const level = rawLevel.toLowerCase();
       if (!["minimal", "low", "medium", "high"].includes(level))
-        throw new Error(
-          "Gemini 4 Argon thinkingLevel must be low, medium or high.",
-        );
+        throw new Error(`${name} thinkingLevel must be low, medium or high.`);
       thinking.thinkingLevel = level === "minimal" ? "low" : level;
     }
     delete thinking.thinking_level;
@@ -94,9 +103,7 @@ export function applyGemini4ArgonRequestPolicy(
   const requestedTokens = config.max_output_tokens ?? config.maxOutputTokens;
   if (requestedTokens !== undefined) {
     if (!Number.isInteger(requestedTokens) || requestedTokens <= 0)
-      throw new Error(
-        "Gemini 4 Argon maxOutputTokens must be a positive integer.",
-      );
+      throw new Error(`${name} maxOutputTokens must be a positive integer.`);
     config.maxOutputTokens = Math.min(
       requestedTokens,
       streaming ? 65536 : 32768,
@@ -115,19 +122,20 @@ export function applyGemini4ArgonRequestPolicy(
 }
 
 /** fetchNative normally invokes these string-body hooks inside the transport.
- * For Argon, run the same hooks once before validation/authentication, then
+ * Run the same hooks once before validation/authentication for these models, then
  * disable their second transport invocation so none can undo this policy.
  */
-export async function finalizeGemini4ArgonRequest(
+export async function finalizeGemini4Request(
   modelId: string | undefined,
   body: Record<string, any>,
   streaming: boolean | undefined,
   hookName: string,
   hooks: readonly { callback: (body: any, type: string) => Promise<any> }[],
 ): Promise<Record<string, any>> {
-  if (!isGemini4ArgonModel(modelId)) return body;
+  const name = modelName(modelId);
+  if (!name) return body;
   let serialized = JSON.stringify(
-    applyGemini4ArgonRequestPolicy(modelId, body, streaming),
+    applyGemini4RequestPolicy(modelId, body, streaming),
   );
   for (const hook of hooks) {
     try {
@@ -147,8 +155,8 @@ export async function finalizeGemini4ArgonRequest(
       throw new Error("Invalid body");
   } catch {
     throw new Error(
-      "Gemini 4 Argon request interceptors must return a JSON request object.",
+      `${name} request interceptors must return a JSON request object.`,
     );
   }
-  return applyGemini4ArgonRequestPolicy(modelId, intercepted, streaming);
+  return applyGemini4RequestPolicy(modelId, intercepted, streaming);
 }

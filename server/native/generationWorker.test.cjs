@@ -2376,19 +2376,24 @@ test(
   },
 );
 
-for (const streaming of [false, true])
+for (const { label, model, streaming } of [
+  ["Argon", "gemini-4-argon"],
+  ["Carbon", "gemini-4-carbon"],
+].flatMap(([label, model]) =>
+  [false, true].map((streaming) => ({ label, model, streaming })),
+))
   test(
-    `registered Gemini 4 Argon ${streaming ? "streams" : "returns"} through Vertex and commits original output scripts atomically`,
+    `registered Gemini 4 ${label} ${streaming ? "streams" : "returns"} through Vertex and commits original output scripts atomically`,
     { timeout: 15000 },
     async (t) => {
       const f = await fixture(
         t,
         async () => {
-          throw Error("Only the synthetic Argon provider port may be used");
+          throw Error("Only the synthetic Gemini provider port may be used");
         },
         {
           settings: {
-            aiModel: "gemini-4-argon-vertex",
+            aiModel: model + "-vertex",
             useStreaming: streaming,
             reasoningEffort: -1,
             google: {
@@ -2401,13 +2406,13 @@ for (const streaming of [false, true])
           },
         },
       );
-      await f.store.call("enqueueJob", "argon", {
+      await f.store.call("enqueueJob", model, {
         type: "send",
         chatId: "a",
         input: "marker",
-        messageId: "argon-input",
+        messageId: model + "-input",
       });
-      const claimed = await f.store.call("claimJob", "argon-worker");
+      const claimed = await f.store.call("claimJob", "gemini-worker");
       const { executeExtensionJob } = await import(
         pathToFileURL(join(__dirname, "dist/extensionJob.mjs")).href
       );
@@ -2425,9 +2430,9 @@ for (const streaming of [false, true])
             body = JSON.parse(init.body);
           calls.push({ url: parsed, body });
           assert.equal(parsed.hostname, "aiplatform.googleapis.com");
-          assert.match(
+          assert.equal(
             parsed.pathname,
-            /\/locations\/global\/publishers\/google\/models\/gemini-4-argon:/,
+            `/v1/projects/synthetic-project/locations/global/publishers/google/models/${model}:${streaming ? "streamGenerateContent" : "generateContent"}`,
           );
           assert.equal(
             parsed.searchParams.get("alt"),
@@ -2458,7 +2463,7 @@ for (const streaming of [false, true])
             ),
           );
           const item = (text) => ({
-            modelVersion: "gemini-4-argon",
+            modelVersion: model,
             candidates: [{ content: { parts: [{ text }] } }],
           });
           if (!streaming) return Response.json(item("raw-output"));

@@ -11,7 +11,7 @@ import { addFetchLog } from "src/ts/globalApi.svelte"
 import type { RequestDataArgumentExtended, requestDataResponse, StreamResponseChunk } from './request'
 import { applyAdditionalParameters, applyParameters, getAdditionalParameters, type LLMParameter } from './shared'
 import { bodyIntercepterStore } from "src/ts/stores.svelte"
-import { applyGemini4ArgonRequestPolicy, finalizeGemini4ArgonRequest, isGemini4ArgonModel, resolveGemini4ArgonVertexRegion } from './gemini4ArgonPolicy'
+import { applyGemini4RequestPolicy, finalizeGemini4Request, isGemini4PolicyModel, resolveGemini4VertexRegion, vertexEndpointHost } from './gemini4RequestPolicy'
 
 type GeminiFunctionCall = {
     id?: string;
@@ -509,7 +509,7 @@ export async function requestGoogleCloudVertex(arg:RequestDataArgumentExtended):
         return token;
     }    
     
-    if(arg.modelInfo.format === LLMFormat.VertexAIGemini && !isGemini4ArgonModel(arg.modelInfo.internalID)){
+    if(arg.modelInfo.format === LLMFormat.VertexAIGemini && !isGemini4PolicyModel(arg.modelInfo.internalID)){
         if(db.vertexAccessTokenExpires < Date.now()){
             if (!db.vertexClientEmail || !db.vertexPrivateKey) {
                 alertError("Vertex AI authentication information is missing or incomplete. Please check your settings.");
@@ -549,11 +549,9 @@ export async function requestGoogleCloudVertex(arg:RequestDataArgumentExtended):
         const endpoint = arg.useStreaming ? 'streamGenerateContent?alt=sse' : 'generateContent'
 
         // Some models (e.g. Gemini 3 preview) are only available via the global endpoint.
-        const effectiveRegion = resolveGemini4ArgonVertexRegion(arg.modelInfo.internalID, REGION) ?? (isVertexGlobalOnlyModel(arg.modelInfo.internalID) ? 'global' : REGION)
+        const effectiveRegion = resolveGemini4VertexRegion(arg.modelInfo.internalID, REGION) ?? (isVertexGlobalOnlyModel(arg.modelInfo.internalID) ? 'global' : REGION)
 
-        url = effectiveRegion === 'global' ?
-            `https://aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${effectiveRegion}/publishers/google/models/${arg.modelInfo.internalID}:${endpoint}` :
-            `https://${effectiveRegion}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${effectiveRegion}/publishers/google/models/${arg.modelInfo.internalID}:${endpoint}`
+        url = `https://${vertexEndpointHost(effectiveRegion)}/v1/projects/${PROJECT_ID}/locations/${effectiveRegion}/publishers/google/models/${arg.modelInfo.internalID}:${endpoint}`
         
         }
     else if(arg.modelInfo.format === LLMFormat.GoogleCloud && arg.useStreaming){
@@ -569,13 +567,13 @@ export async function requestGoogleCloudVertex(arg:RequestDataArgumentExtended):
 
     body = applyAdditionalParameters(body, headers, getAdditionalParameters(arg.aiModel))
     try {
-        body = await finalizeGemini4ArgonRequest(arg.modelInfo.internalID, body, arg.useStreaming, arg.useStreaming ? 'gemini_base_stream' : 'gemini_base', bodyIntercepterStore)
+        body = await finalizeGemini4Request(arg.modelInfo.internalID, body, arg.useStreaming, arg.useStreaming ? 'gemini_base_stream' : 'gemini_base', bodyIntercepterStore)
     } catch(error) {
         return { type: 'fail', result: (error as Error).message }
     }
     // Reject unsupported cache references before even refreshing Vertex OAuth.
     // Other models keep the original authentication/parameter order above.
-    if(arg.modelInfo.format === LLMFormat.VertexAIGemini && isGemini4ArgonModel(arg.modelInfo.internalID)){
+    if(arg.modelInfo.format === LLMFormat.VertexAIGemini && isGemini4PolicyModel(arg.modelInfo.internalID)){
         if(db.vertexAccessTokenExpires < Date.now()){
             if (!db.vertexClientEmail || !db.vertexPrivateKey) {
                 alertError("Vertex AI authentication information is missing or incomplete. Please check your settings.");
@@ -608,7 +606,7 @@ async function requestGoogle(url:string, body:any, headers:{[key:string]:string}
     
     const db = getDatabase()
     try {
-        body = applyGemini4ArgonRequestPolicy(arg.modelInfo.internalID, body, arg.useStreaming)
+        body = applyGemini4RequestPolicy(arg.modelInfo.internalID, body, arg.useStreaming)
     } catch(error) {
         return { type: 'fail', result: (error as Error).message }
     }
@@ -629,7 +627,7 @@ async function requestGoogle(url:string, body:any, headers:{[key:string]:string}
                 failByServerError: true
             }
         }
-        if(arg.modelInfo.format === LLMFormat.VertexAIGemini || isGemini4ArgonModel(arg.modelInfo.internalID)){
+        if(arg.modelInfo.format === LLMFormat.VertexAIGemini || isGemini4PolicyModel(arg.modelInfo.internalID)){
             return {
                 type: 'fail',
                 result: originalError,
@@ -681,7 +679,7 @@ async function requestGoogle(url:string, body:any, headers:{[key:string]:string}
             method: 'POST',
             chatId: arg.chatId,
             signal: arg.abortSignal,
-            interceptor: isGemini4ArgonModel(arg.modelInfo.internalID) ? undefined : 'gemini_base_stream'
+            interceptor: isGemini4PolicyModel(arg.modelInfo.internalID) ? undefined : 'gemini_base_stream'
         })
 
         if(f.status !== 200){
@@ -714,7 +712,7 @@ async function requestGoogle(url:string, body:any, headers:{[key:string]:string}
         method: 'POST',
         chatId: arg.chatId,
         signal: arg.abortSignal,
-        interceptor: isGemini4ArgonModel(arg.modelInfo.internalID) ? undefined : 'gemini_base'
+        interceptor: isGemini4PolicyModel(arg.modelInfo.internalID) ? undefined : 'gemini_base'
     })
     
 
@@ -1243,7 +1241,7 @@ function wrapToolStream(
                         })
 
                         body.contents = chat
-                        body = await finalizeGemini4ArgonRequest(arg.modelInfo.internalID, body, arg.useStreaming, 'gemini_tool', bodyIntercepterStore)
+                        body = await finalizeGemini4Request(arg.modelInfo.internalID, body, arg.useStreaming, 'gemini_tool', bodyIntercepterStore)
                         
                         headers['Content-Type'] = 'application/json'
 
@@ -1259,7 +1257,7 @@ function wrapToolStream(
                                 method: 'POST',
                                 chatId: arg.chatId,
                                 signal: arg.abortSignal,
-                                interceptor: isGemini4ArgonModel(arg.modelInfo.internalID) ? undefined : 'gemini_tool'
+                                interceptor: isGemini4PolicyModel(arg.modelInfo.internalID) ? undefined : 'gemini_tool'
                             })
                         
                             if(resRec.status == 200){
