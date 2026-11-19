@@ -4,6 +4,10 @@
     import PromptDataItem from "src/lib/UI/PromptDataItem.svelte";
     import { tokenizePreset, type PromptItem } from "src/ts/process/prompt";
     import { templateCheck } from "src/ts/process/templates/templateCheck";
+    import {
+        getSettingDatabase,
+        setSettingChanges,
+    } from "src/ts/runtime/fieldControls";
     
     import { DBState } from 'src/ts/stores.svelte';
     import Check from "src/lib/UI/GUI/CheckInput.svelte";
@@ -34,6 +38,20 @@
   }
 
   let { onGoBack = () => {}, mode = 'independent', subMenu = $bindable(0) }: Props = $props();
+
+  const settings = $derived(getSettingDatabase(DBState.db));
+  type SchemaSetting =
+    | "jsonSchemaEnabled"
+    | "jsonSchema"
+    | "strictJsonSchema"
+    | "extractJson";
+
+  function writeSchemaSetting<K extends SchemaSetting>(
+    key: K,
+    value: (typeof settings)[K],
+  ) {
+    setSettingChanges(DBState.db, [{ path: [key], value }]);
+  }
 
     async function executeTokenize(prest: PromptItem[]){
         tokens = await tokenizePreset(prest, true)
@@ -263,10 +281,24 @@
     <Check bind:check={DBState.db.promptSettings.sendName} name={language.formatGroupInSingle} className="mt-4"/>
     <Check bind:check={DBState.db.promptSettings.trimStartNewChat} name={language.trimStartNewChat} className="mt-4"/>
     <Check bind:check={DBState.db.promptSettings.utilOverride} name={language.utilOverride} className="mt-4"/>
-    <Check bind:check={DBState.db.jsonSchemaEnabled} name={language.enableJsonSchema} className="mt-4"/>
+    <Check
+        bind:check={
+            () => settings.jsonSchemaEnabled,
+            (value) => writeSchemaSetting("jsonSchemaEnabled", value)
+        }
+        name={language.enableJsonSchema}
+        className="mt-4"
+    />
     <Check bind:check={DBState.db.outputImageModal} name={language.outputImageModal} className="mt-4"/>
 
-    <Check bind:check={DBState.db.strictJsonSchema} name={language.strictJsonSchema} className="mt-4"/>
+    <Check
+        bind:check={
+            () => settings.strictJsonSchema,
+            (value) => writeSchemaSetting("strictJsonSchema", value)
+        }
+        name={language.strictJsonSchema}
+        className="mt-4"
+    />
 
     {#if DBState.db.showUnrecommended}
         <Check bind:check={DBState.db.promptSettings.customChainOfThought} name={language.customChainOfThought} className="mt-4">
@@ -298,11 +330,21 @@
         <OptionInput value="user">User</OptionInput>
         <OptionInput value="assistant">assistant</OptionInput>
     </SelectInput>
-    {#if DBState.db.jsonSchemaEnabled}
+    {#if settings.jsonSchemaEnabled}
         <span class="text-textcolor mt-4">{language.jsonSchema} <Help key='jsonSchema' /></span>
-        <TextAreaInput bind:value={DBState.db.jsonSchema}/>
+        <TextAreaInput
+            bind:value={
+                () => settings.jsonSchema ?? "",
+                (value) => writeSchemaSetting("jsonSchema", value)
+            }
+        />
         <span class="text-textcolor mt-4">{language.extractJson} <Help key='extractJson' /></span>
-        <TextInput bind:value={DBState.db.extractJson}/>
+        <TextInput
+            bind:value={
+                () => settings.extractJson ?? "",
+                (value) => writeSchemaSetting("extractJson", value)
+            }
+        />
     {/if}
 
     {#if !DBState.db.auxModelUnderModelSettings}

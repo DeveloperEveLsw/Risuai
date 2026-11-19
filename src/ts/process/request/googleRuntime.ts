@@ -16,6 +16,7 @@ import type {
   extractJSON,
   getGeneralJSONSchema,
 } from "../templates/jsonSchema";
+import { getRequestedJsonSchema } from "../templates/jsonSchemaRuntime";
 import type { callTool, decodeToolCall, encodeToolCall } from "../mcp/mcp";
 import type { alertError } from "src/ts/alert";
 import type { addFetchLog } from "src/ts/globalApi.svelte";
@@ -593,10 +594,11 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
         headers["Authorization"] = "Bearer " + db.vertexAccessToken;
       }
     }
-    if (db.jsonSchemaEnabled || arg.schema) {
+    const schema = getRequestedJsonSchema(db, arg.schema);
+    if (schema) {
       body.generation_config.response_mime_type = "application/json";
       body.generation_config.response_schema = host.getGeneralJSONSchema(
-        arg.schema,
+        schema,
         ["$schema", "additionalProperties"],
       );
       console.log(body.generation_config.response_schema);
@@ -711,6 +713,7 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
     arg: RequestDataArgumentExtended,
   ): Promise<requestDataResponse> {
     const db = host.getDatabase();
+    const extractPath = getRequestedJsonSchema(db, arg.schema) && arg.extractJson;
     try {
       body = applyGemini4RequestPolicy(
         arg.modelInfo.internalID,
@@ -756,9 +759,9 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
         thought?: boolean;
       }[],
     ) => {
-      if (arg.extractJson && (db.jsonSchemaEnabled || arg.schema)) {
+      if (extractPath) {
         for (let i = 0; i < rDatas.length; i++) {
-          const extracted = host.extractJSON(rDatas[i].text, arg.extractJson);
+          const extracted = host.extractJSON(rDatas[i].text, extractPath);
           rDatas[i].text = extracted;
         }
       }
@@ -1191,14 +1194,16 @@ export function createGoogleRuntime(host: GoogleRuntimeHost) {
     return new ReadableStream<StreamResponseChunk>({
       async start(controller) {
         const db = host.getDatabase();
+        const extractPath =
+          getRequestedJsonSchema(db, arg.schema) && arg.extractJson;
         let reader = stream.getReader();
         let prefix = "";
         let lastValue = initStreamState();
         while (true) {
           let { done, value } = await reader.read();
           value = initStreamState(value);
-          if (arg.extractJson && (db.jsonSchemaEnabled || arg.schema)) {
-            value["0"] = host.extractJSON(value["0"], arg.extractJson);
+          if (extractPath) {
+            value["0"] = host.extractJSON(value["0"], extractPath);
           }
           let content = value["0"];
           let thoughts = value["__thoughts"];

@@ -1,6 +1,19 @@
 import type { risuChatParser } from "src/ts/parser/parser.svelte";
 import type { getDatabase } from "src/ts/storage/database.svelte";
 import type { jsonOutputTrimmer } from "src/ts/util";
+
+export function getRequestedJsonSchema(
+  settings: { jsonSchemaEnabled?: boolean; jsonSchema?: string },
+  override?: string,
+): string | undefined {
+  if (typeof override === "string" && override.trim()) return override;
+  const { jsonSchemaEnabled, jsonSchema } = settings;
+  if (jsonSchemaEnabled && typeof jsonSchema === "string" && jsonSchema.trim()) {
+    return jsonSchema;
+  }
+  return undefined;
+}
+
 /** Original upstream algorithms, with private state and explicit host capabilities. */
 export interface JsonSchemaRuntimeHost {
   risuChatParser: (typeof import("src/ts/parser/parser.svelte"))["risuChatParser"];

@@ -5,6 +5,7 @@ import { base64url, simplifySchema } from "src/ts/util"
 import { v4 } from "uuid"
 import { saveInlayedSignature, setInlayAsset, writeInlayImage, type InlaySignature } from "../files/inlays"
 import { extractJSON, getGeneralJSONSchema } from "../templates/jsonSchema"
+import { getRequestedJsonSchema } from "../templates/jsonSchemaRuntime"
 import { callTool, decodeToolCall, encodeToolCall } from "../mcp/mcp"
 import { alertError } from "src/ts/alert";
 import { addFetchLog } from "src/ts/globalApi.svelte"
@@ -523,9 +524,10 @@ export async function requestGoogleCloudVertex(arg:RequestDataArgumentExtended):
     }
 
     
-    if(db.jsonSchemaEnabled || arg.schema){
+    const schema = getRequestedJsonSchema(db, arg.schema)
+    if(schema){
         body.generation_config.response_mime_type = "application/json"
-        body.generation_config.response_schema = getGeneralJSONSchema(arg.schema, ['$schema','additionalProperties'])
+        body.generation_config.response_schema = getGeneralJSONSchema(schema, ['$schema','additionalProperties'])
         console.log(body.generation_config.response_schema)
     }    
     
@@ -605,6 +607,7 @@ export async function requestGoogleCloudVertex(arg:RequestDataArgumentExtended):
 async function requestGoogle(url:string, body:any, headers:{[key:string]:string}, arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
     
     const db = getDatabase()
+    const extractPath = getRequestedJsonSchema(db, arg.schema) && arg.extractJson
     try {
         body = applyGemini4RequestPolicy(arg.modelInfo.internalID, body, arg.useStreaming)
     } catch(error) {
@@ -640,9 +643,9 @@ async function requestGoogle(url:string, body:any, headers:{[key:string]:string}
 
     // process the text parts into a single text response
     const processTextResponse = (rDatas: {text: string, thought?: boolean}[]) => {
-        if(arg.extractJson && (db.jsonSchemaEnabled || arg.schema)){
+        if(extractPath){
             for(let i=0;i<rDatas.length;i++){
-                const extracted = extractJSON(rDatas[i].text, arg.extractJson)
+                const extracted = extractJSON(rDatas[i].text, extractPath)
                 rDatas[i].text = extracted
             }
         }
@@ -1102,6 +1105,7 @@ function wrapToolStream(
         async start(controller) {
 
             const db = getDatabase()
+            const extractPath = getRequestedJsonSchema(db, arg.schema) && arg.extractJson
             let reader = stream.getReader()
             let prefix = ''
             let lastValue = initStreamState()
@@ -1111,8 +1115,8 @@ function wrapToolStream(
 
                 value = initStreamState(value)
 
-                if(arg.extractJson && (db.jsonSchemaEnabled || arg.schema)){
-                    value["0"] = extractJSON(value["0"], arg.extractJson)
+                if(extractPath){
+                    value["0"] = extractJSON(value["0"], extractPath)
                 }
 
                 let content = value["0"]

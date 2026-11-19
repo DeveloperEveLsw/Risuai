@@ -8,6 +8,7 @@ import { LLMFlags, LLMFormat } from "../../model/types";
 import { LLMModels } from "../../model/modelCatalog";
 import { createParameterRuntime } from "./parameterRuntime";
 import { parseAdditionalParamJsonValue } from "./additionalParams";
+import { createJsonSchemaRuntime } from "../templates/jsonSchemaRuntime";
 
 function fixture(
   providerFetch: typeof fetch,
@@ -50,6 +51,11 @@ function fixture(
       ...createParameterRuntime({
         getDatabase: () => database,
         parseAdditionalParamJsonValue,
+      }),
+      ...createJsonSchemaRuntime({
+        getDatabase: () => database,
+        risuChatParser: (text) => text,
+        jsonOutputTrimmer: (text) => text,
       }),
       bodyIntercepterStore: [],
       alertError: context.fail,
@@ -94,10 +100,10 @@ function fixture(
     arg,
   };
 }
-const textResponse = () =>
+const textResponse = (text = "Synthetic answer") =>
   new Response(
     JSON.stringify({
-      candidates: [{ content: { parts: [{ text: "Synthetic answer" }] } }],
+      candidates: [{ content: { parts: [{ text }] } }],
     }),
     { headers: { "content-type": "application/json" } },
   );
@@ -121,6 +127,49 @@ function argonFixture(
     },
   };
 }
+
+test.each(["", " \n "])(
+  "Argon Vertex sends a plain request when the enabled schema is blank (%j)",
+  async (jsonSchema) => {
+    const answer = '{"answer":"Synthetic answer"}';
+    const f = argonFixture(
+      async (_url, init) => {
+        const config = JSON.parse(String(init?.body)).generation_config;
+        expect(config).not.toHaveProperty("response_mime_type");
+        expect(config).not.toHaveProperty("response_schema");
+        return textResponse(answer);
+      },
+      { jsonSchemaEnabled: true, jsonSchema },
+    );
+    expect(
+      await f.runtime.requestGoogleCloudVertex({
+        ...f.arg,
+        extractJson: "answer",
+      }),
+    ).toMatchObject({ type: "success", result: answer });
+    expect(f.transport.calls()).toBe(1);
+  },
+);
+
+test("Argon Vertex uses an explicit schema and extracts its answer", async () => {
+  const schema = { type: "object", properties: { answer: { type: "string" } } };
+  const f = argonFixture(
+    async (_url, init) => {
+      const config = JSON.parse(String(init?.body)).generation_config;
+      expect(config.response_mime_type).toBe("application/json");
+      expect(config.response_schema).toEqual(schema);
+      return textResponse('{"answer":"Synthetic answer"}');
+    },
+    { jsonSchemaEnabled: false, jsonSchema: "" },
+  );
+  expect(
+    await f.runtime.requestGoogleCloudVertex({
+      ...f.arg,
+      schema: JSON.stringify(schema),
+      extractJson: "answer",
+    }),
+  ).toMatchObject({ type: "success", result: "Synthetic answer" });
+});
 
 for (const [effort, level] of [
   [-1, "low"],
