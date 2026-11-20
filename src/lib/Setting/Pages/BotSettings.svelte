@@ -54,6 +54,7 @@
     LLMFormat,
     LLMProvider,
   } from "src/ts/model/modellist";
+  import { supportsModelStreaming } from "src/ts/model/modelCatalog";
   import { resolveClaudeThinkingType } from "src/ts/model/types";
   import RegexList from "src/lib/SideBars/Scripts/RegexList.svelte";
   import SettingRenderer from "../SettingRenderer.svelte";
@@ -818,7 +819,7 @@
   {/if}
 
   <div class="py-2 flex flex-col gap-2 mb-4">
-    {#if !usesOllamaCloud && (modelInfo.flags.includes(LLMFlags.hasStreaming) || subModelInfo.flags.includes(LLMFlags.hasStreaming))}
+    {#if !usesOllamaCloud && (supportsModelStreaming(modelInfo) || supportsModelStreaming(subModelInfo))}
       <Check
         bind:check={
           () => !!settings.useStreaming,

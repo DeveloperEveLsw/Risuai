@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, test } from "vitest";
-import { LLMModels } from "./modelCatalog";
+import { LLMModels, supportsModelStreaming } from "./modelCatalog";
 import { LLMFlags, LLMFormat, LLMProvider, LLMTokenizer } from "./types";
 import {
   allowsMinimalReasoningEffort,
@@ -43,6 +43,28 @@ describe("Gemini 4 catalog and thinking controls", () => {
       expect(vertex.flags).not.toBe(google.flags);
     },
   );
+
+  test.each(["gemini-4-argon", "gemini-4-carbon"])(
+    "%s remains selectable for streaming when a preset omits the flag",
+    (id) => {
+      const flags = [
+        LLMFlags.hasFirstSystemPrompt,
+        LLMFlags.hasImageInput,
+        LLMFlags.hasAudioInput,
+      ];
+      expect(supportsModelStreaming({ id, flags })).toBe(true);
+      expect(supportsModelStreaming({ id: `${id}-vertex`, flags })).toBe(true);
+    },
+  );
+
+  test("a non-catalog model can declare its own streaming support", () => {
+    const id = "xcustom:::synthetic";
+    expect(supportsModelStreaming({ id, flags: [] })).toBe(false);
+    expect(
+      supportsModelStreaming({ id, flags: [LLMFlags.hasStreaming] }),
+    ).toBe(true);
+    expect(supportsModelStreaming({ id: "echo_model", flags: [] })).toBe(false);
+  });
 
   test.each([
     ["gemini-4-argon", ["Low", "Medium", "High"]],

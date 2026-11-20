@@ -817,3 +817,14 @@ for (let i = 0; i < LLMModels.length; i++) {
     });
   }
 }
+
+export function supportsModelStreaming(
+  model: Pick<LLMModel, "id" | "flags">,
+): boolean {
+  if (model.flags.includes(LLMFlags.hasStreaming)) return true;
+
+  // Custom flags can omit streaming after a preset switch. The catalog still
+  // records which transports can use the streaming preference.
+  const catalogModel = LLMModels.find((entry) => entry.id === model.id);
+  return catalogModel?.flags.includes(LLMFlags.hasStreaming) ?? false;
+}

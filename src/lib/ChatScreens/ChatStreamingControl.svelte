@@ -1,7 +1,8 @@
 <script lang="ts">
   import { language } from "src/lang";
   import { doingChat } from "src/ts/process/index.svelte";
-  import { getModelInfo, LLMFlags } from "src/ts/model/modellist";
+  import { getModelInfo } from "src/ts/model/modellist";
+  import { supportsModelStreaming } from "src/ts/model/modelCatalog";
   import { DBState } from "src/ts/stores.svelte";
   import {
     entityRuntimeEnabled,
@@ -15,7 +16,7 @@
 
   const settings = $derived(getSettingDatabase(DBState.db));
   const supportsStreaming = $derived(
-    getModelInfo(settings.aiModel).flags.includes(LLMFlags.hasStreaming),
+    supportsModelStreaming(getModelInfo(settings.aiModel)),
   );
 
   function change(event: Event) {

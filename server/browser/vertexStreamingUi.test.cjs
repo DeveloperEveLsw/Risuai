@@ -22,7 +22,7 @@ async function until(read, predicate = Boolean) {
 }
 
 test(
-  "chat streaming switch persists across devices; native Vertex previews Unicode before completion and finishes after all tabs close",
+  "chat streaming switch remains available with custom flags and persists across devices; native Vertex previews Unicode before completion and finishes after all tabs close",
   { timeout: 150000 },
   async (t) => {
     const directory = await mkdtemp(join(tmpdir(), "risu-vertex-stream-"));
@@ -87,6 +87,8 @@ test(
         sendWithEnter: true,
         useStreaming: false,
         aiModel: "reverse_proxy",
+        enableCustomFlags: true,
+        customFlags: [7, 0, 2], // First system prompt, image input, audio input.
         customAPIFormat: 6,
         customProxyRequestModel: "gemini-3.1-pro-preview",
         forceReplaceUrl: "http://127.0.0.1:" + provider.address().port + "/v1/",
@@ -168,6 +170,11 @@ listenEdit('editOutput',function(id,data) setChatVar(id,'saved','yes') return da
     const a = await open(),
       b = await open();
     const control = "document.querySelector('[data-runtime-streaming]')";
+    assert.equal(
+      await a.evaluate(`Boolean(${control})`),
+      true,
+      "The selected model's streaming switch is visible without a custom streaming flag",
+    );
     assert.equal(await a.evaluate(`${control}.checked`), false);
     assert.equal(await b.evaluate(`${control}.checked`), false);
     await a.evaluate(`${control}.click()`);
